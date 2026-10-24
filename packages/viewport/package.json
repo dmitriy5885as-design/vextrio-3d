@@ -1,0 +1,12 @@
+{
+  "exports": "./src/index.ts",
+  "version": "0.1.0",
+  "name": "@forma/viewport",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@forma/geometry": "workspace:*",
+    "@forma/shared": "workspace:*",
+    "@forma/editor": "workspace:*"
+  }
+}

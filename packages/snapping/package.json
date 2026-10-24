@@ -1,0 +1,10 @@
+{
+  "exports": "./src/index.ts",
+  "version": "0.1.0",
+  "name": "@forma/snapping",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@forma/shared": "workspace:*"
+  }
+}

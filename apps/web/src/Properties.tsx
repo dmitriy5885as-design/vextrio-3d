@@ -1,0 +1,223 @@
+import { useEffect, useState } from "react";
+import { useEditor } from "@forma/editor";
+import { ru } from "@forma/ui";
+import { primitiveNames, type SceneObject } from "@forma/shared";
+import { ChevronDown, Box, Copy, Trash2 } from "lucide-react";
+function NumberField({
+  value,
+  label,
+  disabled,
+  onCommit,
+}: {
+  value: number;
+  label: string;
+  disabled: boolean;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(Number(value.toFixed(4))));
+  useEffect(() => setDraft(String(Number(value.toFixed(4)))), [value]);
+  return (
+    <label className="axis-input">
+      <span>{label.split(" ").at(-1)}</span>
+      <input
+        aria-label={label}
+        type="number"
+        step="0.1"
+        value={draft}
+        disabled={disabled}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const n = Number(draft);
+          if (draft !== "" && Number.isFinite(n) && Math.abs(n) < 1e7)
+            onCommit(n);
+          else setDraft(String(value));
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+      />
+    </label>
+  );
+}
+export function Properties() {
+  const s = useEditor();
+  const o = s.project.objects.find((o) => o.id === s.selected);
+  const factor =
+    s.project.units === "mm" ? 1000 : s.project.units === "cm" ? 100 : 1;
+  function transform(
+    key: keyof SceneObject["transform"],
+    i: number,
+    value: number,
+  ) {
+    if (!o) return;
+    const t = structuredClone(o.transform);
+    t[key][i] = key === "position" ? value / factor : value;
+    if (key === "scale" && value <= 0) return;
+    s.patch(o.id, { transform: t });
+  }
+  return (
+    <aside className="properties">
+      <div className="panel-heading">
+        Свойства <span className="micro">ОБЪЕКТ</span>
+      </div>
+      {o ? (
+        <>
+          <div className="object-summary">
+            <div className="object-icon">
+              <Box size={21} />
+            </div>
+            <div>
+              <input
+                aria-label="Название объекта"
+                className="object-name"
+                disabled={o.locked}
+                value={o.name}
+                onChange={(e) =>
+                  s.patch(o.id, { name: e.target.value.slice(0, 200) })
+                }
+              />
+              <small>{primitiveNames[o.type]} · Примитив</small>
+            </div>
+          </div>
+          <div className="section-title">
+            <ChevronDown size={13} /> Трансформация{" "}
+            <span>{ru.units[s.project.units]}</span>
+          </div>
+          {(["position", "rotation", "scale"] as const).map((key, k) => (
+            <div className="property-group" key={key}>
+              <label>
+                {["Положение", "Вращение", "Масштаб"][k]}
+                <small>{["", "°", "×"][k]}</small>
+              </label>
+              <div className="vector-fields">
+                {o.transform[key].map((v, i) => (
+                  <NumberField
+                    key={i}
+                    value={key === "position" ? v * factor : v}
+                    label={`${["Положение", "Вращение", "Масштаб"][k]} ${["X", "Y", "Z"][i]}`}
+                    disabled={o.locked}
+                    onCommit={(n) => transform(key, i, n)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="section-title">
+            <ChevronDown size={13} /> Материал <span>СТАНДАРТНЫЙ</span>
+          </div>
+          <div className="material-card">
+            <div
+              className="material-orb"
+              style={{ background: o.material.color }}
+            />
+            <div>
+              <strong>Материал объекта</strong>
+              <small>Стандартная поверхность</small>
+            </div>
+          </div>
+          <label className="property-row">
+            Цвет{" "}
+            <span>
+              <input
+                aria-label="Цвет материала"
+                type="color"
+                disabled={o.locked}
+                value={o.material.color}
+                onChange={(e) =>
+                  s.patch(o.id, {
+                    material: { ...o.material, color: e.target.value },
+                  })
+                }
+              />
+              <code>{o.material.color.toUpperCase()}</code>
+            </span>
+          </label>
+          <label className="property-row">
+            Шероховатость{" "}
+            <input
+              aria-label="Шероховатость"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              disabled={o.locked}
+              value={o.material.roughness}
+              onChange={(e) =>
+                s.patch(o.id, {
+                  material: {
+                    ...o.material,
+                    roughness: Number(e.target.value),
+                  },
+                })
+              }
+            />
+          </label>
+          <label className="property-row">
+            Металличность{" "}
+            <input
+              aria-label="Металличность"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              disabled={o.locked}
+              value={o.material.metalness}
+              onChange={(e) =>
+                s.patch(o.id, {
+                  material: {
+                    ...o.material,
+                    metalness: Number(e.target.value),
+                  },
+                })
+              }
+            />
+          </label>
+          <div className="section-title">
+            <ChevronDown size={13} /> Объект
+          </div>
+          <label className="property-row">
+            Видимость{" "}
+            <input
+              type="checkbox"
+              checked={o.visible}
+              onChange={(e) => s.patch(o.id, { visible: e.target.checked })}
+              disabled={o.locked}
+            />
+          </label>
+          <label className="property-row">
+            Заблокировать{" "}
+            <input
+              type="checkbox"
+              checked={o.locked}
+              onChange={(e) => s.patch(o.id, { locked: e.target.checked })}
+            />
+          </label>
+          <div className="object-actions">
+            <button disabled={o.locked} onClick={s.duplicate}>
+              <Copy size={14} /> Дубликат
+            </button>
+            <button
+              disabled={o.locked}
+              onClick={s.remove}
+              aria-label="Удалить объект"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="empty-properties">
+          <Box size={34} />
+          <h3>Каждая идея начинается с формы</h3>
+          <p>
+            Создайте объект или выберите его в сцене, чтобы изменить свойства.
+          </p>
+          <button onClick={() => s.add("cube")}>Создать куб</button>
+        </div>
+      )}
+      <div className="panel-bottom">
+        <span className="mint-dot" /> Все изменения — в вашем проекте
+      </div>
+    </aside>
+  );
+}

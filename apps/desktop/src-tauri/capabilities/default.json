@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Main editor window with close protection",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-destroy"]
+}

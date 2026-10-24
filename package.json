@@ -1,0 +1,49 @@
+{
+  "name": "forma-3d",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check:deps": "node scripts/check-deps.mjs",
+    "desktop": "pnpm --filter @forma/desktop dev",
+    "desktop:build": "pnpm --filter @forma/desktop build"
+  },
+  "dependencies": {
+    "@forma/commands": "workspace:*",
+    "@forma/document": "workspace:*",
+    "@forma/editor": "workspace:*",
+    "@forma/file-io": "workspace:*",
+    "@forma/geometry": "workspace:*",
+    "@forma/shared": "workspace:*",
+    "@forma/snapping": "workspace:*",
+    "@forma/tools": "workspace:*",
+    "@forma/ui": "workspace:*",
+    "@forma/viewport": "workspace:*",
+    "@tauri-apps/api": "^2.12.4",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.171.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.171.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "prettier": "^3.9.10",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.8"
+  }
+}

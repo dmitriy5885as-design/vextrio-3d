@@ -1,0 +1,12 @@
+{
+  "exports": "./src/index.ts",
+  "version": "0.1.0",
+  "name": "@forma/editor",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@forma/document": "workspace:*",
+    "@forma/commands": "workspace:*",
+    "@forma/shared": "workspace:*"
+  }
+}
