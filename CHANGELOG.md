@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — S1 надёжности для 0.2 Sketch
+
+- Общая валидация candidate до принятия документа/истории; отказ от нулевого масштаба и несериализуемых runtime-значений.
+- Раздельные lock/unlock intents, защита от mixed patch и заблокированных предков, атомарные ошибки Undo/Redo.
+- Browser download-started сохраняет dirty warning; отмена Save As не меняет имя.
+- Native open candidate/accept/reject сохраняет прежний путь до принятия валидного файла; Rust/Windows проверка требуется.
+- Golden v1 fixtures, постоянные regression tests и рекурсивная проверка зависимостей. [Результаты S1](docs/0.2/S1_REPORT.md).
+
 ## 0.1.0 — Foundation (разработка)
 
 - Создан pnpm-монорепозиторий, React/Vite/TypeScript, Vitest и Playwright.
