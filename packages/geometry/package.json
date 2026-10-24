@@ -4,8 +4,5 @@
   "name": "@forma/geometry",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@forma/shared": "workspace:*",
-    "three": "^0.171.0"
-  }
+  "dependencies": {}
 }

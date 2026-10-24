@@ -5,7 +5,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@forma/geometry": "workspace:*",
     "@forma/shared": "workspace:*",
     "@forma/editor": "workspace:*",
     "react": "^19.0.0",

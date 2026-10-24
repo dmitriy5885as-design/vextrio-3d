@@ -332,3 +332,7 @@ interface OpenCandidate {
 ```
 
 FSM инструментов и FileService получают эти данные через порты. ОС-путь не хранится в проекте или Worker-запросах. Нативный candidateToken подтверждается только после validation/migration; при cancel/error прежний destinationToken остаётся прежним.
+
+## Реализация S2
+
+Исходный проект выше остаётся целевым контрактом полного v2. Реализованное подмножество и уточнённые имена находятся в packages/geometry/src; см. [S2_REPORT.md](S2_REPORT.md). GeometryDelta хранит before/after, inverse выводится и проверяется автоматически; GeometrySession — harness одной модели, GeometryCatalog — внутренний граф контекстов. ProjectV2/полный DocumentDelta/Worker/render DTO ещё не подключены к production. Это не готовность файлового формата v2.

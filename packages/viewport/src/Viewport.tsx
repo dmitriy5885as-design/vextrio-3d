@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { useEditor, isObjectLocked } from "@forma/editor";
-import { PrimitiveAdapter } from "@forma/geometry";
+import { PrimitiveAdapter } from "./PrimitiveAdapter";
 import type { Vec3 } from "@forma/shared";
 
 export function Viewport() {

@@ -17,3 +17,9 @@
 - Реализованы браузерные файлы .v3d; подготовлены нативные команды Tauri с атомарной записью.
 - Добавлены архитектурные документы и план 0.2.
 - Windows-сборка ожидает проверки в окружении Rust/MSVC.
+
+## Unreleased — S2 геометрического основания
+
+- Независимые topology tables/IDs, политика точности, плоскости/размещения, ownership и граф групп/компонентов.
+- Проверяемые delta/inverse/lineage, preview и защита от stale async результатов; local move-vertices harness.
+- PrimitiveAdapter перенесён в viewport; v1 и работающие инструменты сохранены. 59 новых unit tests; [отчёт S2](docs/0.2/S2_REPORT.md).
