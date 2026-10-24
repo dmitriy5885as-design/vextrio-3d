@@ -7,6 +7,7 @@
   "dependencies": {
     "@forma/document": "workspace:*",
     "@forma/commands": "workspace:*",
-    "@forma/shared": "workspace:*"
+    "@forma/shared": "workspace:*",
+    "zustand": "^5.0.0"
   }
 }

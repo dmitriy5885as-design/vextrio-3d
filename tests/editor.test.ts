@@ -126,7 +126,7 @@ describe("Commands", () => {
     const s = useEditor.getState();
     s.add("cube");
     const id = useEditor.getState().selected!;
-    s.patch(id, { locked: true });
+    s.setLocked(id, true);
     s.remove();
     s.duplicate();
     s.patch(id, { name: "changed" });

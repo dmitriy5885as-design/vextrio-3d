@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { test, expect } from "@playwright/test";
-import { PerspectiveCamera, Vector3 } from "three";
+import { PerspectiveCamera, OrthographicCamera, Vector3 } from "three";
 
 test("gizmo drag commits one reversible change", async ({ page }) => {
   await page.goto("/");
@@ -56,6 +58,10 @@ test("create, move, save and reopen cube", async ({ page }) => {
   const download = await downloadEvent;
   const path = await download.path();
   expect(path).toBeTruthy();
+  await expect(page.locator(".status-message")).toContainText(
+    "Запись на диск не подтверждена",
+  );
+  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Новый проект", exact: true }).click();
   await expect(page.getByText("Ваша сцена пока пуста.")).toBeVisible();
   await page.locator("input[type=file]").setInputFiles(path!);
@@ -148,4 +154,119 @@ test("invalid file leaves project intact and cancelled new preserves edits", asy
   });
   await expect(page.locator(".tree-object")).toHaveCount(1);
   await expect.poll(() => messages.some((m) => m.includes("JSON"))).toBe(true);
+});
+
+test("invalid numeric scale and locking keep the last valid object editable after unlock", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator(".start-card").first().click();
+  await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
+  const scale = page.getByRole("spinbutton", {
+    name: "Масштаб X",
+    exact: true,
+  });
+  await scale.fill("0");
+  await scale.press("Enter");
+  await expect(scale).toHaveValue("1");
+  await expect(page.locator(".status-message")).toContainText("масштаб");
+  await page.getByLabel("Заблокировать", { exact: true }).check();
+  await expect(scale).toBeDisabled();
+  await page.keyboard.press("Delete");
+  await expect(page.locator(".tree-object")).toHaveCount(1);
+  await page.getByLabel("Заблокировать", { exact: true }).uncheck();
+  await scale.fill("2");
+  await scale.press("Enter");
+  await expect(scale).toHaveValue("2");
+  await page.keyboard.press("Control+z");
+  await expect(scale).toHaveValue("1");
+});
+test("browser download retains unsaved warning and cancelled new keeps the project", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator(".start-card").first().click();
+  await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
+  const wait = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Сохранить проект", exact: true })
+    .click();
+  await wait;
+  await expect(page.locator(".status-message")).toContainText(
+    "Запись на диск не подтверждена",
+  );
+  let warned = false;
+  page.once("dialog", async (dialog) => {
+    warned = dialog.message().includes("несохранённые");
+    await dialog.dismiss();
+  });
+  await page.getByRole("button", { name: "Новый проект", exact: true }).click();
+  await expect.poll(() => warned).toBe(true);
+  await expect(page.locator(".tree-object")).toHaveCount(1);
+});
+test("golden v1 opens with absolute legacy child placement and roundtrips unchanged", async ({
+  page,
+}) => {
+  const source = "tests/fixtures/v1/mm.v3d",
+    bytes = readFileSync(source),
+    hash = () =>
+      createHash("sha256").update(readFileSync(source)).digest("hex"),
+    before = hash();
+  await page.goto("/");
+  await page.locator(".start-card").first().click();
+  await page.locator("input[type=file]").setInputFiles(source);
+  await expect(page.locator(".tree-object")).toHaveCount(4);
+  await page
+    .getByRole("button", { name: "Выделение (V)", exact: true })
+    .click();
+  const rect = (await page.getByTestId("viewport").boundingBox())!;
+  const camera = new OrthographicCamera(
+    (-10 * rect.width) / rect.height,
+    (10 * rect.width) / rect.height,
+    10,
+    -10,
+    0.05,
+    10000,
+  );
+  camera.position.set(9, 7, 10);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const center = new Vector3(1.25, 1, -2).project(camera);
+  await page.mouse.click(
+    rect.x + ((center.x + 1) * rect.width) / 2,
+    rect.y + ((1 - center.y) * rect.height) / 2,
+  );
+  await expect(
+    page.getByRole("textbox", { name: "Название объекта", exact: true }),
+  ).toHaveValue("Сфера ребёнок");
+  await expect(
+    page.getByRole("spinbutton", { name: "Положение X", exact: true }),
+  ).toHaveValue("1250");
+  const wait = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Сохранить проект", exact: true })
+    .click();
+  const downloaded = await wait;
+  const saved = readFileSync((await downloaded.path())!, "utf8");
+  expect(JSON.parse(saved)).toEqual(JSON.parse(bytes.toString("utf8")));
+  expect(hash()).toBe(before);
+});
+
+test("cancelling Save As does not rename or clear the project", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator(".start-card").first().click();
+  await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
+  let promptSeen = false;
+  page.once("dialog", async (dialog) => {
+    promptSeen = dialog.type() === "prompt";
+    await dialog.dismiss();
+  });
+  await page.keyboard.press("Control+Shift+s");
+  await expect.poll(() => promptSeen).toBe(true);
+  await expect(page.locator(".project-title")).toContainText("Без названия");
+  await expect(page.locator(".tree-object")).toHaveCount(1);
+  await expect(page.locator(".unsaved-dot")).toBeVisible();
+  await expect(page.locator(".file-busy-overlay")).toHaveCount(0);
 });

@@ -40,6 +40,8 @@ import {
   browserFileAdapter,
   isDesktop,
   openNative,
+  acceptNativeOpen,
+  rejectNativeOpen,
   saveNative,
   resetNativeDestination,
 } from "@forma/file-io";
@@ -82,50 +84,92 @@ export function App() {
     [query, setQuery] = useState(""),
     [structure, setStructure] = useState(true);
   const input = useRef<HTMLInputElement>(null);
+  const fileBusyRef = useRef(false);
+  const [fileBusy, setFileBusy] = useState(false);
+  const beginFile = () => {
+    if (fileBusyRef.current) return false;
+    fileBusyRef.current = true;
+    setFileBusy(true);
+    return true;
+  };
+  const endFile = () => {
+    fileBusyRef.current = false;
+    setFileBusy(false);
+  };
   const dirty = JSON.stringify(s.project) !== s.savedSignature;
   const safe = () =>
     !isDirty() ||
     window.confirm(
       "В проекте есть несохранённые изменения. Продолжить без сохранения?",
     );
-  const newProject = () => {
-    if (!safe()) return;
-    s.replace(emptyProject());
-    void resetNativeDestination();
-    setWelcome(false);
-  };
-  const save = async (as = false) => {
+  const newProject = async () => {
+    if (fileBusyRef.current || !safe() || !beginFile()) return;
     try {
-      if (as) {
-        const name = prompt("Название проекта", s.project.name);
-        if (name === null) return;
-        s.mutate("Название проекта", (p) => {
-          p.name = name.trim().slice(0, 200) || "Без названия";
-        });
-      }
-      const project = structuredClone(useEditor.getState().project);
-      if (isDesktop()) {
-        if (!(await saveNative(project, as))) return;
-      } else await browserFileAdapter.save(project);
-      s.markSaved(JSON.stringify(project));
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Не удалось сохранить проект");
+      await resetNativeDestination();
+      const result = s.replace(emptyProject());
+      if (result.status === "rejected") throw Error(result.error);
+      setWelcome(false);
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Не удалось создать проект",
+      );
+    } finally {
+      endFile();
     }
   };
-  const open = () => {
+  const save = async (as = false) => {
+    if (!beginFile()) return;
+    try {
+      const startedProject = useEditor.getState().project;
+      const project = structuredClone(startedProject);
+      if (as) {
+        const name = prompt("Название проекта", project.name);
+        if (name === null) return;
+        project.name = name.trim().slice(0, 200) || "Без названия";
+      }
+      const result = isDesktop()
+        ? await saveNative(project, as)
+        : await browserFileAdapter.save(project);
+      if (result.status === "saved") {
+        if (as && useEditor.getState().project === startedProject)
+          s.mutate("Название проекта", (p) => {
+            p.name = project.name;
+          });
+        s.markSaved(JSON.stringify(project));
+      } else if (result.status === "download-started")
+        s.notify("Скачивание начато. Запись на диск не подтверждена.");
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Не удалось сохранить проект",
+      );
+    } finally {
+      endFile();
+    }
+  };
+  const open = async () => {
+    if (fileBusyRef.current) return;
     if (!isDesktop()) {
       input.current?.click();
       return;
     }
-    if (!safe()) return;
-    void openNative()
-      .then((project) => {
-        if (project) {
-          s.replace(project);
-          setWelcome(false);
-        }
-      })
-      .catch((e) => alert(String(e)));
+    if (!safe() || !beginFile()) return;
+    try {
+      const startedProject = useEditor.getState().project,
+        candidate = await openNative();
+      if (!candidate) return;
+      if (useEditor.getState().project !== startedProject) {
+        await rejectNativeOpen(candidate);
+        throw Error("Проект изменился во время открытия. Повторите открытие.");
+      }
+      const project = await acceptNativeOpen(candidate);
+      const result = s.replace(project);
+      if (result.status === "rejected") throw Error(result.error);
+      setWelcome(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Не удалось открыть файл");
+    } finally {
+      endFile();
+    }
   };
   useEffect(() => {
     const leave = (e: BeforeUnloadEvent) => {
@@ -163,6 +207,7 @@ export function App() {
     const key = (e: KeyboardEvent) => {
       if (
         (e.target as HTMLElement).matches("input,textarea,select") ||
+        fileBusyRef.current ||
         modal ||
         welcome
       )
@@ -291,7 +336,12 @@ export function App() {
     ],
   };
   return (
-    <div className={`app ${s.theme}`}>
+    <div className={`app ${s.theme}`} aria-busy={fileBusy}>
+      {fileBusy && (
+        <div className="file-busy-overlay" role="status">
+          Работа с файлом…
+        </div>
+      )}
       <input
         hidden
         ref={input}
@@ -301,10 +351,16 @@ export function App() {
         onChange={async (e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
-          if (!file || !safe()) return;
+          if (!file || fileBusyRef.current || !safe() || !beginFile()) return;
+          const startedProject = useEditor.getState().project;
           try {
             const project = await browserFileAdapter.open(file);
-            s.replace(project);
+            if (useEditor.getState().project !== startedProject)
+              throw Error(
+                "Проект изменился во время открытия. Повторите открытие.",
+              );
+            const result = s.replace(project);
+            if (result.status === "rejected") throw Error(result.error);
             setWelcome(false);
           } catch (error) {
             alert(
@@ -312,6 +368,8 @@ export function App() {
                 ? error.message
                 : "Не удалось открыть файл",
             );
+          } finally {
+            endFile();
           }
         }}
       />
@@ -530,7 +588,7 @@ export function App() {
                     </button>
                     <button
                       title={o.locked ? "Разблокировать" : "Заблокировать"}
-                      onClick={() => s.patch(o.id, { locked: !o.locked })}
+                      onClick={() => s.setLocked(o.id, !o.locked)}
                     >
                       {o.locked ? <Lock size={12} /> : <Unlock size={12} />}
                     </button>
@@ -797,7 +855,7 @@ export function App() {
                 </div>
                 <p className="dialog-note">
                   Push/Pull, B-Rep и булевы операции запланированы для следующих
-                  версий. FORMA Pro и Edu — будущие редакции общей платформы.
+                  версий. Все основные инструменты FORMA останутся бесплатными.
                 </p>
               </>
             )}

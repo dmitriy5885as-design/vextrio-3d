@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "file": "m.v3d",
+      "sha256": "e01b9e997303f245ae062deb109b0709becf35352a9d4cee8dbbe548f07d7fd7"
+    },
+    {
+      "file": "cm.v3d",
+      "sha256": "c2eac3632c53fb2c2b5d91dbc07082d6dd725c89bd4fc0eade8de30326734d57"
+    },
+    {
+      "file": "mm.v3d",
+      "sha256": "4ce657502a685ef996016bf8558cc85702bd071ef2aad44cbfe3934cad2453a1"
+    }
+  ]
+}

@@ -1103,3 +1103,14 @@ hr {
     min-width: 150px;
   }
 }
+.file-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #0c132099;
+  display: grid;
+  place-items: center;
+  color: #f2f5fa;
+  cursor: progress;
+  backdrop-filter: blur(2px);
+}

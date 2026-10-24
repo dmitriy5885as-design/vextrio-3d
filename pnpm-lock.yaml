@@ -102,10 +102,47 @@ importers:
         specifier: ^2.0.0
         version: 2.12.4
 
-  apps/web: {}
+  apps/web:
+    dependencies:
+      "@forma/document":
+        specifier: workspace:*
+        version: link:../../packages/document
+      "@forma/editor":
+        specifier: workspace:*
+        version: link:../../packages/editor
+      "@forma/file-io":
+        specifier: workspace:*
+        version: link:../../packages/file-io
+      "@forma/shared":
+        specifier: workspace:*
+        version: link:../../packages/shared
+      "@forma/tools":
+        specifier: workspace:*
+        version: link:../../packages/tools
+      "@forma/ui":
+        specifier: workspace:*
+        version: link:../../packages/ui
+      "@forma/viewport":
+        specifier: workspace:*
+        version: link:../../packages/viewport
+      "@tauri-apps/api":
+        specifier: ^2.12.4
+        version: 2.12.4
+      lucide-react:
+        specifier: ^0.468.0
+        version: 0.468.0(react@19.3.1)
+      react:
+        specifier: ^19.0.0
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.3.1(react@19.3.1)
 
   packages/commands:
     dependencies:
+      "@forma/document":
+        specifier: workspace:*
+        version: link:../document
       "@forma/shared":
         specifier: workspace:*
         version: link:../shared
@@ -127,6 +164,9 @@ importers:
       "@forma/shared":
         specifier: workspace:*
         version: link:../shared
+      zustand:
+        specifier: ^5.0.0
+        version: 5.0.16(@types/react@19.3.0)(react@19.3.1)
 
   packages/file-io:
     dependencies:
@@ -136,12 +176,18 @@ importers:
       "@forma/shared":
         specifier: workspace:*
         version: link:../shared
+      "@tauri-apps/api":
+        specifier: ^2.12.4
+        version: 2.12.4
 
   packages/geometry:
     dependencies:
       "@forma/shared":
         specifier: workspace:*
         version: link:../shared
+      three:
+        specifier: ^0.171.0
+        version: 0.171.0
 
   packages/shared: {}
 
@@ -170,6 +216,12 @@ importers:
       "@forma/shared":
         specifier: workspace:*
         version: link:../shared
+      react:
+        specifier: ^19.0.0
+        version: 19.3.1
+      three:
+        specifier: ^0.171.0
+        version: 0.171.0
 
 packages:
   "@babel/code-frame@7.29.7":

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { useEditor } from "@forma/editor";
+import { useEditor, isObjectLocked } from "@forma/editor";
 import { PrimitiveAdapter } from "@forma/geometry";
 import type { Vec3 } from "@forma/shared";
 
@@ -218,7 +218,7 @@ export function Viewport() {
       if (
         mesh &&
         selected &&
-        !selected.locked &&
+        !isObjectLocked(s.project, selected.id) &&
         selected.visible &&
         s.tool !== "select"
       ) {
@@ -259,7 +259,7 @@ export function Viewport() {
         const mesh = transform.object;
         if (mesh) {
           const s = useEditor.getState();
-          s.patch(mesh.userData.id, {
+          const result = s.patch(mesh.userData.id, {
             transform: {
               position: mesh.position.toArray() as Vec3,
               rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z].map(
@@ -268,6 +268,7 @@ export function Viewport() {
               scale: mesh.scale.toArray() as Vec3,
             },
           });
+          if (result.status === "rejected") sync();
         }
       }
     });
