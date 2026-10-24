@@ -23,3 +23,9 @@
 - Независимые topology tables/IDs, политика точности, плоскости/размещения, ownership и граф групп/компонентов.
 - Проверяемые delta/inverse/lineage, preview и защита от stale async результатов; local move-vertices harness.
 - PrimitiveAdapter перенесён в viewport; v1 и работающие инструменты сохранены. 59 новых unit tests; [отчёт S2](docs/0.2/S2_REPORT.md).
+
+## Unreleased — VEXTRIO 3D
+
+- Пользовательский бренд FORMA 3D заменён на VEXTRIO 3D; новый геометрический V и полный набор иконок.
+- Сохранены .v3d, format: "forma", пакеты и app identity; NSIS использует прежние registry keys с новым DisplayName.
+- Исторические записи выше сохранены. [Отчёт о ребрендинге](docs/branding/REPORT.md).

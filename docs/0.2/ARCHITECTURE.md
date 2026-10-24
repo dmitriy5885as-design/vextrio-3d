@@ -1,10 +1,10 @@
-# Архитектура прямого моделирования FORMA 0.2
+# Архитектура прямого моделирования VEXTRIO 3D 0.2
 
 Статус: предложение для утверждения. Ниже описаны будущие правила, не реализованная функциональность. Основание — [аудит](AUDIT.md) и [принципы продукта](../../PRODUCT_STRATEGY.md).
 
 ## 1. Модель и владение данными
 
-Авторитетен документ FORMA. Геометрия — координаты и связи сущностей, а не треугольники Three.js. Производные данные: тесселяция, normals, bounds, adjacency indexes, BVH, плоские DCEL, GPU buffers. Их можно удалить и построить заново без изменения проекта.
+Авторитетен документ VEXTRIO 3D. Геометрия — координаты и связи сущностей, а не треугольники Three.js. Производные данные: тесселяция, normals, bounds, adjacency indexes, BVH, плоские DCEL, GPU buffers. Их можно удалить и построить заново без изменения проекта.
 
 Разделяются три понятия:
 
@@ -108,7 +108,7 @@ Undo во время compute отменяет proposal, затем выполн�
 
 Позднее OpenCascadeBackend обрабатывает команды по capabilities: wires/faces, поверхности, solid operations. Он живёт в Worker, создаёт TopoDS/Geom из канонической модели и возвращает валидированную топологию/opaque serialized B-Rep с engine version. Планарная топология и B-Rep не редактируются независимо как две истины: у asset есть один authoritative representation, другая — кеш/производный результат. Конверсия между representations — явная транзакция с отчётом об ограничениях и потерях. Точные сферы/цилиндры legacy не объявляются точным B-Rep от факта тесселяции.
 
-OpenCascade IsDone/Error и проверка полученной геометрии обязательны. История Generated/Modified/IsDeleted — вход для lineage, не гарантия устойчивого именования. Для face builder ограничения wires проверяет FORMA до вызова и после результата: [OCCT MakeFace](https://occt3d.com/dev/doc/refman/html/class_b_rep_builder_a_p_i___make_face.html). API wrapper и версию привязок необходимо проверить на фактической сборке; документация [OpenCascade.js custom builds](https://ocjs.org/docs/app-dev-workflow/custom-builds) показывает возможность отдельного WASM-модуля, но не подтверждает его готовность в FORMA.
+OpenCascade IsDone/Error и проверка полученной геометрии обязательны. История Generated/Modified/IsDeleted — вход для lineage, не гарантия устойчивого именования. Для face builder ограничения wires проверяет VEXTRIO 3D до вызова и после результата: [OCCT MakeFace](https://occt3d.com/dev/doc/refman/html/class_b_rep_builder_a_p_i___make_face.html). API wrapper и версию привязок необходимо проверить на фактической сборке; документация [OpenCascade.js custom builds](https://ocjs.org/docs/app-dev-workflow/custom-builds) показывает возможность отдельного WASM-модуля, но не подтверждает его готовность в VEXTRIO 3D.
 
 Для операций с неполной историей refs разрешаются по provenance + смежности/геометрическим признакам с confidence; неоднозначность возвращается пользователю. Проверки backend-specific naming входят в приёмку интеграции. WASM handles никогда не попадают в файл или EntityId. Явное освобождение `.delete()`/heap, бюджет памяти, локальная поставка worker/wasm, startup без сети и licenses — release gates будущего подключения. Зависимость OpenCascade не добавлять до такого этапа.
 

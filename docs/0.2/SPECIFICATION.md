@@ -1,4 +1,4 @@
-# Техническое задание FORMA 0.2 Sketch
+# Техническое задание VEXTRIO 3D 0.2 Sketch
 
 Статус: для утверждения. Реализация только после согласования архитектуры. Приоритеты и бесплатность обязательны по [PRODUCT_STRATEGY](../../PRODUCT_STRATEGY.md). Сущности и алгоритмы определены в [ARCHITECTURE](ARCHITECTURE.md), контракты — в [CONTRACTS](CONTRACTS.md).
 

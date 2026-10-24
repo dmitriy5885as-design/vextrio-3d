@@ -78,7 +78,7 @@ export function validateProject(value: unknown): asserts value is Project {
     !Array.isArray(value.objects) ||
     value.objects.length > 10000
   )
-    throw Error("Неподдерживаемый формат проекта FORMA.");
+    throw Error("Неподдерживаемый формат проекта VEXTRIO 3D.");
   const objects = new Map<string, SceneObject>();
   for (const o of value.objects) {
     if (

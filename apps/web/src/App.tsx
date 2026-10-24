@@ -191,7 +191,9 @@ export function App() {
         event.preventDefault();
         if (
           !isDirty() ||
-          globalThis.confirm("Есть несохранённые изменения. Закрыть FORMA?")
+          globalThis.confirm(
+            "Есть несохранённые изменения. Закрыть VEXTRIO 3D?",
+          )
         )
           await window.destroy();
       });
@@ -332,7 +334,7 @@ export function App() {
       { label: "Настройки", action: () => setModal("settings") },
     ],
     Справка: [
-      { label: "О FORMA и управление", action: () => setModal("help") },
+      { label: "О VEXTRIO 3D и управление", action: () => setModal("help") },
     ],
   };
   return (
@@ -375,8 +377,8 @@ export function App() {
       />
       <header className="titlebar">
         <div className="brand">
-          <img src="/forma.svg" alt="" />
-          <strong>FORMA</strong>
+          <img src="/vextrio.svg" alt="" />
+          <strong>VEXTRIO 3D</strong>
           <span className="version">FOUNDATION</span>
         </div>
         <div className="project-title">
@@ -689,13 +691,13 @@ export function App() {
             <option value="mm">Миллиметры</option>
           </select>
         </label>
-        <span className="foundation">FORMA 0.1</span>
+        <span className="foundation">VEXTRIO 3D 0.1</span>
       </footer>
       {welcome && (
         <div className="modal-overlay welcome-overlay">
           <div className="welcome">
             <div className="welcome-art">
-              <img src="/forma.svg" alt="Знак FORMA" />
+              <img src="/vextrio.svg" alt="Знак VEXTRIO 3D" />
               <div className="art-grid" />
               <span>ОТ ЭСКИЗА К ВОЗМОЖНОСТЯМ</span>
               <h1>
@@ -708,10 +710,10 @@ export function App() {
                 <br />
                 проектирования и творчества.
               </p>
-              <small>FORMA 0.1 · FOUNDATION</small>
+              <small>VEXTRIO 3D 0.1 · FOUNDATION</small>
             </div>
             <div className="welcome-content">
-              <span className="eyebrow">FORMA EDITOR</span>
+              <span className="eyebrow">VEXTRIO 3D</span>
               <h2>Начнём с идеи</h2>
               <p>
                 Всё необходимое, чтобы создать
@@ -828,7 +830,7 @@ export function App() {
               <>
                 <span className="eyebrow">SHAPE YOUR IDEAS</span>
                 <h2>
-                  FORMA <small>0.1 Foundation</small>
+                  VEXTRIO 3D <small>0.1 Foundation</small>
                 </h2>
                 <p>
                   Создавайте примитивы, меняйте их форму и собирайте свои идеи в
@@ -855,7 +857,8 @@ export function App() {
                 </div>
                 <p className="dialog-note">
                   Push/Pull, B-Rep и булевы операции запланированы для следующих
-                  версий. Все основные инструменты FORMA останутся бесплатными.
+                  версий. Все основные инструменты VEXTRIO 3D останутся
+                  бесплатными.
                 </p>
               </>
             )}

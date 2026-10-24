@@ -108,8 +108,8 @@ hr {
   height: 32px;
 }
 .brand strong {
-  font-size: 19px;
-  letter-spacing: 2px;
+  font-size: 17px;
+  letter-spacing: 1.4px;
   color: var(--text);
 }
 .version {

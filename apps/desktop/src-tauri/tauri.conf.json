@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "FORMA",
+  "productName": "VEXTRIO 3D",
   "version": "0.1.0",
   "identifier": "studio.forma.editor",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "FORMA Editor",
+        "title": "VEXTRIO 3D",
         "width": 1440,
         "height": 900,
         "minWidth": 1000,
@@ -31,6 +31,17 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png"
-    ]
-  }
+    ],
+    "publisher": "VEXTRIO 3D",
+    "shortDescription": "VEXTRIO 3D — бесплатный 3D-редактор",
+    "windows": {
+      "nsis": {
+        "template": "installer/compat.nsi",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "installerHooks": "installer/rename-shortcuts.nsh"
+      }
+    }
+  },
+  "mainBinaryName": "forma-editor"
 }

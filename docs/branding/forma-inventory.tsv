@@ -1,0 +1,186 @@
+category	path	line	original_text
+user-facing	ARCHITECTURE.md	1	# Архитектура FORMA
+historical	CHANGELOG.md	16	- Добавлен интерфейс FORMA с геометрическим знаком F, палитрой Graphite/Blue/Mint/Cloud, двумя темами и стартовым экраном.
+technical	DEVELOPMENT.md	12	В среде с запретом localhost браузерные тесты требуют разрешённого локального сетевого доступа. Chromium устанавливается через `pnpm exec playwright install chromium`. E2E сохраняет снимок в `test-results/forma-editor.png`.
+user-facing	GEOMETRY_ARCHITECTURE.md	5	Прежний PrimitiveAdapter перенесён в viewport без изменения алгоритмов. Отображение FORMA 0.1 использует его локально; формат v1 и production store/history сохраняются. Новый topology API пока не подключён к инструментам и файлам: автообразование граней/пересечения — S3, миграция/render bridge — S4, рисование — S6.
+user-facing	PRODUCT_STRATEGY.md	1	# FORMA — продуктовые принципы
+user-facing	PRODUCT_STRATEGY.md	3	Дата: 24 октября 2026. Решение владельца продукта из текущего задания. Заменяет прежнее позиционирование с FORMA Pro / Edu как направлениями развития.
+user-facing	PRODUCT_STRATEGY.md	5	FORMA — полноценный, полностью бесплатный универсальный 3D-редактор для Windows и браузера. Долгосрочный ориентир: свободное построение дома, мебели, интерьера и технической модели. Нынешняя 0.1 реализует только фундамент; её возможности не равны этой цели.
+user-facing	PRODUCT_STRATEGY.md	16	8. Собственные бренд, интерфейс и архитектура FORMA. Слоган: «Придай идее форму» / Shape your ideas.
+user-facing	README.md	1	# FORMA Editor · 0.1 Foundation
+user-facing	README.md	9	[Архитектура FORMA 0.2 Sketch](docs/0.2/README.md) утверждена. Реализован [S1 надёжности](docs/0.2/S1_REPORT.md): валидация команд, блокировки, безопасные отказы и регрессионные проверки 0.1. Формат остаётся v1. [S2: вершины, рёбра, грани и транзакции](docs/0.2/S2_REPORT.md) реализованы отдельным ядром; новые инструменты рисования и подключение топологии к UI ещё впереди.
+user-facing	README.md	78	public/forma.svg         векторный знак приложения
+user-facing	README.md	85	Юридическая доступность имени FORMA и сходство знака с другими брендами не проверялись.
+historical	REPORT.md	1	# Результат реализации FORMA · 24 октября 2026
+historical	REPORT.md	3	Создан работающий браузерный фундамент FORMA 0.1 Foundation в фирменном стиле пользователя. Это версия в разработке: подтверждение готовности Windows остаётся открытым.
+historical	REPORT.md	35	Задачи 0.2: контуры и линии, точные размеры, привязки к сущностям, Worker-контракт на массивах, миграции формата, оптимизация истории и React-подписок, автосохранение и настройки. Юридическая проверка FORMA и знака остаётся задачей до публичного запуска.
+technical	apps/desktop/package.json	2	  "name": "@forma/desktop",
+technical	apps/desktop/src-tauri/Cargo.toml	2	name = "forma-editor"
+user-facing	apps/desktop/src-tauri/src/main.rs	15	    let Some(path) = rfd::FileDialog::new().add_filter("FORMA Project", &["v3d"]).pick_file() else { return Ok(None) };
+user-facing	apps/desktop/src-tauri/src/main.rs	43	            let Some(path) = rfd::FileDialog::new().add_filter("FORMA Project", &["v3d"]).set_file_name(format!("{}.v3d", name)).save_file() else { return Ok(false) };
+user-facing	apps/desktop/src-tauri/src/main.rs	58	        .run(tauri::generate_context!()).expect("Не удалось запустить FORMA");
+user-facing	apps/desktop/src-tauri/tauri.conf.json	3	  "productName": "FORMA",
+technical	apps/desktop/src-tauri/tauri.conf.json	5	  "identifier": "studio.forma.editor",
+user-facing	apps/desktop/src-tauri/tauri.conf.json	15	        "title": "FORMA Editor",
+technical	apps/web/package.json	2	  "name": "@forma/web",
+technical	apps/web/package.json	14	    "@forma/viewport": "workspace:*",
+technical	apps/web/package.json	15	    "@forma/editor": "workspace:*",
+technical	apps/web/package.json	16	    "@forma/file-io": "workspace:*",
+technical	apps/web/package.json	17	    "@forma/document": "workspace:*",
+technical	apps/web/package.json	18	    "@forma/shared": "workspace:*",
+technical	apps/web/package.json	19	    "@forma/ui": "workspace:*",
+technical	apps/web/package.json	20	    "@forma/tools": "workspace:*",
+technical	apps/web/src/App.tsx	37	import { Viewport } from "@forma/viewport";
+technical	apps/web/src/App.tsx	38	import { useEditor, isDirty } from "@forma/editor";
+technical	apps/web/src/App.tsx	47	} from "@forma/file-io";
+technical	apps/web/src/App.tsx	48	import { emptyProject } from "@forma/document";
+technical	apps/web/src/App.tsx	49	import { primitiveNames, type Primitive } from "@forma/shared";
+technical	apps/web/src/App.tsx	50	import { ru } from "@forma/ui";
+technical	apps/web/src/App.tsx	51	import { shortcuts, toolLabels } from "@forma/tools";
+user-facing	apps/web/src/App.tsx	194	          globalThis.confirm("Есть несохранённые изменения. Закрыть FORMA?")
+user-facing	apps/web/src/App.tsx	335	      { label: "О FORMA и управление", action: () => setModal("help") },
+user-facing	apps/web/src/App.tsx	378	          <img src="/forma.svg" alt="" />
+user-facing	apps/web/src/App.tsx	379	          <strong>FORMA</strong>
+user-facing	apps/web/src/App.tsx	692	        <span className="foundation">FORMA 0.1</span>
+user-facing	apps/web/src/App.tsx	698	              <img src="/forma.svg" alt="Знак FORMA" />
+user-facing	apps/web/src/App.tsx	711	              <small>FORMA 0.1 · FOUNDATION</small>
+user-facing	apps/web/src/App.tsx	714	              <span className="eyebrow">FORMA EDITOR</span>
+user-facing	apps/web/src/App.tsx	831	                  FORMA <small>0.1 Foundation</small>
+user-facing	apps/web/src/App.tsx	858	                  версий. Все основные инструменты FORMA останутся бесплатными.
+technical	apps/web/src/Properties.tsx	2	import { useEditor, isObjectLocked } from "@forma/editor";
+technical	apps/web/src/Properties.tsx	3	import { ru } from "@forma/ui";
+technical	apps/web/src/Properties.tsx	4	import { primitiveNames, type SceneObject } from "@forma/shared";
+user-facing	docs/0.2/ARCHITECTURE.md	1	# Архитектура прямого моделирования FORMA 0.2
+user-facing	docs/0.2/ARCHITECTURE.md	7	Авторитетен документ FORMA. Геометрия — координаты и связи сущностей, а не треугольники Three.js. Производные данные: тесселяция, normals, bounds, adjacency indexes, BVH, плоские DCEL, GPU buffers. Их можно удалить и построить заново без изменения проекта.
+technical	docs/0.2/ARCHITECTURE.md	111	OpenCascade IsDone/Error и проверка полученной геометрии обязательны. История Generated/Modified/IsDeleted — вход для lineage, не гарантия устойчивого именования. Для face builder ограничения wires проверяет FORMA до вызова и после результата: [OCCT MakeFace](https://occt3d.com/dev/doc/refman/html/class_b_rep_builder_a_p_i___make_face.html). API wrapper и версию привязок необходимо проверить на фактической сборке; документация [OpenCascade.js custom builds](https://ocjs.org/docs/app-dev-workflow/custom-builds) показывает возможность отдельного WASM-модуля, но не подтверждает его готовность в FORMA.
+historical	docs/0.2/AUDIT.md	1	# Аудит FORMA 0.1
+historical	docs/0.2/AUDIT.md	32	| AUD-18 P2               | `scripts/check-deps.mjs:6,12` видит только корневые .ts/.tsx и `from '@forma/...'`; package manifests не перечисляют все внешние зависимости                              | Утверждение о полном запрете циклов слишком широко; вложенные модули/dynamic imports/reexports могут обойти проверку    | Рекурсивный граф по TS resolution и manifest lint, отрицательные fixtures и whitelist bridge-модулей                                                               |
+technical	docs/0.2/CONTRACTS.md	127	  format: "forma";
+user-facing	docs/0.2/README.md	1	# FORMA 0.2 Sketch — пакет для утверждения
+technical	docs/0.2/README.md	3	Статус: архитектура утверждена владельцем как основа S1. [Решение и обязательные условия](https://github.com/dmitriy5885as-design/forma-3d/pull/1#issuecomment-6385002392). [Реализация и проверки S1](S1_REPORT.md) подготовлены к ревью; [S2: топология и транзакции](S2_REPORT.md) реализованы отдельно от v1 UI. Рисование, пересечения и автообразование граней ещё не реализованы. Дата: 24 октября 2026.
+historical	docs/0.2/REPORT.md	1	# Отчёт: аудит и проектирование FORMA 0.2 Sketch
+historical	docs/0.2/S1_REPORT.md	3	Дата: 24 октября 2026. Реализация для ревью, **не выпуск FORMA 0.2**. Основание: [решение владельца в PR №1](https://github.com/dmitriy5885as-design/forma-3d/pull/1#issuecomment-6385002392). PR №1 остаётся draft и не объединяется автоматически.
+historical	docs/0.2/S2_REPORT.md	3	Дата: 24 октября 2026. Основание — утверждённая архитектура, S1 PR #2 (`f61b88a6f8561d858b9a8e954275ee99134a314d`). Это инженерный этап S2.1/S2.2; FORMA 0.2 Sketch ещё не готова.
+historical	docs/0.2/S2_REPORT.md	34	Пользовательский сценарий этого инфраструктурного этапа: существующий пользователь FORMA 0.1 создаёт/выбирает/перемещает/сохраняет примитив как прежде; новые внутренние операции проверяются в harness. Нового сценария рисования в UI ещё нет — его приёмка остаётся S6.
+user-facing	docs/0.2/SPECIFICATION.md	1	# Техническое задание FORMA 0.2 Sketch
+technical	docs/0.2/SPECIFICATION.md	87	Новая запись — `.v3d`, `format:'forma'`, `schemaVersion:2`, geometry policy version, entities/definitions/materials/camera/provenance/references. Входной dispatcher различает v1/v2; неизвестная обязательная версия/representation отвергается до изменения проекта. Необязательные namespaced extensions roundtrip-сохраняются и не исполняются. Render buffers, selection, caches, OS paths, WASM pointers и Undo history не являются обязательными данными файла.
+user-facing	index.html	1	<!doctype html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><meta name="theme-color" content="#161C28"/><title>FORMA — Придай идее форму</title><link rel="icon" href="/forma.svg" type="image/svg+xml"/></head><body><div id="root"></div><script type="module" src="/apps/web/src/main.tsx"></script></body></html>
+technical	package.json	2	  "name": "forma-3d",
+technical	package.json	13	    "desktop": "pnpm --filter @forma/desktop dev",
+technical	package.json	14	    "desktop:build": "pnpm --filter @forma/desktop build"
+technical	package.json	17	    "@forma/commands": "workspace:*",
+technical	package.json	18	    "@forma/document": "workspace:*",
+technical	package.json	19	    "@forma/editor": "workspace:*",
+technical	package.json	20	    "@forma/file-io": "workspace:*",
+technical	package.json	21	    "@forma/geometry": "workspace:*",
+technical	package.json	22	    "@forma/shared": "workspace:*",
+technical	package.json	23	    "@forma/snapping": "workspace:*",
+technical	package.json	24	    "@forma/tools": "workspace:*",
+technical	package.json	25	    "@forma/ui": "workspace:*",
+technical	package.json	26	    "@forma/viewport": "workspace:*",
+technical	packages/commands/package.json	4	  "name": "@forma/commands",
+technical	packages/commands/package.json	8	    "@forma/shared": "workspace:*",
+technical	packages/commands/package.json	9	    "@forma/document": "workspace:*"
+technical	packages/commands/src/index.ts	1	import { clone, type Project } from "@forma/shared";
+technical	packages/commands/src/index.ts	2	import { validateProject } from "@forma/document";
+technical	packages/document/package.json	4	  "name": "@forma/document",
+technical	packages/document/package.json	8	    "@forma/shared": "workspace:*"
+technical	packages/document/src/index.ts	7	} from "@forma/shared";
+technical	packages/document/src/validation.ts	1	import type { Project, SceneObject } from "@forma/shared";
+user-facing	packages/document/src/validation.ts	81	    throw Error("Неподдерживаемый формат проекта FORMA.");
+technical	packages/editor/package.json	4	  "name": "@forma/editor",
+technical	packages/editor/package.json	8	    "@forma/document": "workspace:*",
+technical	packages/editor/package.json	9	    "@forma/commands": "workspace:*",
+technical	packages/editor/package.json	10	    "@forma/shared": "workspace:*",
+technical	packages/editor/src/index.ts	10	} from "@forma/shared";
+technical	packages/editor/src/index.ts	11	import { createObject, emptyProject, validateProject } from "@forma/document";
+technical	packages/editor/src/index.ts	12	import { CommandHistory, SnapshotCommand } from "@forma/commands";
+technical	packages/editor/src/permissions.ts	1	import type { Project, SceneObject } from "@forma/shared";
+technical	packages/file-io/package.json	4	  "name": "@forma/file-io",
+technical	packages/file-io/package.json	8	    "@forma/document": "workspace:*",
+technical	packages/file-io/package.json	9	    "@forma/shared": "workspace:*",
+technical	packages/file-io/src/index.ts	6	} from "@forma/document";
+technical	packages/file-io/src/index.ts	7	import { clone, type Project } from "@forma/shared";
+technical	packages/geometry/package.json	4	  "name": "@forma/geometry",
+technical	packages/shared/package.json	4	  "name": "@forma/shared",
+technical	packages/snapping/package.json	4	  "name": "@forma/snapping",
+technical	packages/snapping/package.json	8	    "@forma/shared": "workspace:*"
+technical	packages/snapping/src/index.ts	1	import type { Vec3 } from "@forma/shared";
+technical	packages/tools/package.json	4	  "name": "@forma/tools",
+technical	packages/tools/package.json	8	    "@forma/shared": "workspace:*"
+technical	packages/tools/src/index.ts	1	import type { TransformMode } from "@forma/shared";
+technical	packages/ui/package.json	4	  "name": "@forma/ui",
+user-facing	packages/ui/src/index.ts	2	  name: "FORMA",
+technical	packages/viewport/package.json	4	  "name": "@forma/viewport",
+technical	packages/viewport/package.json	8	    "@forma/shared": "workspace:*",
+technical	packages/viewport/package.json	9	    "@forma/editor": "workspace:*",
+technical	packages/viewport/src/PrimitiveAdapter.ts	2	import type { SceneObject, Vec3 } from "@forma/shared";
+technical	packages/viewport/src/Viewport.tsx	5	import { useEditor, isObjectLocked } from "@forma/editor";
+technical	packages/viewport/src/Viewport.tsx	7	import type { Vec3 } from "@forma/shared";
+technical	pnpm-lock.yaml	11	      '@forma/commands':
+technical	pnpm-lock.yaml	14	      '@forma/document':
+technical	pnpm-lock.yaml	17	      '@forma/editor':
+technical	pnpm-lock.yaml	20	      '@forma/file-io':
+technical	pnpm-lock.yaml	23	      '@forma/geometry':
+technical	pnpm-lock.yaml	26	      '@forma/shared':
+technical	pnpm-lock.yaml	29	      '@forma/snapping':
+technical	pnpm-lock.yaml	32	      '@forma/tools':
+technical	pnpm-lock.yaml	35	      '@forma/ui':
+technical	pnpm-lock.yaml	38	      '@forma/viewport':
+technical	pnpm-lock.yaml	108	      '@forma/document':
+technical	pnpm-lock.yaml	111	      '@forma/editor':
+technical	pnpm-lock.yaml	114	      '@forma/file-io':
+technical	pnpm-lock.yaml	117	      '@forma/shared':
+technical	pnpm-lock.yaml	120	      '@forma/tools':
+technical	pnpm-lock.yaml	123	      '@forma/ui':
+technical	pnpm-lock.yaml	126	      '@forma/viewport':
+technical	pnpm-lock.yaml	144	      '@forma/document':
+technical	pnpm-lock.yaml	147	      '@forma/shared':
+technical	pnpm-lock.yaml	153	      '@forma/shared':
+technical	pnpm-lock.yaml	159	      '@forma/commands':
+technical	pnpm-lock.yaml	162	      '@forma/document':
+technical	pnpm-lock.yaml	165	      '@forma/shared':
+technical	pnpm-lock.yaml	174	      '@forma/document':
+technical	pnpm-lock.yaml	177	      '@forma/shared':
+technical	pnpm-lock.yaml	190	      '@forma/shared':
+technical	pnpm-lock.yaml	196	      '@forma/shared':
+technical	pnpm-lock.yaml	204	      '@forma/editor':
+technical	pnpm-lock.yaml	207	      '@forma/shared':
+technical	scripts/check-deps.mjs	102	      else if (dep.startsWith("@forma/"))
+technical	scripts/check-deps.mjs	112	        if (isPath || specifier.startsWith("@forma/")) {
+technical	tests/dependencies.test.ts	8	  const root = mkdtempSync(path.join(os.tmpdir(), "forma-deps-"));
+technical	tests/dependencies.test.ts	17	        paths: { "@forma/*": ["packages/*/src/index.ts"] },
+technical	tests/dependencies.test.ts	33	    JSON.stringify({ name: `@forma/${name}`, dependencies: deps }),
+technical	tests/dependencies.test.ts	46	      !path.basename(resolved).startsWith("forma-deps-")
+technical	tests/dependencies.test.ts	60	        "import type {B} from '@forma/b'; export const load=()=>import('@forma/b');",
+technical	tests/dependencies.test.ts	62	    { "@forma/b": "workspace:*" },
+technical	tests/dependencies.test.ts	74	      "nested/bridge.ts": "export * from '@forma/b';",
+technical	tests/dependencies.test.ts	76	    { "@forma/b": "workspace:*" },
+technical	tests/dependencies.test.ts	81	    { "index.ts": "export const load=()=>import('@forma/a');" },
+technical	tests/dependencies.test.ts	82	    { "@forma/a": "workspace:*" },
+technical	tests/dependencies.test.ts	96	    /undeclared dependency @forma\/b/,
+technical	tests/dependencies.test.ts	112	    { "@forma/b": "workspace:*" },
+technical	tests/dependencies.test.ts	118	    { "@forma/a": "workspace:*" },
+technical	tests/e2e/project.spec.ts	71	  await page.screenshot({ path: "test-results/forma-editor.png" });
+technical	tests/e2e/project.spec.ts	125	  await page.screenshot({ path: "test-results/forma-light-1366.png" });
+technical	tests/e2e/project.spec.ts	131	  await page.screenshot({ path: "test-results/forma-dark-1920.png" });
+technical	tests/editor.test.ts	7	} from "@forma/document";
+technical	tests/editor.test.ts	8	import { useEditor } from "@forma/editor";
+technical	tests/editor.test.ts	9	import { snapPosition } from "@forma/snapping";
+technical	tests/file-io.test.ts	6	} from "@forma/file-io";
+technical	tests/file-io.test.ts	7	import { emptyProject, serializeProject } from "@forma/document";
+technical	tests/fixtures/topology.ts	11	} from "@forma/geometry";
+technical	tests/geometry-contexts.test.ts	9	} from "@forma/geometry";
+technical	tests/geometry-session-ids.test.ts	6	} from "@forma/geometry";
+technical	tests/geometry-transactions.test.ts	16	} from "@forma/geometry";
+technical	tests/history-safety.test.ts	2	import { CommandHistory, SnapshotCommand, type Command } from "@forma/commands";
+technical	tests/history-safety.test.ts	3	import { createObject, emptyProject } from "@forma/document";
+technical	tests/s1-regressions.test.ts	2	import { useEditor, isDirty } from "@forma/editor";
+technical	tests/s1-regressions.test.ts	3	import { emptyProject, serializeProject } from "@forma/document";
+technical	tests/topology.test.ts	20	} from "@forma/geometry";
+technical	tests/topology.test.ts	246	        /from\s+['"](?:three|react|zustand|@tauri|@forma\/viewport|@forma\/editor)/,
+technical	tests/v1-compatibility.test.ts	10	} from "@forma/document";
+technical	tests/v1-compatibility.test.ts	11	import { useEditor, isObjectLocked } from "@forma/editor";
+technical	tsconfig.json	17	      "@forma/*": ["packages/*/src/index.ts"]
+technical	vite.config.ts	22	        `@forma/${n}`,
+technical	vitest.config.ts	19	        `@forma/${n}`,
