@@ -260,7 +260,11 @@ function validate(m: GeometryModel, c: ValidationContext) {
           projected[(i + projected.length - 1) % projected.length],
           projected[i],
           projected[(i + 1) % projected.length],
-        ) === 0
+        ) === 0 &&
+        dot(
+          subtract(points[(i + points.length - 1) % points.length], points[i]),
+          subtract(points[(i + 1) % points.length], points[i]),
+        ) >= 0
       )
         throw new GeometryError("DEGENERATE", "Collinear contour corner", [
           loopId,
