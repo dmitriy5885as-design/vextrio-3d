@@ -108,8 +108,8 @@ it("leaves model, revision and redo intact after errors, no-op and unsupported o
   expect((await s.execute(move([0, 0, 0]))).status).toBe("error");
   expect(await s.execute(move([2, 0, 0]))).toEqual({ status: "noop" });
   const unsupported = await s.execute({
-    kind: "make-face",
-    boundaryEdgeIds: [],
+    kind: "delete-entities",
+    entityIds: ["missing"],
   });
   expect(unsupported.status).toBe("error");
   if (unsupported.status === "error")

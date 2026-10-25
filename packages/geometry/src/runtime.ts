@@ -22,6 +22,7 @@ import {
   validatePrepared,
   type PreparedGeometryChange,
 } from "./transactions";
+import { prepareSketch } from "./sketch";
 export type GeometryIntent =
   | {
       kind: "move-vertices";
@@ -57,6 +58,9 @@ export type GeometryResponse = Envelope &
 export interface GeometryBackend {
   propose(request: GeometryRequest): Promise<GeometryResponse>;
 }
+// Separate allocators for independent geometry contexts must never generate
+// identical entity IDs. Requests are constructed on the authoritative host.
+let nextAllocationNamespace = 0;
 function diagnostic(error: unknown): Diagnostic {
   return error instanceof GeometryError
     ? error.diagnostic
@@ -88,8 +92,7 @@ export type OperationResult =
   | { status: "applied" | "noop" | "stale" | "cancelled" }
   | { status: "preview"; model: GeometryModel }
   | { status: "error"; diagnostics: Diagnostic[] };
-// A reference async port for tests and future Worker transport. Only moving
-// existing vertices is implemented here; contour construction belongs to S3.
+// Pure asynchronous backend; the transport can be replaced by a background executor.
 export function createLocalGeometryBackend(
   context: ValidationContext,
 ): GeometryBackend {
@@ -107,11 +110,17 @@ export function createLocalGeometryBackend(
       };
       try {
         validateGeometry(model, { ...context, policy: request.policy });
-        if (intent.kind !== "move-vertices")
-          throw new GeometryError(
-            "UNSUPPORTED_OPERATION",
-            "Contour construction and deletion are not implemented in S2",
+        if (intent.kind !== "move-vertices") {
+          const change = prepareSketch(
+            model,
+            intent,
+            { ...context, policy: request.policy },
+            reply.operationId,
           );
+          return entityTables.every((t) => change.forward[t].length === 0)
+            ? { ...reply, status: "noop" }
+            : { ...reply, status: "proposed", change };
+        }
         const after = structuredClone(model),
           seen = new Set<string>();
         for (const move of intent.positions) {
@@ -144,6 +153,7 @@ export function createLocalGeometryBackend(
 // Independent geometry transaction harness. The v1 editor/store is intentionally
 // unchanged; S4 will wrap these changes in full document transactions.
 export class GeometrySession {
+  private readonly allocationNamespace = nextAllocationNamespace++;
   private model: GeometryModel;
   private sessionId: Id<"session">;
   private revisionValue = 0;
@@ -224,7 +234,9 @@ export class GeometrySession {
         ],
       };
     const requestId = id<"request">(`request/${this.sequence++}`),
-      operationId = id<"operation">(`${requestId}/operation`);
+      operationId = id<"operation">(
+        `${this.model.id.slice(0, 100)}/s${this.allocationNamespace}/r${this.sequence - 1}`,
+      );
     const envelope: Envelope = {
       protocolVersion: 1,
       sessionId: this.sessionId,

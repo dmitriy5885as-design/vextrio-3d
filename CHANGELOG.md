@@ -29,3 +29,10 @@
 - Пользовательский бренд FORMA 3D заменён на VEXTRIO 3D; новый геометрический V и полный набор иконок.
 - Сохранены .v3d, format: "forma", пакеты и app identity; NSIS использует прежние registry keys с новым DisplayName.
 - Исторические записи выше сохранены. [Отчёт о ребрендинге](docs/branding/REPORT.md).
+
+## Unreleased — S3 Sketch
+
+- Настоящие 3D segment intersections, T/X/overlap, канонизация вершин и уникальные атомарные рёбра с provenance.
+- Плоское разбиение, автоматические bounded faces, диагонали, nested regions и holes с сохранением before fill state.
+- Атомарные GeometryDelta/Session, ID-stable Undo/Redo, numerical/resource rejection, 48 новых тестов и воспроизводимый JSON корпус. [Отчёт S3](docs/0.2/S3_REPORT.md).
+- Пользовательский v1 UI и .v3d не менялись; инструменты рисования остаются S6.

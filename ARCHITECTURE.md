@@ -21,3 +21,7 @@
 ## S2: чистое ядро
 
 Geometry теперь не зависит от Three.js или UI; прежний PrimitiveAdapter находится локально в viewport. Реализованы topology/IDs/валидация/математика, граф определений групп и компонентов, delta/inverse/lineage и async session harness. Production UI остаётся на v1; новая история geometry пока не заменяет SnapshotCommand. [Подробности и границы S2](docs/0.2/S2_REPORT.md).
+
+## S3: редактируемые рёбра и плоские области
+
+Pure geometry backend теперь строит 3D T/X/overlap intersections, канонические вершины, минимальные рёбра, planar arrangements, bounded faces и holes. Все изменения остаются GeometryDelta с проверяемым inverse и lineage; GeometrySession сохраняет atomic/stale/cancel/Undo гарантии. Источник данных — GeometryModel, не Three.js. [Алгоритмы, численные примеры и границы S3](docs/0.2/S3_REPORT.md). UI и .v3d остаются на v1 до S4/S6.

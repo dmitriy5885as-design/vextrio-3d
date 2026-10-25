@@ -167,7 +167,8 @@ export function validatePrepared(
       if (
         descendants.has(child.id) ||
         !Object.hasOwn(next[table], child.id) ||
-        Object.hasOwn(model[table], child.id)
+        (Object.hasOwn(model[table], child.id) &&
+          !(entry.kind === "vertex" && entry.reason === "merge"))
       )
         throw new GeometryError(
           "INVALID_TOPOLOGY",
