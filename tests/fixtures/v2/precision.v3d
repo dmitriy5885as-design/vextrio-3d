@@ -1,0 +1,97 @@
+{
+  "format": "forma",
+  "schemaVersion": 2,
+  "name": "Точное позиционирование",
+  "units": "m",
+  "camera": {
+    "position": [
+      6,
+      5,
+      10
+    ],
+    "target": [
+      2,
+      0,
+      0
+    ],
+    "projection": "perspective",
+    "zoom": 1
+  },
+  "rootDefinitionId": "v2/root",
+  "definitions": {
+    "v2/root": {
+      "id": "v2/root",
+      "name": "Сцена",
+      "kind": "scene",
+      "geometryId": "precision/geometry",
+      "childNodeIds": []
+    }
+  },
+  "nodes": {},
+  "geometries": {
+    "precision/geometry": {
+      "id": "precision/geometry",
+      "ownerDefinitionId": "v2/root",
+      "representation": "planar-topology",
+      "vertices": {
+        "precision/seed/vertex/0": {
+          "id": "precision/seed/vertex/0",
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "precision/seed/vertex/1": {
+          "id": "precision/seed/vertex/1",
+          "position": [
+            4,
+            0,
+            0
+          ]
+        }
+      },
+      "edges": {
+        "precision/seed/edge/2": {
+          "id": "precision/seed/edge/2",
+          "start": "precision/seed/vertex/0",
+          "end": "precision/seed/vertex/1",
+          "curve": {
+            "kind": "line"
+          }
+        }
+      },
+      "coedges": {},
+      "loops": {},
+      "faces": {},
+      "shells": {},
+      "bodies": {
+        "precision/seed/body/3": {
+          "id": "precision/seed/body/3",
+          "vertexIds": [
+            "precision/seed/vertex/0",
+            "precision/seed/vertex/1"
+          ],
+          "edgeIds": [
+            "precision/seed/edge/2"
+          ],
+          "faceIds": [],
+          "shellIds": []
+        }
+      }
+    }
+  },
+  "materials": {},
+  "geometryPolicy": {
+    "version": 1,
+    "absoluteDistance": 1e-7,
+    "relativeDistance": 1e-12,
+    "angular": 1e-10,
+    "maxTransformCondition": 100000000
+  },
+  "references": {},
+  "provenance": [],
+  "extensions": {
+    "legacyFields": {}
+  }
+}

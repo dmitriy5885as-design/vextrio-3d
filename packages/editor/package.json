@@ -9,6 +9,7 @@
     "@forma/commands": "workspace:*",
     "@forma/shared": "workspace:*",
     "zustand": "^5.0.0",
-    "@forma/geometry": "workspace:*"
+    "@forma/geometry": "workspace:*",
+    "@forma/snapping": "workspace:*"
   }
 }

@@ -1,4 +1,5 @@
 import { TopologyTree } from "./TopologyTree";
+import { PrecisionPanel } from "./PrecisionPanel";
 import {
   getLegacyObjects,
   emptyProjectV2,
@@ -647,6 +648,7 @@ export function App() {
         )}
         <section className="scene">
           <Viewport />
+          <PrecisionPanel />
           <div className="viewport-header">
             <button onClick={() => s.view("projection")}>
               <View size={14} />

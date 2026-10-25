@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — S5 точного позиционирования
+
+- Общий Snap Engine: topology points/edges/faces/holes/intersections, оси, сетка и parallel/perpendicular inference, CSS radius и hysteresis.
+- Snapshot world-space BVH, ограниченный поиск с диагностикой, perspective-correct on-edge и near/far clipping.
+- Разбор длины, XYZ и размеров preview: m/cm/mm, decimal comma, относительные/абсолютные координаты и ошибки несовместимых ограничений.
+- Полные affine локальные контексты, рабочие плоскости и реальный режим точной точки с применением к вершине через GeometrySession/Undo.
+- Успешное открытие сбрасывает старое topology selection. [Отчёт, демонстрация и проверки S5](docs/0.2/S5_REPORT.md).
+
 ## Unreleased — S4 интеграции топологии
 
 - Production Document v2, безопасная явная миграция v1 и сохранение пользовательских полей, ID, материалов и размещения legacy объектов.

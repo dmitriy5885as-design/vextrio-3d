@@ -19,6 +19,7 @@
     "@forma/ui": "workspace:*",
     "@forma/tools": "workspace:*",
     "@tauri-apps/api": "^2.12.4",
-    "@forma/geometry": "workspace:*"
+    "@forma/geometry": "workspace:*",
+    "@forma/snapping": "workspace:*"
   }
 }

@@ -1,5 +1,7 @@
 # Геометрическое ядро
 
+[S5](docs/0.2/S5_REPORT.md) добавляет независимый Snap Engine и точный ввод поверх production топологии S4. BVH хранит производный world-space snapshot; source of truth остаётся GeometryModel. Перемещение принятой точкой проходит существующий GeometrySession и общую историю, не изменяет Three.js buffers как документ.
+
 S2.1/S2.2 и S3.1/S3.2 реализованы отдельным pure TypeScript API в `packages/geometry`: topology entities/IDs, GeometryPolicy, математика плоскостей/размещений, validators, delta/inverse/lineage и async backend/session harness. Three.js, UI и DOM не являются зависимостями ядра. [Отчёт, проверки и границы S2](docs/0.2/S2_REPORT.md).
 
 Прежний PrimitiveAdapter перенесён в viewport без изменения алгоритмов. Legacy-примитивы используют его локально. [S4](docs/0.2/S4_REPORT.md) подключает production Document v2, явную миграцию v1, GeometrySession.prepare к общей истории, TopologyBridge и entity picking с occurrencePath. Native topology — источник истины; треугольники Earcut используются только для отображения. Рисование — S6; S5 ещё не начат.

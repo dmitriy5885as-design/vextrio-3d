@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { usePrecision } from "./precision";
+export * from "./precision";
 import {
   clone,
   freezeData,
@@ -65,6 +67,7 @@ interface EditorState {
   editGeometry: (
     ref: EntityRef,
     intent: GeometryIntent,
+    acceptContext?: () => boolean,
   ) => Promise<CommandResult>;
   tool: TransformMode | "select";
   revision: number;
@@ -288,7 +291,7 @@ export const useEditor = create<EditorState>((set, get) => {
         reject(error);
       }
     },
-    editGeometry: async (ref, intent) => {
+    editGeometry: async (ref, intent, acceptContext) => {
       if (transactionInProgress)
         return reject(Error("Вложенная команда запрещена."));
       const before = get().project,
@@ -297,6 +300,8 @@ export const useEditor = create<EditorState>((set, get) => {
         return reject(Error("Для топологии нужен документ v2."));
       let session: GeometrySession | undefined;
       try {
+        if (acceptContext && !acceptContext())
+          throw Error("Контекст редактирования изменился.");
         validateEntityRef(before, ref);
         if (isGeometryLocked(before, ref))
           throw Error("Геометрический контекст заблокирован.");
@@ -315,6 +320,8 @@ export const useEditor = create<EditorState>((set, get) => {
         );
         pendingGeometry.add(session);
         const result = await session.prepare(intent);
+        if (acceptContext && !acceptContext())
+          throw Error("Контекст редактирования изменился.");
         if (get().revision !== revision || get().project.schemaVersion !== 2)
           throw Error("Результат геометрии устарел.");
         if (result.status === "noop") return { status: "noop" };
@@ -477,9 +484,15 @@ export const useEditor = create<EditorState>((set, get) => {
           signature = JSON.stringify(accepted);
         cancelGeometry();
         history.clear();
+        usePrecision
+          .getState()
+          .configure({ enabled: false, path: [], planeOverride: null });
+        usePrecision.getState().setAnchor([0, 0, 0]);
         set({
           project: freezeData(accepted),
           selected: null,
+          topologySelection: null,
+          selectedPath: null,
           canUndo: false,
           canRedo: false,
           savedSignature: signature,

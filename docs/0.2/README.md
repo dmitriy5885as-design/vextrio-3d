@@ -1,6 +1,6 @@
 # VEXTRIO 3D 0.2 Sketch — пакет для утверждения
 
-Обновление 25 октября 2026: [S4 — production документ, история, render/picking и roundtrip](S4_REPORT.md) подготовлен к приёмке. [Аудит совместимости всех пяти PR](S4_AUDIT.md). Черновые CONTRACTS ниже сохраняют исторический проектный контекст; production API находится в packages/document/src/v2.ts. S5 не начат.
+Обновление 25 октября 2026: [S4 — production документ, история, render/picking и roundtrip](S4_REPORT.md) реализован; [S5 — точный ввод, системы координат и Snap Engine](S5_REPORT.md) подготовлен к приёмке. [Аудит совместимости всех пяти PR](S4_AUDIT.md). Черновые CONTRACTS ниже сохраняют исторический проектный контекст; production API находится в packages/document/src/v2.ts и packages/snapping/src. S6 не начат.
 
 Статус: архитектура утверждена владельцем как основа S1. [Решение и обязательные условия](https://github.com/dmitriy5885as-design/forma-3d/pull/1#issuecomment-6385002392). [Реализация и проверки S1](S1_REPORT.md) подготовлены к ревью; [S2: топология и транзакции](S2_REPORT.md) реализованы отдельно от v1 UI. [S3: пересечения и автоматические грани](S3_REPORT.md) реализованы в геометрическом backend; рисование в UI ещё не реализовано. Дата: 24 октября 2026.
 

@@ -4,7 +4,13 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { useEditor, isObjectLocked } from "@forma/editor";
+import {
+  useEditor,
+  isObjectLocked,
+  usePrecision,
+  precisionFrame,
+} from "@forma/editor";
+import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
 import type { Vec3 } from "@forma/shared";
 
@@ -57,6 +63,8 @@ export function Viewport() {
       THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
     >();
     let topology: TopologyBridge | null = null;
+    let snapEngine: SnapEngine | null = null;
+    let snapDocument: import("@forma/document").ProjectV2 | null = null;
     let outline: THREE.BoxHelper | null = null;
     scene.add(new THREE.HemisphereLight(0xc6dfff, 0x252a38, 2.7));
     const light = new THREE.DirectionalLight(0xffffff, 3.4);
@@ -330,6 +338,12 @@ export function Viewport() {
         Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
       )
         return;
+      if (usePrecision.getState().enabled) {
+        updatePrecision(e.clientX, e.clientY);
+        const p = usePrecision.getState();
+        if (p.target) usePrecision.setState({ exact: true });
+        return;
+      }
       const rect = renderer.domElement.getBoundingClientRect();
       const ray = new THREE.Raycaster();
       ray.setFromCamera(
@@ -364,6 +378,240 @@ export function Viewport() {
     };
     renderer.domElement.addEventListener("pointerdown", pointerDown);
     renderer.domElement.addEventListener("pointerup", pointerUp);
+    const marker = document.createElement("div");
+    marker.className = "snap-marker";
+    marker.dataset.testid = "snap-marker";
+    marker.hidden = true;
+    el.append(marker);
+    const previewGeometry = new THREE.BufferGeometry().setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(new Float32Array(15), 3).setUsage(
+          THREE.DynamicDrawUsage,
+        ),
+      ),
+      previewMaterial = new THREE.LineBasicMaterial({
+        color: 0x4dd5c0,
+        depthTest: false,
+      });
+    const preview = new THREE.Line(previewGeometry, previewMaterial);
+    preview.frustumCulled = false;
+    preview.renderOrder = 20;
+    scene.add(preview);
+    const planeGeometry = new THREE.BufferGeometry(),
+      planeMaterial = new THREE.LineBasicMaterial({
+        color: 0x3478f6,
+        transparent: true,
+        opacity: 0.5,
+      });
+    const planeGuide = new THREE.Line(planeGeometry, planeMaterial);
+    scene.add(planeGuide);
+    const precisionAxes = new THREE.AxesHelper(1);
+    scene.add(precisionAxes);
+    let lastCursor: [number, number] | null = null,
+      hoverFrame = 0;
+    function projectPoint(
+      point: Vec3,
+      rect = renderer.domElement.getBoundingClientRect(),
+    ) {
+      const view = new THREE.Vector3(...point).applyMatrix4(
+        camera.matrixWorldInverse,
+      );
+      const p = new THREE.Vector3(...point).project(camera);
+      const clip = new THREE.Vector4(view.x, view.y, view.z, 1).applyMatrix4(
+        camera.projectionMatrix,
+      );
+      return {
+        x: ((p.x + 1) * rect.width) / 2,
+        y: ((1 - p.y) * rect.height) / 2,
+        depth: -view.z,
+        w: camera instanceof THREE.PerspectiveCamera ? -view.z : 1,
+        clipZ: p.z,
+        nearPlane: clip.z + clip.w,
+        farPlane: clip.w - clip.z,
+        visible: view.z < 0 && p.z >= -1 - 2e-12 && p.z <= 1 + 2e-12,
+      };
+    }
+    function renderPrecision() {
+      const p = usePrecision.getState(),
+        document = useEditor.getState().project;
+      const enabled = p.enabled && document.schemaVersion === 2;
+      preview.visible = !!(enabled && p.target);
+      planeGuide.visible = enabled;
+      precisionAxes.visible = enabled;
+      controls.mouseButtons.LEFT = enabled
+        ? (null as unknown as THREE.MOUSE)
+        : THREE.MOUSE.ROTATE;
+      transform.enabled = !enabled;
+      if (enabled) {
+        try {
+          const { matrix, plane } = precisionFrame(document, p);
+          const frame = frameMatrix(p.system, matrix, plane);
+          precisionAxes.matrixAutoUpdate = false;
+          precisionAxes.matrix.fromArray(frame);
+          const points = [
+            [-2, -2],
+            [2, -2],
+            [2, 2],
+            [-2, 2],
+            [-2, -2],
+          ].map(([u, v]) =>
+            new THREE.Vector3()
+              .addScaledVector(new THREE.Vector3(...plane.u), u)
+              .addScaledVector(new THREE.Vector3(...plane.v), v),
+          );
+          planeGeometry.setFromPoints(points);
+          planeGuide.position.fromArray(plane.origin);
+          planeGuide.userData.plane = p.planeName;
+          if (p.target) {
+            const points = p.rectangle?.corners ?? [p.anchor, p.target],
+              positions = previewGeometry.getAttribute("position");
+            points.forEach((v, i) =>
+              positions.setXYZ(
+                i,
+                v[0] - p.anchor[0],
+                v[1] - p.anchor[1],
+                v[2] - p.anchor[2],
+              ),
+            );
+            positions.needsUpdate = true;
+            previewGeometry.setDrawRange(0, points.length);
+            preview.position.fromArray(p.anchor);
+            el.dataset.precisionPreviewPoints = String(points.length);
+            const projected = projectPoint(p.target);
+            marker.hidden = !projected.visible;
+            marker.style.left = projected.x + "px";
+            marker.style.top = projected.y + "px";
+            marker.dataset.kind = p.exact
+              ? "exact"
+              : (p.hover?.kind ?? "plane");
+            marker.textContent = p.exact
+              ? "Точная точка"
+              : (p.hover?.label ??
+                (p.planeOverride
+                  ? "Плоскость грани"
+                  : `Плоскость ${p.planeName}`));
+          } else marker.hidden = true;
+        } catch {
+          marker.hidden = true;
+          preview.visible = false;
+          planeGuide.visible = false;
+          precisionAxes.visible = false;
+        }
+      } else marker.hidden = true;
+      requestRender();
+    }
+    function updatePrecision(clientX: number, clientY: number) {
+      const p = usePrecision.getState(),
+        s = useEditor.getState(),
+        document = s.project;
+      if (!p.enabled || document.schemaVersion !== 2) return;
+      if (p.exact || p.editing) {
+        renderPrecision();
+        return;
+      }
+      try {
+        if (
+          !snapDocument ||
+          snapDocument.nodes !== document.nodes ||
+          snapDocument.geometries !== document.geometries ||
+          snapDocument.definitions !== document.definitions ||
+          snapDocument.geometryPolicy !== document.geometryPolicy
+        ) {
+          snapEngine = new SnapEngine(document);
+          snapDocument = document;
+        }
+        camera.updateMatrixWorld();
+        const rect = renderer.domElement.getBoundingClientRect(),
+          cursor: [number, number] = [clientX - rect.left, clientY - rect.top];
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(
+          new THREE.Vector2(
+            (cursor[0] / rect.width) * 2 - 1,
+            1 - (cursor[1] / rect.height) * 2,
+          ),
+          camera,
+        );
+        const { matrix, plane } = precisionFrame(document, p),
+          frame = frameMatrix(p.system, matrix, plane);
+        const result = snapEngine!.query({
+          cursor,
+          project: (point) => projectPoint(point, rect),
+          ray: {
+            origin: ray.ray.origin.toArray() as Vec3,
+            direction: ray.ray.direction.toArray() as Vec3,
+          },
+          plane,
+          anchor: p.anchor,
+          axes: [0, 1, 2].map((i) =>
+            normalize(frame.slice(i * 4, i * 4 + 3) as Vec3),
+          ),
+          gridStep: p.gridStep,
+          enabled: s.snap,
+          perspective: camera instanceof THREE.PerspectiveCamera,
+          contextPath: p.path,
+          contextOnly: p.contextOnly,
+          axis: p.axis ? { X: 0, Y: 1, Z: 2 }[p.axis] : null,
+        });
+        p.hoverPoint(
+          result.candidate?.point ?? result.raw,
+          result.candidate,
+          null,
+        );
+        el.dataset.snapTested = String(snapEngine!.stats.tested);
+        el.dataset.snapSources = String(snapEngine!.sourceCount);
+        el.dataset.snapTruncated = String(snapEngine!.stats.truncated);
+        const warning = snapEngine!.stats.truncated
+          ? "Плотная область: достигнут бюджет поиска. Приблизьте вид или включите только активный контекст."
+          : "";
+        if (usePrecision.getState().warning !== warning)
+          usePrecision.setState({ warning });
+        renderPrecision();
+      } catch (e) {
+        usePrecision.setState({
+          error: e instanceof Error ? e.message : "Ошибка привязки",
+        });
+      }
+    }
+    const pointerMove = (event: PointerEvent) => {
+      lastCursor = [event.clientX, event.clientY];
+      if (!hoverFrame)
+        hoverFrame = requestAnimationFrame(() => {
+          hoverFrame = 0;
+          if (lastCursor) updatePrecision(...lastCursor);
+        });
+    };
+    const pointerLeave = () => {
+      if (!usePrecision.getState().exact)
+        usePrecision.getState().hoverPoint(null, null, null);
+    };
+    const cancelPrecision = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        usePrecision.getState().clear();
+        snapEngine?.reset();
+      }
+    };
+    renderer.domElement.addEventListener("pointermove", pointerMove);
+    renderer.domElement.addEventListener("pointerleave", pointerLeave);
+    renderer.domElement.addEventListener("pointercancel", pointerLeave);
+    window.addEventListener("keydown", cancelPrecision);
+    const refreshPrecision = () => {
+      if (lastCursor) updatePrecision(...lastCursor);
+      renderPrecision();
+    };
+    controls.addEventListener("change", refreshPrecision);
+    const unsubscribePrecision = usePrecision.subscribe((state, previous) => {
+      if (
+        state.path !== previous.path ||
+        state.system !== previous.system ||
+        state.planeName !== previous.planeName ||
+        state.planeOverride !== previous.planeOverride ||
+        state.enabled !== previous.enabled ||
+        state.axis !== previous.axis ||
+        state.contextOnly !== previous.contextOnly
+      )
+        snapEngine?.reset();
+      renderPrecision();
+    });
     const lost = (e: Event) => {
       e.preventDefault();
       contextLost = true;
@@ -382,6 +630,33 @@ export function Viewport() {
     resize();
     sync();
     const unsubscribe = useEditor.subscribe((state, prev) => {
+      if (state.revision !== prev.revision) {
+        const a = state.project,
+          b = prev.project;
+        const changed =
+          a.schemaVersion !== 2 ||
+          b.schemaVersion !== 2 ||
+          JSON.stringify([a.nodes, a.definitions, a.geometries]) !==
+            JSON.stringify([b.nodes, b.definitions, b.geometries]);
+        if (changed) {
+          snapEngine = null;
+          snapDocument = null;
+          usePrecision.getState().clear();
+          if (a.schemaVersion !== 2)
+            usePrecision.getState().configure({ enabled: false, path: [] });
+          else {
+            try {
+              precisionFrame(a, usePrecision.getState());
+            } catch {
+              usePrecision.getState().configure({ path: [] });
+            }
+          }
+        }
+      }
+      if (state.snap !== prev.snap) {
+        snapEngine?.reset();
+        usePrecision.getState().clear();
+      }
       if (state.cameraRequest !== prev.cameraRequest && state.cameraRequest) {
         const view = state.cameraRequest.view;
         if (view === "restore") restore();
@@ -444,6 +719,18 @@ export function Viewport() {
     return () => {
       disposed = true;
       unsubscribe();
+      unsubscribePrecision();
+      cancelAnimationFrame(hoverFrame);
+      window.removeEventListener("keydown", cancelPrecision);
+      controls.removeEventListener("change", refreshPrecision);
+      renderer.domElement.removeEventListener("pointermove", pointerMove);
+      previewGeometry.dispose();
+      previewMaterial.dispose();
+      planeGeometry.dispose();
+      planeMaterial.dispose();
+      precisionAxes.geometry.dispose();
+      (precisionAxes.material as THREE.Material).dispose();
+      marker.remove();
       observer.disconnect();
       topology?.dispose();
       cancelAnimationFrame(frame);
