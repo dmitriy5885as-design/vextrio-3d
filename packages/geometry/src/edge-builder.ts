@@ -1,3 +1,4 @@
+import { contextPlane } from "./sketch-common";
 import {
   createIdAllocator,
   entityTables,
@@ -6,14 +7,7 @@ import {
   type Id,
   type Vec3,
 } from "./model";
-import {
-  assertVector,
-  dot,
-  length,
-  subtract,
-  validatePlane,
-  transformPlane,
-} from "./math";
+import { assertVector, dot, length, subtract, validatePlane } from "./math";
 import { metric, near, onPlane } from "./sketch-common";
 import { segmentIntersections } from "./intersections";
 import type { ValidationContext } from "./validate";
@@ -51,9 +45,7 @@ export function splitSegments(
     { world, local, tolerance } = metric(model, context, segments.flat()),
     reserved = entityTables.flatMap((t) => Object.keys(model[t]));
   if (plane) {
-    const metricPlane = context.placement
-      ? transformPlane(plane, context.placement)
-      : plane;
+    const metricPlane = contextPlane(plane, context);
     for (const p of segments.flat())
       if (!onPlane(world(p), metricPlane, tolerance))
         throw new GeometryError(

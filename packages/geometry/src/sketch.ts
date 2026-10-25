@@ -1,3 +1,4 @@
+import { contextPlane } from "./sketch-common";
 import {
   entityTables,
   GeometryError,
@@ -7,14 +8,7 @@ import {
   type Face,
   type Vec3,
 } from "./model";
-import {
-  cross,
-  dot,
-  length,
-  projectPoint,
-  subtract,
-  transformPlane,
-} from "./math";
+import { cross, dot, length, projectPoint, subtract } from "./math";
 import {
   canonical,
   validateGeometry,
@@ -81,9 +75,7 @@ function faceContains(
   tolerance: number,
 ): boolean {
   const { world } = metric(m, context),
-    plane = context.placement
-      ? transformPlane(f.plane, context.placement)
-      : f.plane;
+    plane = contextPlane(f.plane, context);
   if (!onPlane(point, plane, tolerance)) return false;
   const polygon = (lid: string) =>
     loopUses(m, lid).map((use) => {
@@ -257,9 +249,7 @@ function regenerateFaces(
   for (const cell of cells) {
     const containing = Object.values(before.faces)
       .filter((f) => {
-        const p = context.placement
-          ? transformPlane(f.plane, context.placement)
-          : f.plane;
+        const p = contextPlane(f.plane, context);
         return (
           length(cross(p.normal, cell.plane.normal)) <=
             (context.policy?.angular ?? 1e-10) &&
@@ -307,9 +297,7 @@ function regenerateFaces(
     }
     const inherited = containing[0],
       inheritedPlane = inherited
-        ? context.placement
-          ? transformPlane(inherited.plane, context.placement)
-          : inherited.plane
+        ? contextPlane(inherited.plane, context)
         : null,
       flipped = inheritedPlane
         ? dot(inheritedPlane.normal, cell.plane.normal) < 0

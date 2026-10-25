@@ -4,7 +4,8 @@ import {
   validateProject,
   MAX_PROJECT_BYTES,
 } from "@forma/document";
-import { clone, type Project } from "@forma/shared";
+import { clone } from "@forma/shared";
+import type { Document as Project } from "@forma/document";
 export type SaveResult =
   | { status: "saved" }
   | { status: "download-started" }

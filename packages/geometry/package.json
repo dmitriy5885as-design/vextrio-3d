@@ -4,5 +4,7 @@
   "name": "@forma/geometry",
   "private": true,
   "type": "module",
-  "dependencies": {}
+  "dependencies": {
+    "earcut": "3.0.2"
+  }
 }

@@ -36,9 +36,13 @@ export function createObject(type: Primitive, index = 0): SceneObject {
     parentId: null,
   };
 }
-export { validateProject, MAX_PROJECT_BYTES } from "./validation";
-import { validateProject, MAX_PROJECT_BYTES } from "./validation";
-export function parseProject(text: string): Project {
+export { validateProject } from "./document-validation";
+export { MAX_PROJECT_BYTES } from "./validation";
+export * from "./v2";
+import { validateProject } from "./document-validation";
+import { MAX_PROJECT_BYTES } from "./validation";
+import type { Document } from "./v2";
+export function parseProject(text: string): Document {
   if (new TextEncoder().encode(text).byteLength > MAX_PROJECT_BYTES)
     throw Error("Файл превышает допустимые 20 МБ.");
   let candidate: unknown;
@@ -50,7 +54,7 @@ export function parseProject(text: string): Project {
   validateProject(candidate);
   return clone(candidate);
 }
-export function serializeProject(project: Project): string {
+export function serializeProject(project: Document): string {
   validateProject(project);
   const text = JSON.stringify(project, null, 2);
   if (new TextEncoder().encode(text).byteLength > MAX_PROJECT_BYTES)

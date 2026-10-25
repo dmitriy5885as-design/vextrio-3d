@@ -10,7 +10,7 @@ const vector = (v: unknown): v is [number, number, number] =>
 const kinds = ["cube", "sphere", "cylinder", "plane"];
 
 // Check runtime candidates before JSON.stringify can hide undefined/NaN or run accessors.
-function assertJsonData(value: unknown) {
+export function assertJsonData(value: unknown) {
   const active = new Set<object>();
   const stack: { value: unknown; leave?: boolean }[] = [{ value }];
   while (stack.length) {
@@ -66,7 +66,7 @@ function assertJsonData(value: unknown) {
   }
 }
 
-export function validateProject(value: unknown): asserts value is Project {
+export function validateProjectV1(value: unknown): asserts value is Project {
   assertJsonData(value);
   if (
     !record(value) ||

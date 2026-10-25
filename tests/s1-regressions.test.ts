@@ -1,3 +1,4 @@
+import { getLegacyObjects } from "@forma/document";
 import { beforeEach, expect, it } from "vitest";
 import { useEditor, isDirty } from "@forma/editor";
 import { emptyProject, serializeProject } from "@forma/document";
@@ -30,7 +31,9 @@ it("rejects zero scale without changing document, selection, dirty or redo branc
   expect(checkpoint()).toEqual(before);
   expect(() => serializeProject(useEditor.getState().project)).not.toThrow();
   s.redo();
-  expect(useEditor.getState().project.objects[0].name).toBe("temporary");
+  expect(getLegacyObjects(useEditor.getState().project)[0].name).toBe(
+    "temporary",
+  );
 });
 it("rejects mixed locked patch rather than treating locked key as authorization", () => {
   const s = useEditor.getState();
@@ -42,7 +45,7 @@ it("rejects mixed locked patch rather than treating locked key as authorization"
   s.patch(id, mixed);
   expect(checkpoint()).toEqual(before);
   s.undo();
-  expect(useEditor.getState().project.objects[0].locked).toBe(false);
+  expect(getLegacyObjects(useEditor.getState().project)[0].locked).toBe(false);
 });
 it.each([0, -1, NaN, Infinity, -Infinity])(
   "rejects invalid scale %s on the shared mutation path",
@@ -57,7 +60,7 @@ it.each([0, -1, NaN, Infinity, -Infinity])(
     });
     expect(checkpoint()).toEqual(before);
     s.redo();
-    expect(useEditor.getState().project.objects).toHaveLength(2);
+    expect(getLegacyObjects(useEditor.getState().project)).toHaveLength(2);
   },
 );
 it("keeps everything when the draft callback throws after changing it", () => {
@@ -84,7 +87,7 @@ it("keeps redo on no-op and rejects invalid camera or replacement before clearin
   s.replace(invalid);
   expect(checkpoint()).toEqual(before);
   s.redo();
-  expect(useEditor.getState().project.objects).toHaveLength(1);
+  expect(getLegacyObjects(useEditor.getState().project)).toHaveLength(1);
 });
 it("cannot bypass locks through the general mutation callback", () => {
   const s = useEditor.getState();
@@ -101,10 +104,12 @@ it("cannot bypass locks through the general mutation callback", () => {
   expect(checkpoint()).toEqual(before);
   s.setLocked(id, false);
   s.patch(id, { name: "allowed" });
-  expect(useEditor.getState().project.objects[0].name).toBe("allowed");
+  expect(getLegacyObjects(useEditor.getState().project)[0].name).toBe(
+    "allowed",
+  );
   s.undo();
   s.undo();
-  expect(useEditor.getState().project.objects[0].locked).toBe(true);
+  expect(getLegacyObjects(useEditor.getState().project)[0].locked).toBe(true);
 });
 it("does not retain a draft reference held by a caller", () => {
   const s = useEditor.getState();
@@ -161,7 +166,7 @@ it("keeps accepted projects immutable outside commands", () => {
   const s = useEditor.getState();
   s.add("cube");
   expect(() => {
-    useEditor.getState().project.objects[0].transform.scale[0] = 0;
+    getLegacyObjects(useEditor.getState().project)[0].transform.scale[0] = 0;
   }).toThrow();
   expect(() => serializeProject(useEditor.getState().project)).not.toThrow();
 });

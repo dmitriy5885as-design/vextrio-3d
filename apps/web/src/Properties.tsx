@@ -1,3 +1,6 @@
+import { getLegacyObjects } from "@forma/document";
+import { tessellateFace } from "@forma/geometry";
+import { isGeometryLocked } from "@forma/editor";
 import { useEffect, useState } from "react";
 import { useEditor, isObjectLocked } from "@forma/editor";
 import { ru } from "@forma/ui";
@@ -42,11 +45,76 @@ function NumberField({
 }
 export function Properties() {
   const s = useEditor();
-  const o = s.project.objects.find((o) => o.id === s.selected);
+  const o = getLegacyObjects(s.project).find((o) => o.id === s.selected);
   const objectLocked = o ? isObjectLocked(s.project, o.id) : false;
   const ancestorLocked = o ? isObjectLocked(s.project, o.id, true) : false;
   const factor =
     s.project.units === "mm" ? 1000 : s.project.units === "cm" ? 100 : 1;
+  const ref = s.topologySelection;
+  if (s.project.schemaVersion === 2 && ref) {
+    const m = s.project.geometries[ref.geometryId],
+      name = {
+        vertex: "Вершина",
+        edge: "Ребро",
+        face: "Грань",
+        coedge: "Обход ребра",
+        loop: "Контур",
+        shell: "Оболочка",
+        body: "Тело",
+      }[ref.kind],
+      face = ref.kind === "face" ? m.faces[ref.entityId] : null,
+      edge = ref.kind === "edge" ? m.edges[ref.entityId] : null,
+      vertex = ref.kind === "vertex" ? m.vertices[ref.entityId] : null;
+    return (
+      <aside
+        className="properties"
+        data-testid="topology-selection"
+        data-kind={ref.kind}
+        data-entity-id={ref.entityId}
+      >
+        <div className="panel-heading">
+          Свойства <span className="micro">ТОПОЛОГИЯ</span>
+        </div>
+        <div className="property-group">
+          <h3>{name}</h3>
+          <p>Определение: {s.project.definitions[ref.definitionId].name}</p>
+          <p>
+            ID: <code>{ref.entityId}</code>
+          </p>
+          <p>
+            Геометрия: <code>{ref.geometryId}</code>
+          </p>
+          <p>Экземпляр: {ref.occurrencePath.join(" / ") || "Сцена"}</p>
+          {face && (
+            <p data-testid="face-area">
+              Площадь: {Number(tessellateFace(m, face).area.toFixed(8))} м² (в
+              определении)
+            </p>
+          )}
+          {edge && (
+            <p>
+              Вершины: {edge.start} → {edge.end}
+            </p>
+          )}
+          {vertex && <p>Координаты: {vertex.position.join(", ")} м</p>}
+          {face && (
+            <button
+              className="start-card"
+              disabled={isGeometryLocked(s.project, ref)}
+              onClick={() =>
+                void s.editGeometry(ref, {
+                  kind: "delete-entities",
+                  entityIds: [ref.entityId],
+                })
+              }
+            >
+              Удалить грань
+            </button>
+          )}
+        </div>
+      </aside>
+    );
+  }
   function transform(
     key: keyof SceneObject["transform"],
     i: number,

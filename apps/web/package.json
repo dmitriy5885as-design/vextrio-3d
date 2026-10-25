@@ -18,6 +18,7 @@
     "@forma/shared": "workspace:*",
     "@forma/ui": "workspace:*",
     "@forma/tools": "workspace:*",
-    "@tauri-apps/api": "^2.12.4"
+    "@tauri-apps/api": "^2.12.4",
+    "@forma/geometry": "workspace:*"
   }
 }

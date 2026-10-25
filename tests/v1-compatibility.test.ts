@@ -1,3 +1,4 @@
+import { getLegacyObjects } from "@forma/document";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -25,29 +26,33 @@ describe("immutable golden v1 corpus", () => {
       const project = parseProject(original.toString("utf8"));
       expect(project).toEqual(JSON.parse(original.toString("utf8")));
       useEditor.getState().replace(project);
-      expect(useEditor.getState().project.objects.map((o) => o.id)).toEqual([
+      expect(
+        getLegacyObjects(useEditor.getState().project).map((o) => o.id),
+      ).toEqual([
         "legacy-cube",
         "legacy-sphere",
         "legacy-cylinder",
         "legacy-plane",
       ]);
       expect(
-        useEditor.getState().project.objects.map((o) => o.transform.position),
+        getLegacyObjects(useEditor.getState().project).map(
+          (o) => o.transform.position,
+        ),
       ).toEqual([
         [8, 1, 0],
         [1.25, 1, -2],
         [-3, 1, 1],
         [0, 0, 0],
       ]);
-      expect(project.objects[1].parentId).toBe("legacy-cube");
-      expect(project.objects.map((o) => o.material.color)).toEqual([
+      expect(getLegacyObjects(project)[1].parentId).toBe("legacy-cube");
+      expect(getLegacyObjects(project).map((o) => o.material.color)).toEqual([
         "#3478f6",
         "#4dd5c0",
         "#a9c6e8",
         "#f2f5fa",
       ]);
-      expect(project.objects[2].locked).toBe(true);
-      expect(project.objects[3].visible).toBe(false);
+      expect(getLegacyObjects(project)[2].locked).toBe(true);
+      expect(getLegacyObjects(project)[3].visible).toBe(false);
       expect(
         parseProject(serializeProject(useEditor.getState().project)),
       ).toEqual(project);
@@ -97,9 +102,9 @@ it("rejects edits through locked ancestors without reinterpreting legacy transfo
   expect(useEditor.getState().project).toEqual(before);
   s.setLocked(parent.id, false);
   expect(s.patch(child.id, { name: "allowed" }).status).toBe("applied");
-  expect(useEditor.getState().project.objects[1].transform.position).toEqual([
-    1, 0, 0,
-  ]);
+  expect(
+    getLegacyObjects(useEditor.getState().project)[1].transform.position,
+  ).toEqual([1, 0, 0]);
 });
 it.each([
   ["units", ["m"]],

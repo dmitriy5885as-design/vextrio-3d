@@ -1,4 +1,5 @@
-import { clone, type Project } from "@forma/shared";
+import { clone } from "@forma/shared";
+import type { Document as Project } from "@forma/document";
 import { validateProject } from "@forma/document";
 export interface Command {
   label: string;

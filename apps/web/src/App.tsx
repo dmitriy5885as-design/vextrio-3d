@@ -1,3 +1,9 @@
+import { TopologyTree } from "./TopologyTree";
+import {
+  getLegacyObjects,
+  emptyProjectV2,
+  definitionOccurrences,
+} from "@forma/document";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
@@ -45,7 +51,7 @@ import {
   saveNative,
   resetNativeDestination,
 } from "@forma/file-io";
-import { emptyProject } from "@forma/document";
+
 import { primitiveNames, type Primitive } from "@forma/shared";
 import { ru } from "@forma/ui";
 import { shortcuts, toolLabels } from "@forma/tools";
@@ -83,6 +89,24 @@ export function App() {
     [menu, setMenu] = useState<string | null>(null),
     [query, setQuery] = useState(""),
     [structure, setStructure] = useState(true);
+  const removeSelected = () => {
+    const ref = s.topologySelection;
+    if (ref?.kind === "face")
+      void s.editGeometry(ref, {
+        kind: "delete-entities",
+        entityIds: [ref.entityId],
+      });
+    else s.remove();
+  };
+  const nativeContexts =
+    s.project.schemaVersion === 2
+      ? definitionOccurrences(s.project).filter(
+          (o) =>
+            s.project.schemaVersion === 2 &&
+            (o.path.length > 0 ||
+              s.project.definitions[o.definitionId].geometryId),
+        )
+      : [];
   const input = useRef<HTMLInputElement>(null);
   const fileBusyRef = useRef(false);
   const [fileBusy, setFileBusy] = useState(false);
@@ -106,7 +130,7 @@ export function App() {
     if (fileBusyRef.current || !safe() || !beginFile()) return;
     try {
       await resetNativeDestination();
-      const result = s.replace(emptyProject());
+      const result = s.replace(emptyProjectV2());
       if (result.status === "rejected") throw Error(result.error);
       setWelcome(false);
     } catch (error) {
@@ -252,6 +276,11 @@ export function App() {
     }[]
   > = {
     Файл: [
+      {
+        label: "Преобразовать в v2",
+        action: () => s.upgradeProject(),
+        disabled: s.project.schemaVersion === 2,
+      },
       { label: "Новый проект", action: newProject, shortcut: "Ctrl N" },
       { label: "Открыть…", action: open, shortcut: "Ctrl O" },
       { label: "Сохранить", action: () => void save(), shortcut: "Ctrl S" },
@@ -282,7 +311,7 @@ export function App() {
       },
       {
         label: "Удалить",
-        action: s.remove,
+        action: removeSelected,
         shortcut: "Del",
         disabled: !s.selected,
       },
@@ -522,8 +551,8 @@ export function App() {
             </Button>
             <Button
               title="Удалить выделенное"
-              disabled={!s.selected}
-              onClick={s.remove}
+              disabled={!s.selected && s.topologySelection?.kind !== "face"}
+              onClick={removeSelected}
             >
               <Trash2 size={18} />
             </Button>
@@ -563,10 +592,10 @@ export function App() {
               <ChevronDown size={12} />
               <Layers size={14} />
               <strong>Сцена</strong>
-              <span>{s.project.objects.length}</span>
+              <span>{getLegacyObjects(s.project).length}</span>
             </div>
             <div className="object-list">
-              {s.project.objects
+              {getLegacyObjects(s.project)
                 .filter((o) =>
                   o.name
                     .toLocaleLowerCase()
@@ -596,16 +625,20 @@ export function App() {
                     </button>
                   </div>
                 ))}
-              {s.project.objects.length === 0 && (
-                <div className="empty-tree">
-                  Ваша сцена пока пуста.
-                  <br />
-                  Добавьте первую форму.
-                </div>
-              )}
+              <TopologyTree />
+              {getLegacyObjects(s.project).length === 0 &&
+                nativeContexts.length === 0 && (
+                  <div className="empty-tree">
+                    Ваша сцена пока пуста.
+                    <br />
+                    Добавьте первую форму.
+                  </div>
+                )}
             </div>
             <div className="structure-footer">
-              <Boxes size={14} /> {s.project.objects.length} объектов{" "}
+              <Boxes size={14} />{" "}
+              {getLegacyObjects(s.project).length + nativeContexts.length}{" "}
+              объектов{" "}
               <button title="Добавить куб" onClick={() => s.add("cube")}>
                 +
               </button>
@@ -671,7 +704,11 @@ export function App() {
         </span>
         <span>{toolLabels[s.tool]}</span>
         <span className="status-selection">
-          {s.selected ? "Выделен 1 объект" : "Нет выделения"}
+          {s.topologySelection
+            ? `Выбрана топология: ${s.topologySelection.entityId}`
+            : s.selected
+              ? "Выделен 1 объект"
+              : "Нет выделения"}
         </span>
         <span className="status-spacer" />
         <span>Привязка: {s.snap ? "0,25 м" : "выкл."}</span>

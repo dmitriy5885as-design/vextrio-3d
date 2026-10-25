@@ -1,3 +1,5 @@
+import { TopologyBridge } from "./TopologyBridge";
+import { getLegacyObjects } from "@forma/document";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -54,6 +56,7 @@ export function Viewport() {
       string,
       THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
     >();
+    let topology: TopologyBridge | null = null;
     let outline: THREE.BoxHelper | null = null;
     scene.add(new THREE.HemisphereLight(0xc6dfff, 0x252a38, 2.7));
     const light = new THREE.DirectionalLight(0xffffff, 3.4);
@@ -158,7 +161,41 @@ export function Viewport() {
       controls.rotateSpeed = s.sensitivity;
       controls.panSpeed = s.sensitivity;
       controls.zoomSpeed = s.sensitivity;
-      const ids = new Set(s.project.objects.map((o) => o.id));
+      if (s.project.schemaVersion === 2) {
+        if (!topology || !topology.sameContent(s.project)) {
+          try {
+            const next = new TopologyBridge(s.project, s.revision);
+            scene.add(next.root);
+            if (topology) {
+              scene.remove(topology.root);
+              topology.dispose();
+            }
+            topology = next;
+            el.dataset.topologyFaces = String(
+              Object.values(s.project.geometries).reduce(
+                (n, g) => n + Object.keys(g.faces).length,
+                0,
+              ),
+            );
+          } catch (error) {
+            s.notify(
+              error instanceof Error
+                ? error.message
+                : "Ошибка отображения топологии",
+            );
+            return;
+          }
+        }
+        topology.selection(s.topologySelection, s.selected, s.selectedPath);
+      } else if (topology) {
+        scene.remove(topology.root);
+        topology.dispose();
+        topology = null;
+        delete el.dataset.topologyFaces;
+      }
+      const objects =
+        s.project.schemaVersion === 1 ? getLegacyObjects(s.project) : [];
+      const ids = new Set(objects.map((o) => o.id));
       for (const [id, mesh] of meshes)
         if (!ids.has(id)) {
           scene.remove(mesh);
@@ -166,7 +203,7 @@ export function Viewport() {
           mesh.material.dispose();
           meshes.delete(id);
         }
-      for (const obj of s.project.objects) {
+      for (const obj of objects) {
         let mesh = meshes.get(obj.id);
         const signature = JSON.stringify(obj.geometry);
         if (!mesh) {
@@ -203,8 +240,13 @@ export function Viewport() {
         );
         mesh.material.emissiveIntensity = 0.2;
       }
-      const selected = s.project.objects.find((o) => o.id === s.selected);
-      const mesh = s.selected ? meshes.get(s.selected) : undefined;
+      const selected = getLegacyObjects(s.project).find(
+        (o) => o.id === s.selected,
+      );
+      const mesh = s.selected
+        ? (topology?.findLegacy(s.selected, s.selectedPath) ??
+          meshes.get(s.selected))
+        : undefined;
       if (outline) {
         scene.remove(outline);
         outline.geometry.dispose();
@@ -297,6 +339,23 @@ export function Viewport() {
         ),
         camera,
       );
+      if (topology) {
+        const distance = camera.position.distanceTo(controls.target),
+          threshold =
+            camera instanceof THREE.PerspectiveCamera
+              ? (distance *
+                  Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                  12) /
+                rect.height
+              : (((ortho.top - ortho.bottom) / camera.zoom) * 6) / rect.height;
+        const result = topology.pick(ray, threshold);
+        if (result && "ref" in result)
+          useEditor.getState().selectEntity(result.ref);
+        else if (result && "legacyId" in result)
+          useEditor.getState().selectOccurrence(result.legacyId, result.path);
+        else useEditor.getState().selectEntity(null);
+        return;
+      }
       const hit = ray.intersectObjects(
         [...meshes.values()].filter((m) => m.visible),
         false,
@@ -333,7 +392,12 @@ export function Viewport() {
           let target = new THREE.Vector3();
           let distance = 14;
           if (view === "focus") {
-            const mesh = state.selected ? meshes.get(state.selected) : null;
+            const mesh = state.selected
+              ? (topology?.findLegacy(state.selected, state.selectedPath) ??
+                meshes.get(state.selected))
+              : state.topologySelection
+                ? topology?.root
+                : null;
             if (mesh) {
               const box = new THREE.Box3().setFromObject(mesh);
               box.getCenter(target);
@@ -365,8 +429,10 @@ export function Viewport() {
         }
       }
       if (
-        state.project.objects !== prev.project.objects ||
+        state.project !== prev.project ||
         state.selected !== prev.selected ||
+        state.selectedPath !== prev.selectedPath ||
+        state.topologySelection !== prev.topologySelection ||
         state.tool !== prev.tool ||
         state.grid !== prev.grid ||
         state.snap !== prev.snap ||
@@ -379,6 +445,7 @@ export function Viewport() {
       disposed = true;
       unsubscribe();
       observer.disconnect();
+      topology?.dispose();
       cancelAnimationFrame(frame);
       controls.dispose();
       transform.dispose();

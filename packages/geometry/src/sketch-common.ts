@@ -19,6 +19,19 @@ import {
 } from "./math";
 import { inside, orientation } from "./predicates";
 import type { ValidationContext } from "./validate";
+import {
+  affinePlane,
+  transformAffine,
+  inverseAffine,
+  validateAffine,
+} from "./affine";
+import { transformPlane } from "./math";
+export const contextPlane = (plane: PlaneFrame, context: ValidationContext) =>
+  context.worldTransform
+    ? affinePlane(plane, context.worldTransform)
+    : context.placement
+      ? transformPlane(plane, context.placement)
+      : plane;
 export const unit = (v: Vec3) => multiply(v, 1 / length(v));
 export const near = (a: Vec3, b: Vec3, t: number) =>
   length(subtract(a, b)) <= t;
@@ -27,10 +40,23 @@ export function metric(
   context: ValidationContext,
   extra: Vec3[] = [],
 ) {
+  if (context.worldTransform)
+    validateAffine(context.worldTransform, context.policy);
+  const inverse = context.worldTransform
+    ? inverseAffine(context.worldTransform)
+    : null;
   const world = (p: Vec3) =>
-    context.placement ? localToWorld(p, context.placement) : p;
+    context.worldTransform
+      ? transformAffine(p, context.worldTransform)
+      : context.placement
+        ? localToWorld(p, context.placement)
+        : p;
   const local = (p: Vec3) =>
-    context.placement ? worldToLocal(p, context.placement) : p;
+    inverse
+      ? transformAffine(p, inverse)
+      : context.placement
+        ? worldToLocal(p, context.placement)
+        : p;
   const points = [
     ...Object.values(model.vertices).map((v) => world(v.position)),
     ...extra.map(world),

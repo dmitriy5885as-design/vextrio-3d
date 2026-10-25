@@ -114,6 +114,9 @@ importers:
       '@forma/file-io':
         specifier: workspace:*
         version: link:../../packages/file-io
+      '@forma/geometry':
+        specifier: workspace:*
+        version: link:../../packages/geometry
       '@forma/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -150,6 +153,9 @@ importers:
 
   packages/document:
     dependencies:
+      '@forma/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@forma/shared':
         specifier: workspace:*
         version: link:../shared
@@ -162,6 +168,9 @@ importers:
       '@forma/document':
         specifier: workspace:*
         version: link:../document
+      '@forma/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@forma/shared':
         specifier: workspace:*
         version: link:../shared
@@ -181,7 +190,11 @@ importers:
         specifier: ^2.12.4
         version: 2.12.4
 
-  packages/geometry: {}
+  packages/geometry:
+    dependencies:
+      earcut:
+        specifier: 3.0.2
+        version: 3.0.2
 
   packages/shared: {}
 
@@ -201,9 +214,15 @@ importers:
 
   packages/viewport:
     dependencies:
+      '@forma/document':
+        specifier: workspace:*
+        version: link:../document
       '@forma/editor':
         specifier: workspace:*
         version: link:../editor
+      '@forma/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@forma/shared':
         specifier: workspace:*
         version: link:../shared
@@ -1062,6 +1081,9 @@ packages:
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
+
+  earcut@3.0.2:
+    resolution: {integrity: sha512-X7hshQbLyMJ/3RPhyObLARM2sNxxmRALLKx1+NVFFnQ9gKzmCrxm9+uLIAdBcvc8FNLpctqlQ2V6AE92Ol9UDQ==}
 
   electron-to-chromium@1.5.463:
     resolution: {integrity: sha512-nVWNU6ltFjopvOdD44J4zoBkgO0M+WZiFKKFV7EjebOH9z0KNphk6bCEjplXtJofL21ARIuuwWOCsFkBVklm6w==}
@@ -2104,6 +2126,8 @@ snapshots:
   deep-eql@5.0.2: {}
 
   detect-libc@2.1.2: {}
+
+  earcut@3.0.2: {}
 
   electron-to-chromium@1.5.463: {}
 

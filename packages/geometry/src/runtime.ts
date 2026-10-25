@@ -80,6 +80,9 @@ function frozen<T>(value: T): T {
 function copyContext(context: ValidationContext): ValidationContext {
   return {
     ...context,
+    worldTransform: context.worldTransform
+      ? frozen(structuredClone(context.worldTransform))
+      : undefined,
     materialIds: new Set(context.materialIds),
     policy: frozen(structuredClone(context.policy ?? defaultPolicy)),
     reservedIds: context.reservedIds ? new Set(context.reservedIds) : undefined,
@@ -90,7 +93,12 @@ function copyContext(context: ValidationContext): ValidationContext {
 }
 export type OperationResult =
   | { status: "applied" | "noop" | "stale" | "cancelled" }
-  | { status: "preview"; model: GeometryModel }
+  | {
+      status: "preview";
+      model: GeometryModel;
+      change: PreparedGeometryChange;
+      operationId: Id<"operation">;
+    }
   | { status: "error"; diagnostics: Diagnostic[] };
 // Pure asynchronous backend; the transport can be replaced by a background executor.
 export function createLocalGeometryBackend(
@@ -235,7 +243,7 @@ export class GeometrySession {
       };
     const requestId = id<"request">(`request/${this.sequence++}`),
       operationId = id<"operation">(
-        `${this.model.id.slice(0, 100)}/s${this.allocationNamespace}/r${this.sequence - 1}`,
+        `${this.model.id.slice(0, 60)}/${this.sessionId.slice(0, 64)}/s${this.allocationNamespace}/r${this.sequence - 1}`,
       );
     const envelope: Envelope = {
       protocolVersion: 1,
@@ -284,7 +292,13 @@ export class GeometrySession {
             throw new GeometryError("INVALID_TOPOLOGY", "Retired ID reuse", [
               patch.id,
             ]);
-      if (mode === "preview") return { status: "preview", model: frozen(next) };
+      if (mode === "preview")
+        return {
+          status: "preview",
+          model: frozen(next),
+          change: frozen(change),
+          operationId,
+        };
       this.model = frozen(next);
       this.reserve(next);
       this.past.push(frozen(change));
@@ -306,6 +320,9 @@ export class GeometrySession {
   }
   undo() {
     return this.replay(this.past, this.future, true);
+  }
+  prepare(intent: GeometryIntent) {
+    return this.execute(intent, "preview");
   }
   redo() {
     return this.replay(this.future, this.past, false);

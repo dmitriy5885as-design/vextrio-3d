@@ -23,6 +23,12 @@ import {
   type PlacementTransform,
 } from "./math";
 import { inside, orientation, segmentsTouch } from "./predicates";
+import {
+  validateAffine,
+  transformAffine,
+  affinePlane,
+  type AffineTransform,
+} from "./affine";
 export interface ValidationContext {
   ownerDefinitionId: string;
   materialIds: ReadonlySet<string>;
@@ -30,6 +36,7 @@ export interface ValidationContext {
   policy?: GeometryPolicy;
   // One placement at this boundary; full occurrence-path composition is S4/S5.
   placement?: PlacementTransform;
+  worldTransform?: AffineTransform;
 }
 function fail(message: string, refs: string[] = []): never {
   throw new GeometryError("INVALID_TOPOLOGY", message, refs);
@@ -149,14 +156,17 @@ function validate(m: GeometryModel, c: ValidationContext) {
     min: Vec3 = [Infinity, Infinity, Infinity],
     max: Vec3 = [-Infinity, -Infinity, -Infinity];
   if (c.placement) validateTransform(c.placement, policy);
+  if (c.worldTransform) validateAffine(c.worldTransform, policy);
   const worldPositions = new Map<string, Vec3>();
   for (const vertex of vertices) {
     assertVector(vertex.position);
     if (vertex.role !== undefined && vertex.role !== "construction")
       fail("Invalid vertex role");
-    const point = c.placement
-      ? localToWorld(vertex.position, c.placement)
-      : vertex.position;
+    const point = c.worldTransform
+      ? transformAffine(vertex.position, c.worldTransform)
+      : c.placement
+        ? localToWorld(vertex.position, c.placement)
+        : vertex.position;
     worldPositions.set(vertex.id, point);
     point.forEach((n, i) => {
       min[i] = Math.min(min[i], n);
@@ -299,9 +309,11 @@ function validate(m: GeometryModel, c: ValidationContext) {
   const loopFace = new Map<string, string>();
   for (const f of Object.values(m.faces)) {
     validatePlane(f.plane, policy);
-    const metricPlane = c.placement
-      ? transformPlane(f.plane, c.placement)
-      : f.plane;
+    const metricPlane = c.worldTransform
+      ? affinePlane(f.plane, c.worldTransform)
+      : c.placement
+        ? transformPlane(f.plane, c.placement)
+        : f.plane;
     if (
       !c.materialIds.has(f.frontMaterialId) ||
       !c.materialIds.has(f.backMaterialId)

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — S4 интеграции топологии
+
+- Production Document v2, безопасная явная миграция v1 и сохранение пользовательских полей, ID, материалов и размещения legacy объектов.
+- GeometrySession.prepare и forward/inverse команды в общей Undo/Redo; защита stale результатов, occurrence locks и persisted lineage.
+- Render/picking bridge с отверстиями, материалами сторон, affine размещением и каноническими entity ID/occurrencePath.
+- Реальные .v3d fixtures и браузерные проверки загрузки, выбора и повторного открытия. [Отчёт S4](docs/0.2/S4_REPORT.md); Windows/Cargo проверка остаётся открытой.
+
 ## Unreleased — S1 надёжности для 0.2 Sketch
 
 - Общая валидация candidate до принятия документа/истории; отказ от нулевого масштаба и несериализуемых runtime-значений.

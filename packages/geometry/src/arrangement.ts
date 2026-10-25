@@ -1,3 +1,4 @@
+import { contextPlane } from "./sketch-common";
 import {
   GeometryError,
   type GeometryModel,
@@ -6,13 +7,7 @@ import {
   type Vec2,
   type Vec3,
 } from "./model";
-import {
-  cross,
-  length,
-  projectPoint,
-  transformPlane,
-  unprojectPoint,
-} from "./math";
+import { cross, length, projectPoint, unprojectPoint } from "./math";
 import { orientation } from "./predicates";
 import {
   inRegion,
@@ -62,15 +57,8 @@ export function discoverPlanes(
     }
   }
   for (const f of Object.values(model.faces))
-    include(
-      context.placement ? transformPlane(f.plane, context.placement) : f.plane,
-    );
-  if (declared)
-    include(
-      context.placement
-        ? transformPlane(declared, context.placement)
-        : declared,
-    );
+    include(contextPlane(f.plane, context));
+  if (declared) include(contextPlane(declared, context));
   // Candidate planes from pairs, then full containment of relevant edges. No
   // plane is inferred by simply dropping a coordinate of a spatial contour.
   for (let i = 0; i < edges.length; i++)

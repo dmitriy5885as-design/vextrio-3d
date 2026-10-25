@@ -1,3 +1,4 @@
+import { getLegacyObjects } from "@forma/document";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   emptyProject,
@@ -73,12 +74,9 @@ describe("Commands", () => {
   it("creates each primitive", () => {
     for (const kind of ["cube", "sphere", "cylinder", "plane"] as const)
       useEditor.getState().add(kind);
-    expect(useEditor.getState().project.objects.map((o) => o.type)).toEqual([
-      "cube",
-      "sphere",
-      "cylinder",
-      "plane",
-    ]);
+    expect(
+      getLegacyObjects(useEditor.getState().project).map((o) => o.type),
+    ).toEqual(["cube", "sphere", "cylinder", "plane"]);
   });
   it("undoes and redoes mixed edits in sequence", () => {
     const s = useEditor.getState();
@@ -93,9 +91,9 @@ describe("Commands", () => {
       },
     });
     s.duplicate();
-    expect(useEditor.getState().project.objects).toHaveLength(2);
+    expect(getLegacyObjects(useEditor.getState().project)).toHaveLength(2);
     s.remove();
-    expect(useEditor.getState().project.objects).toHaveLength(1);
+    expect(getLegacyObjects(useEditor.getState().project)).toHaveLength(1);
     s.undo();
     s.undo();
     s.undo();
@@ -103,9 +101,9 @@ describe("Commands", () => {
     s.redo();
     s.redo();
     s.redo();
-    expect(useEditor.getState().project.objects[0].transform.position).toEqual([
-      3, 2, 1,
-    ]);
+    expect(
+      getLegacyObjects(useEditor.getState().project)[0].transform.position,
+    ).toEqual([3, 2, 1]);
   });
   it("branches history after undo", () => {
     const s = useEditor.getState();
@@ -118,7 +116,7 @@ describe("Commands", () => {
     const s = useEditor.getState();
     s.add("cube");
     s.duplicate();
-    const [a, b] = useEditor.getState().project.objects;
+    const [a, b] = getLegacyObjects(useEditor.getState().project);
     expect(a.id).not.toBe(b.id);
     expect(a.transform.position[0]).not.toBe(b.transform.position[0]);
   });
@@ -130,8 +128,10 @@ describe("Commands", () => {
     s.remove();
     s.duplicate();
     s.patch(id, { name: "changed" });
-    expect(useEditor.getState().project.objects).toHaveLength(1);
-    expect(useEditor.getState().project.objects[0].name).not.toBe("changed");
+    expect(getLegacyObjects(useEditor.getState().project)).toHaveLength(1);
+    expect(getLegacyObjects(useEditor.getState().project)[0].name).not.toBe(
+      "changed",
+    );
   });
   it("resets history after open", () => {
     const s = useEditor.getState();
@@ -141,7 +141,7 @@ describe("Commands", () => {
     );
     s.replace(restored);
     expect(useEditor.getState().canUndo).toBe(false);
-    expect(useEditor.getState().project.objects).toHaveLength(1);
+    expect(getLegacyObjects(useEditor.getState().project)).toHaveLength(1);
   });
   it("snaps positions consistently", () =>
     expect(snapPosition([0.12, 0.6, -0.3], 0.25)).toEqual([0, 0.5, -0.25]));

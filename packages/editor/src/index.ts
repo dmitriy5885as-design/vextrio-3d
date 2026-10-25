@@ -2,13 +2,32 @@ import { create } from "zustand";
 import {
   clone,
   freezeData,
-  type Project,
+  type Project as ProjectV1,
   type Primitive,
   type SceneObject,
   type CameraData,
   type TransformMode,
 } from "@forma/shared";
-import { createObject, emptyProject, validateProject } from "@forma/document";
+import {
+  createObject,
+  emptyProject,
+  validateProject,
+  getLegacyObjects,
+  mutateLegacy,
+  migrateProject,
+  definitionAtPath,
+  validateEntityRef,
+  geometryContext,
+  type Document as Project,
+  type EntityRef,
+} from "@forma/document";
+import {
+  GeometrySession,
+  createLocalGeometryBackend,
+  type GeometryIntent,
+} from "@forma/geometry";
+import { GeometryDocumentCommand } from "./geometry-command";
+import { isGeometryLocked } from "./permissions";
 import { CommandHistory, SnapshotCommand } from "@forma/commands";
 import {
   authorizeMutation,
@@ -16,7 +35,7 @@ import {
   isObjectLocked,
   type MutationAction,
 } from "./permissions";
-export { isObjectLocked } from "./permissions";
+export { isObjectLocked, isGeometryLocked } from "./permissions";
 export type CommandResult =
   { status: "applied" | "noop" } | { status: "rejected"; error: string };
 export type ObjectPatch = Partial<
@@ -28,6 +47,25 @@ export type ObjectPatch = Partial<
 interface EditorState {
   project: Project;
   selected: string | null;
+  upgradeProject: () => CommandResult;
+  patchNode: (
+    key: string,
+    patch: Partial<
+      Pick<
+        import("@forma/geometry").InstanceNode,
+        "name" | "visible" | "transform"
+      >
+    >,
+  ) => CommandResult;
+  setNodeLocked: (key: string, locked: boolean) => CommandResult;
+  selectedPath: string[] | null;
+  topologySelection: EntityRef | null;
+  selectEntity: (ref: EntityRef | null) => void;
+  selectOccurrence: (id: string, path: string[]) => void;
+  editGeometry: (
+    ref: EntityRef,
+    intent: GeometryIntent,
+  ) => Promise<CommandResult>;
   tool: TransformMode | "select";
   revision: number;
   savedSignature: string;
@@ -37,7 +75,7 @@ interface EditorState {
   sensitivity: number;
   message: string;
   cameraRequest: { view: string; nonce: number } | null;
-  mutate: (label: string, fn: (candidate: Project) => void) => CommandResult;
+  mutate: (label: string, fn: (candidate: ProjectV1) => void) => CommandResult;
   add: (type: Primitive) => CommandResult;
   select: (id: string | null) => void;
   patch: (id: string, patch: ObjectPatch) => CommandResult;
@@ -65,7 +103,7 @@ export const useEditor = create<EditorState>((set, get) => {
     set({ message });
     return { status: "rejected", error: message };
   };
-  const commit = (
+  const commitDocument = (
     label: string,
     fn: (candidate: Project) => void,
     action: MutationAction = { kind: "edit" },
@@ -103,9 +141,21 @@ export const useEditor = create<EditorState>((set, get) => {
       transactionInProgress = false;
     }
   };
+  const commit = (
+    label: string,
+    fn: (candidate: ProjectV1) => void,
+    action: MutationAction = { kind: "edit" },
+  ) => commitDocument(label, (p) => mutateLegacy(p, fn), action);
+  const pendingGeometry = new Set<GeometrySession>();
+  const cancelGeometry = () => {
+    for (const session of pendingGeometry) session.cancelAll();
+    pendingGeometry.clear();
+  };
   return {
     project: initial,
     selected: null,
+    selectedPath: null,
+    topologySelection: null,
     tool: "select",
     revision: 0,
     savedSignature: JSON.stringify(initial),
@@ -118,25 +168,188 @@ export const useEditor = create<EditorState>((set, get) => {
     canUndo: false,
     canRedo: false,
     mutate: (label, fn) => commit(label, fn),
+    patchNode: (key, patch) =>
+      commitDocument(
+        "Изменение узла",
+        (p) => {
+          if (
+            p.schemaVersion !== 2 ||
+            !p.nodes[key] ||
+            p.nodes[key].kind === "legacy-primitive"
+          )
+            throw Error("Узел не найден.");
+          if (
+            Object.keys(patch).some(
+              (k) => !["name", "visible", "transform"].includes(k),
+            )
+          )
+            throw Error("Недопустимое свойство узла.");
+          Object.assign(p.nodes[key], clone(patch));
+        },
+        { kind: "native-node", id: key },
+      ),
+    setNodeLocked: (key, locked) =>
+      commitDocument(
+        locked ? "Узел заблокирован" : "Узел разблокирован",
+        (p) => {
+          if (
+            p.schemaVersion !== 2 ||
+            !p.nodes[key] ||
+            p.nodes[key].kind === "legacy-primitive"
+          )
+            throw Error("Узел не найден.");
+          p.nodes[key].locked = locked;
+        },
+        { kind: "native-node", id: key, setLock: locked },
+      ),
+    upgradeProject: () => {
+      if (transactionInProgress)
+        return reject(Error("Вложенная команда запрещена."));
+      const before = get().project;
+      if (before.schemaVersion === 2) return { status: "noop" };
+      try {
+        const next = migrateProject(before),
+          project = history.run(
+            new SnapshotCommand("Миграция в v2", before, next),
+            before,
+          );
+        cancelGeometry();
+        set({
+          project: freezeData(project),
+          revision: get().revision + 1,
+          canUndo: history.canUndo,
+          canRedo: history.canRedo,
+          topologySelection: null,
+          message: "Проект преобразован в v2",
+        });
+        return { status: "applied" };
+      } catch (error) {
+        return reject(error);
+      }
+    },
     add: (type) => {
       try {
         const object = createObject(
           type,
-          get().project.objects.filter((o) => o.type === type).length,
+          getLegacyObjects(get().project).filter((o) => o.type === type).length,
         );
-        object.transform.position[0] = get().project.objects.length * 0.5;
+        object.transform.position[0] =
+          getLegacyObjects(get().project).length * 0.5;
         const result = commit(`Создан объект: ${object.name}`, (p) =>
           p.objects.push(object),
         );
         if (result.status === "applied")
-          set({ selected: object.id, tool: "translate" });
+          set({
+            selected: object.id,
+            selectedPath: null,
+            topologySelection: null,
+            tool: "translate",
+          });
         return result;
       } catch (error) {
         return reject(error);
       }
     },
+    selectEntity: (ref) => {
+      if (transactionInProgress) return;
+      try {
+        if (ref) {
+          const p = get().project;
+          if (p.schemaVersion !== 2) throw Error("Нужен документ v2.");
+          validateEntityRef(p, ref);
+        }
+        set({
+          topologySelection: ref ? clone(ref) : null,
+          selected: null,
+          selectedPath: null,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    },
+    selectOccurrence: (key, path) => {
+      if (transactionInProgress) return;
+      try {
+        const p = get().project;
+        if (
+          p.schemaVersion !== 2 ||
+          !p.nodes[key] ||
+          p.nodes[key].kind !== "legacy-primitive" ||
+          path.length > 128 ||
+          definitionAtPath(p, path) !== p.nodes[key].parentDefinitionId
+        )
+          throw Error("Неверный путь примитива.");
+        set({
+          selected: key,
+          selectedPath: clone(path),
+          topologySelection: null,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    },
+    editGeometry: async (ref, intent) => {
+      if (transactionInProgress)
+        return reject(Error("Вложенная команда запрещена."));
+      const before = get().project,
+        revision = get().revision;
+      if (before.schemaVersion !== 2)
+        return reject(Error("Для топологии нужен документ v2."));
+      let session: GeometrySession | undefined;
+      try {
+        validateEntityRef(before, ref);
+        if (isGeometryLocked(before, ref))
+          throw Error("Геометрический контекст заблокирован.");
+        const context = geometryContext(
+          before,
+          ref.geometryId,
+          true,
+          ref.occurrencePath,
+        );
+        session = new GeometrySession(
+          before.geometries[ref.geometryId],
+          context,
+          createLocalGeometryBackend(context),
+          ("edit/" +
+            crypto.randomUUID()) as import("@forma/geometry").Id<"session">,
+        );
+        pendingGeometry.add(session);
+        const result = await session.prepare(intent);
+        if (get().revision !== revision || get().project.schemaVersion !== 2)
+          throw Error("Результат геометрии устарел.");
+        if (result.status === "noop") return { status: "noop" };
+        if (result.status !== "preview")
+          throw Error(
+            result.status === "error"
+              ? result.diagnostics[0].message
+              : "Операция отменена.",
+          );
+        const project = history.run(
+          new GeometryDocumentCommand(
+            "Изменение геометрии",
+            ref,
+            result.change,
+          ),
+          get().project,
+        );
+        set({
+          project: freezeData(project),
+          revision: revision + 1,
+          canUndo: history.canUndo,
+          canRedo: history.canRedo,
+          topologySelection: null,
+          message: "Геометрия изменена",
+        });
+        return { status: "applied" };
+      } catch (error) {
+        return reject(error);
+      } finally {
+        if (session) pendingGeometry.delete(session);
+      }
+    },
     select: (selected) => {
-      if (!transactionInProgress) set({ selected });
+      if (!transactionInProgress)
+        set({ selected, selectedPath: null, topologySelection: null });
     },
     patch: (id, patch) =>
       commit("Изменение свойств", (p) => {
@@ -175,7 +388,7 @@ export const useEditor = create<EditorState>((set, get) => {
     },
     duplicate: () => {
       const before = get().project,
-        source = before.objects.find((o) => o.id === get().selected);
+        source = getLegacyObjects(before).find((o) => o.id === get().selected);
       if (!source) return { status: "noop" };
       if (isObjectLocked(before, source.id))
         return reject(Error("Объект или его родитель заблокирован."));
@@ -183,13 +396,23 @@ export const useEditor = create<EditorState>((set, get) => {
       copy.id = crypto.randomUUID();
       copy.name = `${copy.name} — копия`.slice(0, 200);
       copy.transform.position[0] += 2.5;
-      const result = commit("Дублирование объекта", (p) =>
-        p.objects.push(copy),
-      );
+      const result = commitDocument("Дублирование объекта", (p) => {
+        mutateLegacy(p, (view) => view.objects.push(copy));
+        if (p.schemaVersion === 2 && before.schemaVersion === 2) {
+          const parent = before.nodes[source.id].parentDefinitionId,
+            node = p.nodes[copy.id];
+          p.definitions[p.rootDefinitionId].childNodeIds = p.definitions[
+            p.rootDefinitionId
+          ].childNodeIds.filter((key) => key !== copy.id);
+          node.parentDefinitionId = parent;
+          p.definitions[parent].childNodeIds.push(copy.id as never);
+        }
+      });
       if (result.status === "applied") set({ selected: copy.id });
       return result;
     },
     undo: () => {
+      cancelGeometry();
       if (transactionInProgress)
         return reject(Error("Вложенная команда запрещена."));
       if (!history.canUndo) return { status: "noop" };
@@ -201,7 +424,10 @@ export const useEditor = create<EditorState>((set, get) => {
         }));
         set({
           project: freezeData(project),
-          selected: project.objects.some((o) => o.id === get().selected)
+          topologySelection: null,
+          selected: getLegacyObjects(project).some(
+            (o) => o.id === get().selected,
+          )
             ? get().selected
             : null,
           revision: get().revision + 1,
@@ -215,6 +441,7 @@ export const useEditor = create<EditorState>((set, get) => {
       }
     },
     redo: () => {
+      cancelGeometry();
       if (transactionInProgress)
         return reject(Error("Вложенная команда запрещена."));
       if (!history.canRedo) return { status: "noop" };
@@ -226,7 +453,9 @@ export const useEditor = create<EditorState>((set, get) => {
         }));
         set({
           project: freezeData(project),
-          selected: project.objects.some((o) => o.id === get().selected)
+          selected: getLegacyObjects(project).some(
+            (o) => o.id === get().selected,
+          )
             ? get().selected
             : null,
           revision: get().revision + 1,
@@ -246,6 +475,7 @@ export const useEditor = create<EditorState>((set, get) => {
         validateProject(project);
         const accepted = clone(project),
           signature = JSON.stringify(accepted);
+        cancelGeometry();
         history.clear();
         set({
           project: freezeData(accepted),

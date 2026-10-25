@@ -29,6 +29,7 @@ describe("atomic history boundaries", () => {
     const bad: Command = {
       label: "bad",
       execute(value) {
+        if (value.schemaVersion !== 1) throw Error("Fixture must be v1");
         value.objects = [createObject("cube")];
         value.objects[0].transform.scale[0] = 0;
         return value;

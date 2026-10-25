@@ -6,3 +6,5 @@ export * from "./runtime";
 export * from "./contexts";
 export * from "./intersections";
 export * from "./sketch";
+export * from "./tessellate";
+export * from "./affine";
