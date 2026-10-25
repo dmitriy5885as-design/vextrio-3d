@@ -109,7 +109,10 @@ export function isObjectLocked(
       isObjectLockedV1(legacyView(p), key, ancestorsOnly))
   );
 }
-export function isGeometryLocked(p: ProjectV2, ref: EntityRef) {
+export function isGeometryLocked(
+  p: ProjectV2,
+  ref: Pick<EntityRef, "definitionId">,
+) {
   return definitionOccurrences(p).some(
     (o) => o.definitionId === ref.definitionId && o.locked,
   );

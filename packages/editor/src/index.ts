@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { usePrecision } from "./precision";
+import {
+  ToolController,
+  type ToolState,
+  type SketchReply,
+  type ToolName,
+} from "@forma/tools";
+import { usePrecision, precisionFrame } from "./precision";
 export * from "./precision";
 import {
   clone,
@@ -8,7 +14,7 @@ import {
   type Primitive,
   type SceneObject,
   type CameraData,
-  type TransformMode,
+  type Vec3,
 } from "@forma/shared";
 import {
   createObject,
@@ -20,6 +26,8 @@ import {
   definitionAtPath,
   validateEntityRef,
   geometryContext,
+  definitionOccurrences,
+  occurrenceMatrix,
   type Document as Project,
   type EntityRef,
 } from "@forma/document";
@@ -27,6 +35,12 @@ import {
   GeometrySession,
   createLocalGeometryBackend,
   type GeometryIntent,
+  emptyGeometry,
+  id,
+  transformAffine,
+  inverseAffine,
+  tessellateFace,
+  tessellationArea,
 } from "@forma/geometry";
 import { GeometryDocumentCommand } from "./geometry-command";
 import { isGeometryLocked } from "./permissions";
@@ -62,14 +76,24 @@ interface EditorState {
   setNodeLocked: (key: string, locked: boolean) => CommandResult;
   selectedPath: string[] | null;
   topologySelection: EntityRef | null;
-  selectEntity: (ref: EntityRef | null) => void;
+  selectEntity: (ref: EntityRef | null, additive?: boolean) => void;
+  topologySelections: EntityRef[];
+  topologyHover: EntityRef | null;
+  setTopologyHover: (ref: EntityRef | null) => void;
+  drawSegments: (
+    path: string[],
+    segments: [Vec3, Vec3][],
+    preview?: boolean,
+    accept?: () => boolean,
+    shared?: boolean,
+  ) => Promise<SketchReply>;
   selectOccurrence: (id: string, path: string[]) => void;
   editGeometry: (
     ref: EntityRef,
     intent: GeometryIntent,
     acceptContext?: () => boolean,
   ) => Promise<CommandResult>;
-  tool: TransformMode | "select";
+  tool: ToolName;
   revision: number;
   savedSignature: string;
   grid: boolean;
@@ -98,6 +122,7 @@ interface EditorState {
 }
 const history = new CommandHistory();
 const initial = freezeData(emptyProject());
+let publishingSketch = false;
 export const useEditor = create<EditorState>((set, get) => {
   let transactionInProgress = false;
   const reject = (error: unknown): CommandResult => {
@@ -159,6 +184,8 @@ export const useEditor = create<EditorState>((set, get) => {
     selected: null,
     selectedPath: null,
     topologySelection: null,
+    topologySelections: [],
+    topologyHover: null,
     tool: "select",
     revision: 0,
     savedSignature: JSON.stringify(initial),
@@ -253,7 +280,154 @@ export const useEditor = create<EditorState>((set, get) => {
         return reject(error);
       }
     },
-    selectEntity: (ref) => {
+    setTopologyHover: (ref) => {
+      if (ref) {
+        try {
+          const p = get().project;
+          if (p.schemaVersion !== 2) return;
+          validateEntityRef(p, ref);
+        } catch {
+          ref = null;
+        }
+      }
+      if (JSON.stringify(get().topologyHover) !== JSON.stringify(ref))
+        set({ topologyHover: ref ? clone(ref) : null });
+    },
+    drawSegments: async (
+      path,
+      segments,
+      preview = false,
+      accept,
+      shared = false,
+    ) => {
+      const before = get().project,
+        revision = get().revision;
+      let session: GeometrySession | undefined;
+      try {
+        if (transactionInProgress)
+          throw Error("Другая команда ещё выполняется.");
+        if (accept && !accept()) throw Error("Построение отменено.");
+        if (before.schemaVersion !== 2)
+          throw Error(
+            "Для рисования преобразуйте проект в v2 через меню Файл.",
+          );
+        const definitionId = definitionAtPath(before, path),
+          occurrences = definitionOccurrences(before);
+        const occurrence = occurrences.find(
+          (o) => JSON.stringify(o.path) === JSON.stringify(path),
+        );
+        if (!occurrence?.visible || isGeometryLocked(before, { definitionId }))
+          throw Error("Контекст скрыт или заблокирован.");
+        if (
+          !preview &&
+          !shared &&
+          occurrences.filter((o) => o.definitionId === definitionId).length > 1
+        )
+          throw Error(
+            "Подтвердите изменение всех экземпляров общего компонента.",
+          );
+        const staged = clone(before),
+          seed: ConstructorParameters<typeof GeometryDocumentCommand>[3] = {};
+        let gid = staged.definitions[definitionId].geometryId;
+        if (!gid) {
+          gid = id("geometry/" + crypto.randomUUID());
+          seed.geometry = emptyGeometry(gid, id(definitionId));
+          staged.geometries[gid] = clone(seed.geometry);
+          staged.definitions[definitionId].geometryId = gid;
+        }
+        if (!Object.keys(staged.materials).length) {
+          const materialId = "material/" + crypto.randomUUID();
+          seed.material = {
+            id: materialId,
+            color: "#86b7c6",
+            roughness: 0.7,
+            metalness: 0,
+          };
+          staged.materials[materialId] = clone(seed.material);
+        }
+        const scope = {
+            definitionId,
+            geometryId: gid,
+            occurrencePath: [...path],
+          },
+          context = geometryContext(staged, gid, true, path),
+          matrix = inverseAffine(occurrenceMatrix(staged, path));
+        const local = segments.map(
+          ([a, b]) =>
+            [transformAffine(a, matrix), transformAffine(b, matrix)] as [
+              Vec3,
+              Vec3,
+            ],
+        );
+        session = new GeometrySession(
+          staged.geometries[gid],
+          context,
+          createLocalGeometryBackend(context),
+          id("draw/" + crypto.randomUUID()),
+        );
+        pendingGeometry.add(session);
+        const result = await session.prepare({
+          kind: "insert-segments",
+          segments: local,
+          plane: null,
+        });
+        if (accept && !accept()) throw Error("Построение отменено.");
+        if (get().revision !== revision)
+          throw Error("Результат построения устарел.");
+        if (result.status === "noop") return { status: "noop" };
+        if (result.status !== "preview")
+          throw Error(
+            result.status === "error"
+              ? result.diagnostics[0].message
+              : "Построение отменено.",
+          );
+        const command = new GeometryDocumentCommand(
+          segments.length === 4 ? "Прямоугольник построен" : "Линия построена",
+          scope,
+          result.change,
+          seed,
+        );
+        const candidate = command.execute(get().project);
+        validateProject(candidate);
+        if (candidate.schemaVersion !== 2) throw Error("Нужен v2.");
+        const g = candidate.geometries[gid],
+          world = occurrenceMatrix(candidate, path),
+          stats = {
+            vertices: Object.keys(g.vertices).length,
+            edges: Object.keys(g.edges).length,
+            faces: Object.keys(g.faces).length,
+            areas: Object.values(g.faces).map((f) =>
+              tessellationArea(tessellateFace(g, f), world),
+            ),
+          };
+        if (preview) return { status: "preview", stats };
+        const project = history.run(command, get().project);
+        publishingSketch = true;
+        try {
+          set({
+            project: freezeData(project),
+            revision: revision + 1,
+            canUndo: history.canUndo,
+            canRedo: history.canRedo,
+            topologySelection: null,
+            topologySelections: [],
+            topologyHover: null,
+            message: command.label,
+          });
+        } finally {
+          publishingSketch = false;
+        }
+        return { status: "applied", stats };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Ошибка построения";
+        if (!preview) set({ message });
+        return { status: "rejected", error: message };
+      } finally {
+        if (session) pendingGeometry.delete(session);
+      }
+    },
+    selectEntity: (ref, additive = false) => {
       if (transactionInProgress) return;
       try {
         if (ref) {
@@ -261,8 +435,20 @@ export const useEditor = create<EditorState>((set, get) => {
           if (p.schemaVersion !== 2) throw Error("Нужен документ v2.");
           validateEntityRef(p, ref);
         }
+        const key = (r: EntityRef) =>
+          JSON.stringify([r.geometryId, r.kind, r.entityId, r.occurrencePath]);
+        const selections = additive
+          ? get().topologySelections.filter((r) => !ref || key(r) !== key(ref))
+          : [];
+        if (
+          ref &&
+          (!additive ||
+            !get().topologySelections.some((r) => key(r) === key(ref)))
+        )
+          selections.push(clone(ref));
         set({
-          topologySelection: ref ? clone(ref) : null,
+          topologySelection: selections.at(-1) ?? null,
+          topologySelections: selections,
           selected: null,
           selectedPath: null,
         });
@@ -286,6 +472,8 @@ export const useEditor = create<EditorState>((set, get) => {
           selected: key,
           selectedPath: clone(path),
           topologySelection: null,
+          topologySelections: [],
+          topologyHover: null,
         });
       } catch (error) {
         reject(error);
@@ -356,7 +544,13 @@ export const useEditor = create<EditorState>((set, get) => {
     },
     select: (selected) => {
       if (!transactionInProgress)
-        set({ selected, selectedPath: null, topologySelection: null });
+        set({
+          selected,
+          selectedPath: null,
+          topologySelection: null,
+          topologySelections: [],
+          topologyHover: null,
+        });
     },
     patch: (id, patch) =>
       commit("Изменение свойств", (p) => {
@@ -419,6 +613,7 @@ export const useEditor = create<EditorState>((set, get) => {
       return result;
     },
     undo: () => {
+      sketchController.cancel();
       cancelGeometry();
       if (transactionInProgress)
         return reject(Error("Вложенная команда запрещена."));
@@ -448,6 +643,7 @@ export const useEditor = create<EditorState>((set, get) => {
       }
     },
     redo: () => {
+      sketchController.cancel();
       cancelGeometry();
       if (transactionInProgress)
         return reject(Error("Вложенная команда запрещена."));
@@ -490,6 +686,7 @@ export const useEditor = create<EditorState>((set, get) => {
         usePrecision.getState().setAnchor([0, 0, 0]);
         set({
           project: freezeData(accepted),
+          tool: "select",
           selected: null,
           topologySelection: null,
           selectedPath: null,
@@ -520,6 +717,15 @@ export const useEditor = create<EditorState>((set, get) => {
       }
     },
     setTool: (tool) => {
+      if (
+        (tool === "line" || tool === "rectangle") &&
+        get().project.schemaVersion !== 2
+      ) {
+        reject(
+          Error("Для рисования преобразуйте проект в v2 через меню Файл."),
+        );
+        return;
+      }
       if (!transactionInProgress) set({ tool });
     },
     view: (view) => {
@@ -545,3 +751,80 @@ export const useEditor = create<EditorState>((set, get) => {
 export const isDirty = () =>
   JSON.stringify(useEditor.getState().project) !==
   useEditor.getState().savedSignature;
+
+const draw =
+  (preview: boolean) => (segments: [Vec3, Vec3][], accept: () => boolean) => {
+    const precision = usePrecision.getState();
+    return useEditor
+      .getState()
+      .drawSegments(
+        [...precision.path],
+        segments,
+        preview,
+        accept,
+        precision.sharedEditConfirmed,
+      );
+  };
+export const sketchController = new ToolController({
+  preview: draw(true),
+  commit: draw(false),
+});
+export const useSketch = create<ToolState>(() => sketchController.state);
+sketchController.subscribe((state) => {
+  useSketch.setState(state, true);
+  if ((state.phase === "Start" || state.phase === "Continue") && state.start)
+    usePrecision.getState().setAnchor(state.start);
+  if (state.tool && (state.phase === "Idle" || state.phase === "Finish"))
+    usePrecision.getState().clear();
+});
+usePrecision.subscribe((s, previous) => {
+  if (
+    s.path !== previous.path ||
+    s.system !== previous.system ||
+    s.planeName !== previous.planeName ||
+    s.planeOverride !== previous.planeOverride ||
+    (!s.enabled && previous.enabled)
+  )
+    sketchController.cancel();
+});
+useEditor.subscribe((s, previous) => {
+  if (s.revision !== previous.revision) {
+    const a = s.project,
+      b = previous.project;
+    const geometryChanged =
+      a.schemaVersion !== 2 ||
+      b.schemaVersion !== 2 ||
+      JSON.stringify([a.nodes, a.definitions, a.geometries]) !==
+        JSON.stringify([b.nodes, b.definitions, b.geometries]);
+    if (!publishingSketch && sketchController.state.tool && geometryChanged)
+      sketchController.cancel();
+    if (geometryChanged && (s.topologySelections.length || s.topologyHover))
+      useEditor.setState({
+        topologySelection: null,
+        topologySelections: [],
+        topologyHover: null,
+      });
+  }
+  if (s.tool !== previous.tool) {
+    const draw = s.tool === "line" || s.tool === "rectangle";
+    if (draw) {
+      const p = usePrecision.getState();
+      const path = s.topologySelection?.occurrencePath ?? p.path;
+      usePrecision.getState().configure({
+        enabled: true,
+        ...(JSON.stringify(path) !== JSON.stringify(p.path) ? { path } : {}),
+      });
+      useEditor.setState({ snap: true });
+    } else if (previous.tool === "line" || previous.tool === "rectangle")
+      usePrecision.getState().configure({ enabled: false });
+    sketchController.activate(draw ? (s.tool as "line" | "rectangle") : null);
+  }
+});
+export function sketchPlane() {
+  const p = useEditor.getState().project;
+  if (p.schemaVersion !== 2) throw Error("Нужен документ v2.");
+  const plane = precisionFrame(p, usePrecision.getState()).plane;
+  return sketchController.state.start
+    ? { ...plane, origin: sketchController.state.start }
+    : plane;
+}

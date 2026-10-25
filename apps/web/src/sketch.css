@@ -1,0 +1,101 @@
+.sketch-panel {
+  position: absolute;
+  z-index: 13;
+  right: 12px;
+  top: 58px;
+  width: min(320px, calc(100% - 24px));
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #3478f677;
+  border-radius: 9px;
+  padding: 12px;
+  box-shadow: 0 6px 24px #0004;
+  font-size: 12px;
+  max-height: calc(100% - 105px);
+  overflow: auto;
+}
+.sketch-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.sketch-title strong {
+  color: #4dd5c0;
+}
+.sketch-panel p {
+  margin: 7px 0;
+}
+.sketch-panel form {
+  display: flex;
+  gap: 6px;
+  align-items: end;
+}
+.sketch-panel label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.sketch-panel form label {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.sketch-panel input:not([type="checkbox"]),
+.sketch-panel select {
+  background: var(--input, #202c3e);
+  color: var(--text);
+  border: 1px solid #61748a;
+  border-radius: 4px;
+  padding: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+.sketch-panel button {
+  border: 1px solid #3478f677;
+  border-radius: 4px;
+  padding: 6px;
+}
+.sketch-panel output,
+.sketch-panel small {
+  display: block;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.sketch-panel output {
+  color: #4dd5c0;
+}
+.sketch-panel details {
+  margin-top: 6px;
+}
+.sketch-panel details label {
+  margin-top: 6px;
+  justify-content: space-between;
+}
+.sketch-error {
+  color: #ff8990;
+}
+.sketch-panel [aria-invalid="true"] {
+  outline: 1px solid #ff8990;
+}
+.sketch-toggle {
+  margin-top: 8px;
+}
+@media (max-width: 1200px) {
+  .scene.sketch-active .viewport-canvas {
+    bottom: 230px;
+  }
+  .sketch-panel {
+    font-size: 11px;
+    top: auto;
+    bottom: 33px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    height: 190px;
+    max-height: 190px;
+  }
+  .sketch-panel form {
+    flex-wrap: wrap;
+  }
+}

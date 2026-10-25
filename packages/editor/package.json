@@ -10,6 +10,7 @@
     "@forma/shared": "workspace:*",
     "zustand": "^5.0.0",
     "@forma/geometry": "workspace:*",
-    "@forma/snapping": "workspace:*"
+    "@forma/snapping": "workspace:*",
+    "@forma/tools":"workspace:*"
   }
 }

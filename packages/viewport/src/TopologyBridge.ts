@@ -67,6 +67,9 @@ export class TopologyBridge {
                 roughness: data.roughness,
                 metalness: data.metalness,
                 side,
+                polygonOffset: true,
+                polygonOffsetFactor: 1,
+                polygonOffsetUnits: 1,
               }),
             ),
             mesh = new THREE.Mesh(geometry, material);
@@ -80,7 +83,11 @@ export class TopologyBridge {
           this.pickables.push(mesh);
         }
       }
+      const used = new Set(Object.values(m.coedges).map((c) => c.edgeId));
       const edges = Object.values(m.edges),
+        baseColors = edges.map((e) =>
+          used.has(e.id) ? [0.04, 0.1, 0.17] : [0.25, 0.65, 0.8],
+        ),
         edgeGeometry = this.own(new THREE.BufferGeometry());
       edgeGeometry.setAttribute(
         "position",
@@ -95,7 +102,7 @@ export class TopologyBridge {
       edgeGeometry.setAttribute(
         "color",
         new THREE.Float32BufferAttribute(
-          edges.flatMap(() => [0.25, 0.65, 0.8, 0.25, 0.65, 0.8]),
+          baseColors.flatMap((c) => [...c, ...c]),
           3,
         ),
       );
@@ -106,6 +113,7 @@ export class TopologyBridge {
       lines.userData = {
         baseRef: ref("edge", ""),
         ids: edges.map((e) => e.id),
+        baseColors,
         renderRevision: this.revision,
       };
       local.add(lines);
@@ -213,23 +221,27 @@ export class TopologyBridge {
     selected: EntityRef | null,
     legacyId: string | null,
     path: string[] | null,
+    selections: EntityRef[] = selected ? [selected] : [],
+    hover: EntityRef | null = null,
   ) {
-    const same = (ref: EntityRef) =>
-      selected &&
-      ref.definitionId === selected.definitionId &&
-      ref.geometryId === selected.geometryId &&
-      JSON.stringify(ref.occurrencePath) ===
-        JSON.stringify(selected.occurrencePath);
+    const matches = (a: EntityRef, b: EntityRef) =>
+      a.definitionId === b.definitionId &&
+      a.geometryId === b.geometryId &&
+      a.kind === b.kind &&
+      a.entityId === b.entityId &&
+      JSON.stringify(a.occurrencePath) === JSON.stringify(b.occurrencePath);
     for (const object of this.pickables) {
       if (object instanceof THREE.Mesh) {
         const ref = object.userData.entityRef as EntityRef | undefined,
           active = ref
-            ? same(ref) &&
-              ref.entityId === selected?.entityId &&
-              ref.kind === selected?.kind
+            ? selections.some((s) => matches(ref, s))
             : object === this.findLegacy(legacyId ?? "", path);
         (object.material as THREE.MeshStandardMaterial).emissive.set(
-          active ? "#164f9c" : "#000000",
+          active
+            ? "#164f9c"
+            : ref && hover && matches(ref, hover)
+              ? "#075043"
+              : "#000000",
         );
       } else if (
         object instanceof THREE.LineSegments ||
@@ -242,16 +254,18 @@ export class TopologyBridge {
           ids = object.userData.ids as string[],
           stride = object instanceof THREE.LineSegments ? 2 : 1;
         for (let i = 0; i < ids.length; i++) {
-          const active =
-            same(ref) &&
-            selected?.kind === ref.kind &&
-            selected.entityId === ids[i];
+          const entity = { ...ref, entityId: ids[i] },
+            active = selections.some((s) => matches(entity, s)),
+            hovered = hover && matches(entity, hover);
+          const base = (object.userData.baseColors?.[i] ?? [
+            0.25, 0.7, 0.8,
+          ]) as number[];
           for (let j = 0; j < stride; j++)
             colors.setXYZ(
               i * stride + j,
-              active ? 1 : 0.25,
-              active ? 0.85 : 0.7,
-              active ? 0.3 : 0.8,
+              active ? 1 : hovered ? 0.3 : base[0],
+              active ? 0.85 : hovered ? 1 : base[1],
+              active ? 0.3 : hovered ? 0.75 : base[2],
             );
         }
         colors.needsUpdate = true;
@@ -262,6 +276,7 @@ export class TopologyBridge {
     ray: THREE.Raycaster,
     threshold: number,
   ): { ref: EntityRef } | { legacyId: string; path: string[] } | null {
+    this.root.updateMatrixWorld(true);
     ray.params.Line.threshold = threshold;
     ray.params.Points.threshold = threshold;
     const visible = (o: THREE.Object3D) => {

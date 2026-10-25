@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — S6 интерактивного Sketch
+
+- Настоящие L/линия и R/прямоугольник: мышь, точные размеры, автоматические грани и пересечения S3.
+- Общий ToolController: debounce preview, commit/continue, отмена/blur/pointercancel, epoch guard и защита двойных/повторных событий.
+- Атомарная seed geometry/material в общей delta Undo/Redo, world/local contexts и физические площади экземпляров.
+- Space/V и Shift selection по EntityRef, отдельный hover; компактный input dock для узких окон.
+- Origin Snap и узлы сетки на осях; исправлены интеграционные регрессии S5 и сохранение начала при смене единиц. [Отчёт S6](docs/0.2/S6_REPORT.md).
+
 ## Unreleased — S5 точного позиционирования
 
 - Общий Snap Engine: topology points/edges/faces/holes/intersections, оси, сетка и parallel/perpendicular inference, CSS radius и hysteresis.

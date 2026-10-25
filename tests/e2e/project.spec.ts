@@ -80,7 +80,7 @@ test("mouse selection, history, camera and themes at target resolutions", async 
   await page.locator(".start-card").first().click();
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   await page
-    .getByRole("button", { name: "Выделение (V)", exact: true })
+    .getByRole("button", { name: "Выделение (Space)", exact: true })
     .click();
   const canvas = page.getByTestId("viewport");
   const rect = (await canvas.boundingBox())!;
@@ -217,7 +217,7 @@ test("golden v1 opens with absolute legacy child placement and roundtrips unchan
   await page.locator("input[type=file]").setInputFiles(source);
   await expect(page.locator(".tree-object")).toHaveCount(4);
   await page
-    .getByRole("button", { name: "Выделение (V)", exact: true })
+    .getByRole("button", { name: "Выделение (Space)", exact: true })
     .click();
   const rect = (await page.getByTestId("viewport").boundingBox())!;
   const camera = new OrthographicCamera(

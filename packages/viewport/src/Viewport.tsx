@@ -9,6 +9,8 @@ import {
   isObjectLocked,
   usePrecision,
   precisionFrame,
+  sketchController,
+  sketchPlane,
 } from "@forma/editor";
 import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
@@ -104,7 +106,7 @@ export function Viewport() {
         opacity: 0.7,
       }),
     );
-    grid.position.y = 0.002;
+    grid.position.y = -0.002;
     grid.renderOrder = 1;
     scene.add(grid);
     const axis = new THREE.AxesHelper(4);
@@ -194,7 +196,13 @@ export function Viewport() {
             return;
           }
         }
-        topology.selection(s.topologySelection, s.selected, s.selectedPath);
+        topology.selection(
+          s.topologySelection,
+          s.selected,
+          s.selectedPath,
+          s.topologySelections,
+          s.topologyHover,
+        );
       } else if (topology) {
         scene.remove(topology.root);
         topology.dispose();
@@ -270,7 +278,7 @@ export function Viewport() {
         selected &&
         !isObjectLocked(s.project, selected.id) &&
         selected.visible &&
-        s.tool !== "select"
+        (s.tool === "translate" || s.tool === "rotate" || s.tool === "scale")
       ) {
         if (transform.object !== mesh) transform.attach(mesh);
         transform.setMode(s.tool);
@@ -326,11 +334,17 @@ export function Viewport() {
       outline?.update();
       requestRender();
     });
-    let down = { x: 0, y: 0 };
+    let down = { x: 0, y: 0 },
+      downTool = sketchController.state.tool,
+      downGeneration = sketchController.generation;
     const pointerDown = (e: PointerEvent) => {
       down = { x: e.clientX, y: e.clientY };
+      downTool = sketchController.state.tool;
+      downGeneration = sketchController.generation;
     };
     const pointerUp = (e: PointerEvent) => {
+      if (downTool !== sketchController.state.tool) return;
+      if (sketchController.state.tool) return;
       if (
         e.button !== 0 ||
         dragging ||
@@ -364,10 +378,10 @@ export function Viewport() {
               : (((ortho.top - ortho.bottom) / camera.zoom) * 6) / rect.height;
         const result = topology.pick(ray, threshold);
         if (result && "ref" in result)
-          useEditor.getState().selectEntity(result.ref);
+          useEditor.getState().selectEntity(result.ref, e.shiftKey);
         else if (result && "legacyId" in result)
           useEditor.getState().selectOccurrence(result.legacyId, result.path);
-        else useEditor.getState().selectEntity(null);
+        else useEditor.getState().selectEntity(null, e.shiftKey);
         return;
       }
       const hit = ray.intersectObjects(
@@ -378,6 +392,27 @@ export function Viewport() {
     };
     renderer.domElement.addEventListener("pointerdown", pointerDown);
     renderer.domElement.addEventListener("pointerup", pointerUp);
+    const drawingClick = (e: MouseEvent) => {
+      if (
+        downTool !== sketchController.state.tool ||
+        downGeneration !== sketchController.generation
+      )
+        return;
+      if (
+        !sketchController.state.tool ||
+        e.button !== 0 ||
+        e.detail > 1 ||
+        Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
+      )
+        return;
+      updatePrecision(e.clientX, e.clientY);
+      void sketchController.click(
+        usePrecision.getState().target,
+        sketchPlane(),
+        "pointer/" + e.timeStamp,
+      );
+    };
+    renderer.domElement.addEventListener("click", drawingClick);
     const marker = document.createElement("div");
     marker.className = "snap-marker";
     marker.dataset.testid = "snap-marker";
@@ -444,7 +479,10 @@ export function Viewport() {
       transform.enabled = !enabled;
       if (enabled) {
         try {
-          const { matrix, plane } = precisionFrame(document, p);
+          const { matrix } = precisionFrame(document, p),
+            plane = sketchController.state.tool
+              ? sketchPlane()
+              : precisionFrame(document, p).plane;
           const frame = frameMatrix(p.system, matrix, plane);
           precisionAxes.matrixAutoUpdate = false;
           precisionAxes.matrix.fromArray(frame);
@@ -463,7 +501,11 @@ export function Viewport() {
           planeGuide.position.fromArray(plane.origin);
           planeGuide.userData.plane = p.planeName;
           if (p.target) {
-            const points = p.rectangle?.corners ?? [p.anchor, p.target],
+            const segments = sketchController.state.segments;
+            const points =
+                sketchController.state.tool && segments.length
+                  ? [segments[0][0], ...segments.map((s) => s[1])]
+                  : (p.rectangle?.corners ?? [p.anchor, p.target]),
               positions = previewGeometry.getAttribute("position");
             points.forEach((v, i) =>
               positions.setXYZ(
@@ -500,12 +542,12 @@ export function Viewport() {
       } else marker.hidden = true;
       requestRender();
     }
-    function updatePrecision(clientX: number, clientY: number) {
+    function updatePrecision(clientX: number, clientY: number, flush = false) {
       const p = usePrecision.getState(),
         s = useEditor.getState(),
         document = s.project;
       if (!p.enabled || document.schemaVersion !== 2) return;
-      if (p.exact || p.editing) {
+      if (p.exact || (p.editing && !flush)) {
         renderPrecision();
         return;
       }
@@ -531,7 +573,10 @@ export function Viewport() {
           ),
           camera,
         );
-        const { matrix, plane } = precisionFrame(document, p),
+        const { matrix } = precisionFrame(document, p),
+          plane = sketchController.state.tool
+            ? sketchPlane()
+            : precisionFrame(document, p).plane,
           frame = frameMatrix(p.system, matrix, plane);
         const result = snapEngine!.query({
           cursor,
@@ -552,11 +597,19 @@ export function Viewport() {
           contextOnly: p.contextOnly,
           axis: p.axis ? { X: 0, Y: 1, Z: 2 }[p.axis] : null,
         });
-        p.hoverPoint(
-          result.candidate?.point ?? result.raw,
-          result.candidate,
-          null,
-        );
+        if (flush)
+          usePrecision.setState({
+            target: result.candidate?.point ?? result.raw,
+            hover: result.candidate,
+          });
+        else
+          p.hoverPoint(
+            result.candidate?.point ?? result.raw,
+            result.candidate,
+            null,
+          );
+        if (sketchController.state.tool)
+          sketchController.move(usePrecision.getState().target, plane);
         el.dataset.snapTested = String(snapEngine!.stats.tested);
         el.dataset.snapSources = String(snapEngine!.sourceCount);
         el.dataset.snapTruncated = String(snapEngine!.stats.truncated);
@@ -577,15 +630,54 @@ export function Viewport() {
       if (!hoverFrame)
         hoverFrame = requestAnimationFrame(() => {
           hoverFrame = 0;
-          if (lastCursor) updatePrecision(...lastCursor);
+          if (lastCursor) {
+            if (usePrecision.getState().enabled) updatePrecision(...lastCursor);
+            else if (useEditor.getState().tool === "select" && topology) {
+              const rect = renderer.domElement.getBoundingClientRect(),
+                ray = new THREE.Raycaster();
+              camera.updateMatrixWorld();
+              ray.setFromCamera(
+                new THREE.Vector2(
+                  ((lastCursor[0] - rect.left) / rect.width) * 2 - 1,
+                  1 - ((lastCursor[1] - rect.top) / rect.height) * 2,
+                ),
+                camera,
+              );
+              const threshold =
+                camera instanceof THREE.PerspectiveCamera
+                  ? (camera.position.distanceTo(controls.target) *
+                      Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                      12) /
+                    rect.height
+                  : (((ortho.top - ortho.bottom) / camera.zoom) * 6) /
+                    rect.height;
+              const hit = topology.pick(ray, threshold);
+              useEditor
+                .getState()
+                .setTopologyHover(hit && "ref" in hit ? hit.ref : null);
+            }
+          }
         });
     };
-    const pointerLeave = () => {
+    const pointerLeave = (event?: PointerEvent) => {
+      if (
+        event?.relatedTarget instanceof HTMLElement &&
+        event.relatedTarget.closest(".sketch-panel,.precision-panel")
+      )
+        return;
+      useEditor.getState().setTopologyHover(null);
       if (!usePrecision.getState().exact)
         usePrecision.getState().hoverPoint(null, null, null);
+      if (
+        sketchController.state.tool &&
+        !usePrecision.getState().editing &&
+        !usePrecision.getState().exact
+      )
+        sketchController.move(null, sketchPlane());
     };
     const cancelPrecision = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        sketchController.cancel();
         usePrecision.getState().clear();
         snapEngine?.reset();
       }
@@ -594,12 +686,28 @@ export function Viewport() {
     renderer.domElement.addEventListener("pointerleave", pointerLeave);
     renderer.domElement.addEventListener("pointercancel", pointerLeave);
     window.addEventListener("keydown", cancelPrecision);
+    const cancelDrawing = () => {
+      if (sketchController.state.tool) sketchController.cancel();
+      usePrecision.getState().clear();
+    };
+    window.addEventListener("blur", cancelDrawing);
+    renderer.domElement.addEventListener("pointercancel", cancelDrawing);
+    const unsubscribeSketch = sketchController.subscribe(() =>
+      renderPrecision(),
+    );
     const refreshPrecision = () => {
       if (lastCursor) updatePrecision(...lastCursor);
       renderPrecision();
     };
     controls.addEventListener("change", refreshPrecision);
     const unsubscribePrecision = usePrecision.subscribe((state, previous) => {
+      if (
+        state.editing &&
+        !previous.editing &&
+        sketchController.state.tool &&
+        lastCursor
+      )
+        updatePrecision(...lastCursor, true);
       if (
         state.path !== previous.path ||
         state.system !== previous.system ||
@@ -630,6 +738,19 @@ export function Viewport() {
     resize();
     sync();
     const unsubscribe = useEditor.subscribe((state, prev) => {
+      if (
+        state.topologyHover !== prev.topologyHover &&
+        state.project === prev.project
+      ) {
+        topology?.selection(
+          state.topologySelection,
+          state.selected,
+          state.selectedPath,
+          state.topologySelections,
+          state.topologyHover,
+        );
+        requestRender();
+      }
       if (state.revision !== prev.revision) {
         const a = state.project,
           b = prev.project;
@@ -720,6 +841,9 @@ export function Viewport() {
       disposed = true;
       unsubscribe();
       unsubscribePrecision();
+      unsubscribeSketch();
+      window.removeEventListener("blur", cancelDrawing);
+      renderer.domElement.removeEventListener("click", drawingClick);
       cancelAnimationFrame(hoverFrame);
       window.removeEventListener("keydown", cancelPrecision);
       controls.removeEventListener("change", refreshPrecision);

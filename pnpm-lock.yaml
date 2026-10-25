@@ -180,6 +180,9 @@ importers:
       '@forma/snapping':
         specifier: workspace:*
         version: link:../snapping
+      '@forma/tools':
+        specifier: workspace:*
+        version: link:../tools
       zustand:
         specifier: ^5.0.0
         version: 5.0.16(@types/react@19.3.0)(react@19.3.1)
@@ -218,9 +221,15 @@ importers:
 
   packages/tools:
     dependencies:
+      '@forma/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@forma/shared':
         specifier: workspace:*
         version: link:../shared
+      '@forma/snapping':
+        specifier: workspace:*
+        version: link:../snapping
 
   packages/ui: {}
 

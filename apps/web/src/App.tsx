@@ -1,5 +1,6 @@
 import { TopologyTree } from "./TopologyTree";
 import { PrecisionPanel } from "./PrecisionPanel";
+import { SketchPanel } from "./SketchPanel";
 import {
   getLegacyObjects,
   emptyProjectV2,
@@ -40,6 +41,7 @@ import {
   X,
   Trash2,
   Globe,
+  Pencil,
 } from "lucide-react";
 import { Viewport } from "@forma/viewport";
 import { useEditor, isDirty } from "@forma/editor";
@@ -91,6 +93,10 @@ export function App() {
     [query, setQuery] = useState(""),
     [structure, setStructure] = useState(true);
   const removeSelected = () => {
+    if (s.topologySelections.length > 1) {
+      s.notify("Для удаления выберите одну грань.");
+      return;
+    }
     const ref = s.topologySelection;
     if (ref?.kind === "face")
       void s.editGeometry(ref, {
@@ -250,7 +256,8 @@ export function App() {
         if (key === "d") s.duplicate();
         return;
       }
-      if (key === "delete" || key === "backspace") s.remove();
+      if (key === "delete" || key === "backspace") removeSelected();
+      if (key === " ") e.preventDefault();
       if (key === "escape") {
         s.select(null);
         setMenu(null);
@@ -352,7 +359,13 @@ export function App() {
         action: () => s.setTool("translate"),
         shortcut: "G",
       },
-      { label: "Вращение", action: () => s.setTool("rotate"), shortcut: "R" },
+      { label: "Вращение", action: () => s.setTool("rotate"), shortcut: "E" },
+      { label: "Линия", action: () => s.setTool("line"), shortcut: "L" },
+      {
+        label: "Прямоугольник",
+        action: () => s.setTool("rectangle"),
+        shortcut: "R",
+      },
       { label: "Масштаб", action: () => s.setTool("scale"), shortcut: "S" },
       { label: "Push / Pull · в версии 0.3", action: () => {}, disabled: true },
     ],
@@ -518,9 +531,15 @@ export function App() {
           <div>
             {(
               [
-                { tool: "select", icon: <MousePointer2 size={20} />, key: "V" },
+                {
+                  tool: "select",
+                  icon: <MousePointer2 size={20} />,
+                  key: "Space",
+                },
+                { tool: "line", icon: <Pencil size={20} />, key: "L" },
+                { tool: "rectangle", icon: <Square size={20} />, key: "R" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "G" },
-                { tool: "rotate", icon: <Rotate3D size={21} />, key: "R" },
+                { tool: "rotate", icon: <Rotate3D size={21} />, key: "E" },
                 { tool: "scale", icon: <Scaling size={20} />, key: "S" },
               ] as const
             ).map((t) => (
@@ -646,9 +665,15 @@ export function App() {
             </div>
           </aside>
         )}
-        <section className="scene">
+        <section
+          className={`scene${s.tool === "line" || s.tool === "rectangle" ? " sketch-active" : ""}`}
+        >
           <Viewport />
-          <PrecisionPanel />
+          {s.tool === "line" || s.tool === "rectangle" ? (
+            <SketchPanel />
+          ) : (
+            <PrecisionPanel />
+          )}
           <div className="viewport-header">
             <button onClick={() => s.view("projection")}>
               <View size={14} />
@@ -680,10 +705,16 @@ export function App() {
           </div>
           <div className="viewport-bottom">
             <span>
-              <MousePointer2 size={12} /> Выбор · ЛКМ
+              <MousePointer2 size={12} />{" "}
+              {s.tool === "line" || s.tool === "rectangle"
+                ? "ЛКМ · точка"
+                : "Выбор · ЛКМ · Shift"}
             </span>
             <span>
-              <Rotate3D size={13} /> Орбита · перетаскивание
+              <Rotate3D size={13} />{" "}
+              {s.tool === "line" || s.tool === "rectangle"
+                ? "ПКМ · орбита"
+                : "Орбита · перетаскивание"}
             </span>
             <span>
               <Hand size={13} /> Панорама · СКМ
@@ -705,6 +736,11 @@ export function App() {
           {s.message}
         </span>
         <span>{toolLabels[s.tool]}</span>
+        {s.topologySelections.length > 1 && (
+          <span data-testid="selection-count">
+            Выбрано: {s.topologySelections.length}
+          </span>
+        )}
         <span className="status-selection">
           {s.topologySelection
             ? `Выбрана топология: ${s.topologySelection.entityId}`
@@ -876,9 +912,11 @@ export function App() {
                   пространстве.
                 </p>
                 <div className="help-grid">
-                  <kbd>V</kbd>
+                  <kbd>Space / V</kbd>
                   <span>Выделение</span>
-                  <kbd>G / R / S</kbd>
+                  <kbd>L / R</kbd>
+                  <span>Линия / прямоугольник</span>
+                  <kbd>G / E / S</kbd>
                   <span>Перемещение / вращение / масштаб</span>
                   <kbd>F</kbd>
                   <span>Фокус на выбранном объекте</span>

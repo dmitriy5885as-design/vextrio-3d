@@ -1,5 +1,5 @@
-import { getLegacyObjects } from "@forma/document";
-import { tessellateFace } from "@forma/geometry";
+import { getLegacyObjects, occurrenceMatrix } from "@forma/document";
+import { tessellateFace, tessellationArea } from "@forma/geometry";
 import { isGeometryLocked } from "@forma/editor";
 import { useEffect, useState } from "react";
 import { useEditor, isObjectLocked } from "@forma/editor";
@@ -77,6 +77,12 @@ export function Properties() {
         </div>
         <div className="property-group">
           <h3>{name}</h3>
+          {s.topologySelections.length > 1 && (
+            <p>
+              Выбрано {s.topologySelections.length} · свойства последнего
+              элемента
+            </p>
+          )}
           <p>Определение: {s.project.definitions[ref.definitionId].name}</p>
           <p>
             ID: <code>{ref.entityId}</code>
@@ -96,11 +102,26 @@ export function Properties() {
               Вершины: {edge.start} → {edge.end}
             </p>
           )}
+          {face && ref.occurrencePath.length > 0 && (
+            <p data-testid="face-world-area">
+              Площадь экземпляра:{" "}
+              {Number(
+                tessellationArea(
+                  tessellateFace(m, face),
+                  occurrenceMatrix(s.project, ref.occurrencePath),
+                ).toFixed(8),
+              )}{" "}
+              м²
+            </p>
+          )}
           {vertex && <p>Координаты: {vertex.position.join(", ")} м</p>}
           {face && (
             <button
               className="start-card"
-              disabled={isGeometryLocked(s.project, ref)}
+              disabled={
+                s.topologySelections.length > 1 ||
+                isGeometryLocked(s.project, ref)
+              }
               onClick={() =>
                 void s.editGeometry(ref, {
                   kind: "delete-entities",

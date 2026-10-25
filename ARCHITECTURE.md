@@ -1,5 +1,7 @@
 # Архитектура VEXTRIO 3D
 
+Текущее дополнение [S6](docs/0.2/S6_REPORT.md): tools содержит независимый ToolController/ToolHost, editor связывает FSM с GeometrySession и общей историей, viewport/SketchPanel маршрутизируют мышь и клавиатуру. GeometryDocumentCommand поддерживает атомарное создание первой geometry/material; hover и множественный EntityRef selection остаются transient UI. Статусы предшествующих этапов ниже исторические.
+
 Текущий этап: [S5 — точный ввод и независимый Snap Engine](docs/0.2/S5_REPORT.md), подготовлен к приёмке. snapping использует document/geometry/shared; editor и viewport потребляют snapping без обратной зависимости. Схема файла не менялась. Разделы S1–S3 ниже описывают состояние на момент соответствующего этапа.
 
 Основание 0.1 развивается по утверждённой [архитектуре 0.2](docs/0.2/ARCHITECTURE.md). Реализованы S1–S3. [S4](docs/0.2/S4_REPORT.md) подключает production Document v2 к общей истории, файлам, отображению и выбору топологических сущностей; v1 остаётся совместимой веткой документа. Ни один PR автоматически не объединяется; S4 ожидает приёмки.

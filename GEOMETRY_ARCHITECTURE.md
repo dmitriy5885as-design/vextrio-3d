@@ -1,5 +1,7 @@
 # Геометрическое ядро
 
+[S6](docs/0.2/S6_REPORT.md) рисует через существующий insert-segments S3. Прямоугольник — четыре сегмента в одной транзакции; никакой PrimitiveAdapter не создаёт его документную геометрию. Preview использует GeometrySession.prepare без истории. Добавлено производное измерение physical area в affine occurrence; алгоритмы S3 не переписаны.
+
 [S5](docs/0.2/S5_REPORT.md) добавляет независимый Snap Engine и точный ввод поверх production топологии S4. BVH хранит производный world-space snapshot; source of truth остаётся GeometryModel. Перемещение принятой точкой проходит существующий GeometrySession и общую историю, не изменяет Three.js buffers как документ.
 
 S2.1/S2.2 и S3.1/S3.2 реализованы отдельным pure TypeScript API в `packages/geometry`: topology entities/IDs, GeometryPolicy, математика плоскостей/размещений, validators, delta/inverse/lineage и async backend/session harness. Three.js, UI и DOM не являются зависимостями ядра. [Отчёт, проверки и границы S2](docs/0.2/S2_REPORT.md).

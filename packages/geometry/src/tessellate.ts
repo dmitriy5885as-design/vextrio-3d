@@ -1,4 +1,5 @@
 import earcut from "earcut";
+import type { AffineTransform } from "./affine";
 import {
   GeometryError,
   type GeometryModel,
@@ -13,6 +14,25 @@ export interface FaceTessellation {
   positions: Vec3[];
   indices: number[];
   area: number;
+}
+// Physical area of a derived face in an occurrence. Translation is omitted to
+// preserve small dimensions at large world coordinates; shear is retained.
+export function tessellationArea(
+  dto: FaceTessellation,
+  m: AffineTransform,
+): number {
+  const direction = (v: Vec3): Vec3 => [
+    m[0] * v[0] + m[4] * v[1] + m[8] * v[2],
+    m[1] * v[0] + m[5] * v[1] + m[9] * v[2],
+    m[2] * v[0] + m[6] * v[1] + m[10] * v[2],
+  ];
+  let area = 0;
+  for (let i = 0; i < dto.indices.length; i += 3) {
+    const [a, b, c] = dto.indices.slice(i, i + 3).map((j) => dto.positions[j]),
+      n = cross(direction(subtract(b, a)), direction(subtract(c, a)));
+    area += Math.hypot(...n) / 2;
+  }
+  return area;
 }
 // Derived data only. Indices never become document edges or entity identifiers.
 export function tessellateFace(

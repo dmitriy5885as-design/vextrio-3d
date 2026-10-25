@@ -29,6 +29,7 @@ export type SnapKind =
   | "intersection"
   | "axis"
   | "grid"
+  | "origin"
   | "parallel"
   | "perpendicular";
 export interface Projection {
@@ -147,6 +148,7 @@ const labels: Record<SnapKind, string> = {
   intersection: "Пересечение",
   axis: "Ось",
   grid: "Сетка",
+  origin: "Начало плоскости",
   parallel: "Параллельно ребру",
   perpendicular: "Перпендикулярно ребру",
 };
@@ -161,6 +163,7 @@ const priority: Record<SnapKind, number> = {
   edge: 5,
   face: 6,
   grid: 7,
+  origin: 2,
 };
 const samePath = (a: string[], b: string[]) =>
   a.length === b.length && a.every((n, i) => n === b[i]);
@@ -513,6 +516,7 @@ export class SnapEngine {
         }
     }
     if (raw) {
+      if (q.enabled) append("origin", q.plane.origin, "plane/origin");
       for (const [i, axis] of q.axes.entries()) {
         const d = normalize(axis),
           p = add(q.anchor, multiply(d, dot(subtract(raw, q.anchor), d)));
@@ -574,9 +578,21 @@ export class SnapEngine {
       }
       return true;
     });
+    const rank = (c: SnapCandidate) =>
+      c.kind === "grid" &&
+      q.axes.some((axis) => {
+        const d = subtract(c.point, q.anchor),
+          a = normalize(axis);
+        return (
+          length(subtract(d, multiply(a, dot(d, a)))) <=
+          distanceTolerance(length(d), this.policy)
+        );
+      })
+        ? 2.5
+        : priority[c.kind];
     eligible.sort(
       (a, b) =>
-        priority[a.kind] - priority[b.kind] ||
+        rank(a) - rank(b) ||
         a.distance - b.distance ||
         a.depth - b.depth ||
         a.key.localeCompare(b.key),
@@ -586,9 +602,7 @@ export class SnapEngine {
       this.previous && eligible.find((c) => c.key === this.previous!.key);
     if (
       held &&
-      (!result ||
-        priority[result.kind] >= priority[held.kind] ||
-        result.distance > radius * 0.4)
+      (!result || rank(result) >= rank(held) || result.distance > radius * 0.4)
     )
       result = held;
     this.previous = result;

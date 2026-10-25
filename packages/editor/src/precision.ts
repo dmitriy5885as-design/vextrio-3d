@@ -29,6 +29,7 @@ export interface PrecisionState {
   editing: boolean;
   error: string;
   warning: string;
+  sharedEditConfirmed: boolean;
   screen: [number, number] | null;
   configure: (
     patch: Partial<
@@ -42,6 +43,7 @@ export interface PrecisionState {
         | "axis"
         | "gridStep"
         | "contextOnly"
+        | "sharedEditConfirmed"
       >
     >,
   ) => void;
@@ -90,11 +92,12 @@ export const usePrecision = create<PrecisionState>((set, get) => ({
   editing: false,
   error: "",
   warning: "",
+  sharedEditConfirmed: false,
   screen: null,
   configure: (patch) =>
     set({
       ...(patch.path || patch.system || patch.planeName
-        ? { planeOverride: null }
+        ? { planeOverride: null, sharedEditConfirmed: false }
         : {}),
       ...patch,
       target: null,
