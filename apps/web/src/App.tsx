@@ -1,4 +1,5 @@
 import { TopologyTree } from "./TopologyTree";
+import { useRecovery } from "./useRecovery";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
 import { ExtrudePanel } from "./ExtrudePanel";
@@ -44,7 +45,7 @@ import {
   Globe,
   Pencil,
 } from "lucide-react";
-import { Viewport } from "@forma/viewport";
+import { Viewport, NavigationCube } from "@forma/viewport";
 import { useEditor, isDirty } from "@forma/editor";
 import {
   browserFileAdapter,
@@ -57,7 +58,12 @@ import {
   resetNativeDestination,
 } from "@forma/file-io";
 
-import { primitiveNames, type Primitive } from "@forma/shared";
+import {
+  APP_VERSION,
+  APP_RELEASE_LABEL,
+  primitiveNames,
+  type Primitive,
+} from "@forma/shared";
 import { ru } from "@forma/ui";
 import { shortcuts, toolLabels } from "@forma/tools";
 import { Properties } from "./Properties";
@@ -89,6 +95,7 @@ function Button({
 }
 export function App() {
   const s = useEditor();
+  const recovery = useRecovery();
   const [welcome, setWelcome] = useState(true),
     [modal, setModal] = useState<"settings" | "help" | null>(null),
     [menu, setMenu] = useState<string | null>(null),
@@ -445,7 +452,7 @@ export function App() {
         <div className="brand">
           <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
           <strong>VEXTRIO 3D</strong>
-          <span className="version">SKETCH · PREVIEW</span>
+          <span className="version">{APP_RELEASE_LABEL}</span>
         </div>
         <div className="project-title">
           <span className={dirty ? "unsaved-dot" : "saved-dot"} />
@@ -455,7 +462,7 @@ export function App() {
         </div>
         <div className="local-badge">
           <span className="mint-dot" /> Локальный проект{" "}
-          <span className="version">v0.1.0</span>
+          <span className="version">v{APP_VERSION}</span>
         </div>
       </header>
       <nav className="menubar">
@@ -710,22 +717,7 @@ export function App() {
             </button>
             <span>Объёмный вид</span>
           </div>
-          <div className="view-cube">
-            <button
-              onClick={() => s.view("top")}
-              title="Вид сверху"
-              aria-label="Вид сверху"
-            >
-              ВЕРХ
-            </button>
-            <div>
-              <button onClick={() => s.view("front")}>ФРОНТ</button>
-              <button onClick={() => s.view("right")}>ПРАВО</button>
-            </div>
-            <button className="iso" onClick={() => s.view("iso")}>
-              Изометрия ↗
-            </button>
-          </div>
+          <NavigationCube />
           <div className="scene-caption">
             <span className="mint-dot" /> ПРОСТРАНСТВО ДЛЯ ВАШИХ ИДЕЙ
           </div>
@@ -757,6 +749,22 @@ export function App() {
         <Properties />
       </main>
       <footer className="statusbar">
+        <span
+          className="recovery-status"
+          data-testid="recovery-status"
+          role="status"
+          title={
+            recovery.error ||
+            "Последняя локальная автокопия: " +
+              new Date(recovery.savedAt).toLocaleTimeString()
+          }
+        >
+          {recovery.error
+            ? "Автокопия: ошибка"
+            : recovery.savedAt
+              ? "Автокопия ✓"
+              : ""}
+        </span>
         <span className="status-message">
           <span className="mint-dot" />
           {s.message}
@@ -792,7 +800,7 @@ export function App() {
             <option value="mm">Миллиметры</option>
           </select>
         </label>
-        <span className="foundation">VEXTRIO 3D 0.1</span>
+        <span className="foundation">VEXTRIO 3D {APP_VERSION}</span>
       </footer>
       {welcome && (
         <div className="modal-overlay welcome-overlay">
@@ -814,11 +822,45 @@ export function App() {
                 <br />
                 проектирования и творчества.
               </p>
-              <small>VEXTRIO 3D 0.1 · SKETCH · PREVIEW</small>
+              <small>VEXTRIO 3D {APP_RELEASE_LABEL}</small>
             </div>
             <div className="welcome-content">
               <span className="eyebrow">VEXTRIO 3D</span>
               <h2>Начнём с идеи</h2>
+              {(recovery.snapshot || recovery.error) && (
+                <div className="recovery-card" data-testid="recovery-card">
+                  <strong>Локальная автокопия</strong>
+                  {recovery.snapshot && (
+                    <p>
+                      {recovery.snapshot.project.name} ·{" "}
+                      {new Date(recovery.snapshot.savedAt).toLocaleString()}
+                    </p>
+                  )}
+                  {recovery.error && <p role="alert">{recovery.error}</p>}
+                  <div>
+                    {recovery.snapshot && (
+                      <button
+                        disabled={recovery.busy}
+                        onClick={async () => {
+                          if (await recovery.restore()) setWelcome(false);
+                        }}
+                      >
+                        Восстановить проект
+                      </button>
+                    )}
+                    <button
+                      disabled={recovery.busy}
+                      onClick={() => void recovery.discard()}
+                    >
+                      Удалить автокопию
+                    </button>
+                  </div>
+                  <small>
+                    Последний редактируемый проект в этом браузере. Файл на
+                    диске не перезаписывается.
+                  </small>
+                </div>
+              )}
               <p>
                 Всё необходимое, чтобы создать
                 <br />
@@ -934,7 +976,7 @@ export function App() {
               <>
                 <span className="eyebrow">SHAPE YOUR IDEAS</span>
                 <h2>
-                  VEXTRIO 3D <small>Sketch Preview</small>
+                  VEXTRIO 3D <small>{APP_RELEASE_LABEL}</small>
                 </h2>
                 <p>
                   Нарисуйте прямоугольник (R), выберите его грань (Space),

@@ -73,6 +73,7 @@ interface EditorState {
   selected: string | null;
   upgradeProject: () => CommandResult;
   groupScene: (kind?: "group" | "component") => CommandResult;
+  setFaceColor: (ref: EntityRef, color: string) => CommandResult;
   copyInstance: (nodeId: string) => CommandResult;
   makeUnique: (nodeId: string) => CommandResult;
   removeInstance: (nodeId: string) => CommandResult;
@@ -113,7 +114,8 @@ interface EditorState {
   theme: "dark" | "light";
   sensitivity: number;
   message: string;
-  cameraRequest: { view: string; nonce: number } | null;
+  cameraRequest: { view: string; nonce: number; direction?: Vec3 } | null;
+  navigateCamera: (direction: Vec3) => void;
   mutate: (label: string, fn: (candidate: ProjectV1) => void) => CommandResult;
   add: (type: Primitive) => CommandResult;
   select: (id: string | null) => void;
@@ -242,6 +244,23 @@ export const useEditor = create<EditorState>((set, get) => {
     canUndo: false,
     canRedo: false,
     mutate: (label, fn) => commit(label, fn),
+    setFaceColor: (ref, color) => {
+      const result = structure("Цвет грани", (p) => {
+        validateEntityRef(p, ref);
+        if (ref.kind !== "face") throw Error("Выберите грань.");
+        if (isGeometryLocked(p, ref)) throw Error("Геометрия заблокирована.");
+        if (!/^#[0-9a-f]{6}$/i.test(color)) throw Error("Некорректный цвет.");
+        const face = p.geometries[ref.geometryId].faces[ref.entityId];
+        for (const side of ["frontMaterialId", "backMaterialId"] as const) {
+          const previous = p.materials[face[side]],
+            key = id<"material">("material/" + crypto.randomUUID());
+          p.materials[key] = { ...clone(previous), id: key, color };
+          face[side] = key;
+        }
+      });
+      if (result.status === "applied") get().selectEntity(ref);
+      return result;
+    },
     groupScene: (kind = "group") => {
       let ref: EntityRef | null = null;
       const result = structure(
@@ -842,6 +861,21 @@ export const useEditor = create<EditorState>((set, get) => {
     view: (view) => {
       if (!transactionInProgress)
         set({ cameraRequest: { view, nonce: Date.now() } });
+    },
+    navigateCamera: (direction) => {
+      if (
+        !transactionInProgress &&
+        direction.length === 3 &&
+        direction.every(Number.isFinite) &&
+        Math.hypot(...direction) > 1e-9
+      )
+        set({
+          cameraRequest: {
+            view: "direction",
+            direction: clone(direction),
+            nonce: Date.now(),
+          },
+        });
     },
     markSaved: (signature) => {
       if (transactionInProgress) return;

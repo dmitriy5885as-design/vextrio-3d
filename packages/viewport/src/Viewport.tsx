@@ -171,9 +171,27 @@ export function Viewport() {
     function switchCamera(projection: string) {
       const next = projection === "orthographic" ? ortho : perspective;
       if (next === camera) return;
+      const distance = camera.position.distanceTo(controls.target),
+        height =
+          camera === ortho
+            ? 20 / camera.zoom
+            : (2 *
+                distance *
+                Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) /
+              camera.zoom;
       next.position.copy(camera.position);
       next.quaternion.copy(camera.quaternion);
-      next.zoom = 1;
+      next.zoom = next === ortho ? 20 / height : 1;
+      if (next === perspective)
+        next.position
+          .copy(camera.position)
+          .sub(controls.target)
+          .normalize()
+          .multiplyScalar(
+            height /
+              (2 * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))),
+          )
+          .add(controls.target);
       next.updateProjectionMatrix();
       camera = next;
       controls.object = camera;
@@ -417,6 +435,9 @@ export function Viewport() {
       }
       const rect = renderer.domElement.getBoundingClientRect();
       const ray = new THREE.Raycaster();
+      // File opening / navigation can precede the next render frame. Picking
+      // must use the current camera rather than the last rendered matrix.
+      camera.updateMatrixWorld(true);
       ray.setFromCamera(
         new THREE.Vector2(
           ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -842,39 +863,59 @@ export function Viewport() {
           switchCamera(camera === ortho ? "perspective" : "orthographic");
           saveCamera();
         } else {
-          let target = new THREE.Vector3();
-          let distance = 14;
-          if (view === "focus") {
+          let target = controls.target.clone();
+          let distance = camera.position.distanceTo(target);
+          if (view === "focus" || view === "reset") {
             const mesh = state.selected
               ? (topology?.findLegacy(state.selected, state.selectedPath) ??
                 meshes.get(state.selected))
               : state.topologySelection
-                ? topology?.root
+                ? (topology?.findPlacement(
+                    state.topologySelection.occurrencePath,
+                  ) ?? topology?.root)
                 : null;
-            if (mesh) {
-              const box = new THREE.Box3().setFromObject(mesh);
+            const box = new THREE.Box3();
+            if (view === "reset") {
+              if (topology) box.expandByObject(topology.root);
+              for (const m of meshes.values())
+                if (m.visible) box.expandByObject(m);
+            } else if (mesh) box.setFromObject(mesh);
+            if (!box.isEmpty()) {
               box.getCenter(target);
               distance = Math.max(
                 3,
                 box.getSize(new THREE.Vector3()).length() * 1.7,
               );
+              if (camera === ortho)
+                camera.zoom =
+                  20 /
+                  Math.max(1, box.getSize(new THREE.Vector3()).length() * 1.25);
+            } else {
+              target.set(0, 0, 0);
+              distance = 14;
             }
           }
           const directions: Record<string, Vec3> = {
             top: [0, 1, 0.0001],
             front: [0, 0, 1],
             right: [1, 0, 0],
+            left: [-1, 0, 0],
+            back: [0, 0, -1],
+            bottom: [0, -1, 0.0001],
             iso: [1, 0.8, 1],
             reset: [1, 0.8, 1],
             focus: [1, 0.8, 1],
           };
           camera.position.copy(
-            new THREE.Vector3(...(directions[view] ?? directions.iso))
+            new THREE.Vector3(
+              ...(state.cameraRequest.direction ??
+                directions[view] ??
+                directions.iso),
+            )
               .normalize()
               .multiplyScalar(distance)
               .add(target),
           );
-          camera.zoom = 1;
           camera.updateProjectionMatrix();
           controls.target.copy(target);
           controls.update();

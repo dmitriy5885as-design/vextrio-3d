@@ -1,3 +1,5 @@
+export const APP_VERSION = "0.2.0-alpha.1";
+export const APP_RELEASE_LABEL = "0.2 Alpha";
 export type Vec3 = [number, number, number];
 export type Primitive = "cube" | "sphere" | "cylinder" | "plane";
 export type TransformMode = "translate" | "rotate" | "scale";

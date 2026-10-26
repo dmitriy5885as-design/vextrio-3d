@@ -1,4 +1,8 @@
-import { getLegacyObjects, occurrenceMatrix } from "@forma/document";
+import {
+  getLegacyObjects,
+  occurrenceMatrix,
+  definitionOccurrences,
+} from "@forma/document";
 import { tessellateFace, tessellationArea, bodyVolume } from "@forma/geometry";
 import { isGeometryLocked } from "@forma/editor";
 import { useEffect, useState } from "react";
@@ -51,6 +55,17 @@ export function Properties() {
   const factor =
     s.project.units === "mm" ? 1000 : s.project.units === "cm" ? 100 : 1;
   const ref = s.topologySelection;
+  const [paintShared, setPaintShared] = useState(false);
+  useEffect(
+    () => setPaintShared(false),
+    [ref?.entityId, JSON.stringify(ref?.occurrencePath)],
+  );
+  const sharedFace =
+    s.project.schemaVersion === 2 && ref
+      ? definitionOccurrences(s.project).filter(
+          (o) => o.definitionId === ref.definitionId,
+        ).length > 1
+      : false;
   if (s.project.schemaVersion === 2 && ref) {
     const m = s.project.geometries[ref.geometryId],
       name = {
@@ -136,6 +151,31 @@ export function Properties() {
             </p>
           )}
           {vertex && <p>Координаты: {vertex.position.join(", ")} м</p>}
+          {face && sharedFace && (
+            <label className="property-row">
+              <input
+                type="checkbox"
+                checked={paintShared}
+                onChange={(e) => setPaintShared(e.target.checked)}
+              />
+              Окрасить все связанные экземпляры
+            </label>
+          )}
+          {face && (
+            <label className="property-row">
+              Цвет грани
+              <input
+                type="color"
+                aria-label="Цвет выбранной грани"
+                value={s.project.materials[face.frontMaterialId].color}
+                disabled={
+                  isGeometryLocked(s.project, ref) ||
+                  (sharedFace && !paintShared)
+                }
+                onChange={(e) => s.setFaceColor(ref, e.target.value)}
+              />
+            </label>
+          )}
           {ref.occurrencePath.length === 0 ? (
             <button className="start-card" onClick={() => s.groupScene()}>
               Сгруппировать всю геометрию сцены

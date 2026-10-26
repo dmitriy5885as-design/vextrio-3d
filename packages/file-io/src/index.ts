@@ -6,6 +6,7 @@ import {
 } from "@forma/document";
 import { clone } from "@forma/shared";
 export * from "./export";
+export * from "./recovery";
 import type { Document as Project } from "@forma/document";
 export type SaveResult =
   | { status: "saved" }
