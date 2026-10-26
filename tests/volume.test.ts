@@ -57,6 +57,31 @@ it("extrudes a planar face with a hole into a closed genus-one shell with exact 
   expect(Object.keys(after.vertices)).toHaveLength(16);
   expect(Object.keys(after.edges)).toHaveLength(24);
   expect(applyDelta(after, change.inverse, context)).toEqual(g);
+  // v2 can contain a consistently oriented closed boundary without an explicit
+  // shell record. Volume must not silently become zero for such documents.
+  const implicit = structuredClone(after);
+  for (const shell of Object.values(implicit.shells))
+    for (const use of shell.faces)
+      if (use.orientation === -1) {
+        const face = implicit.faces[use.faceId];
+        face.plane.normal = face.plane.normal.map((n) => -n) as [
+          number,
+          number,
+          number,
+        ];
+        face.plane.v = face.plane.v.map((n) => -n) as [number, number, number];
+        for (const lid of [face.outerLoopId, ...face.innerLoopIds]) {
+          implicit.loops[lid].coedgeIds.reverse();
+          for (const cid of implicit.loops[lid].coedgeIds)
+            implicit.coedges[cid].direction =
+              implicit.coedges[cid].direction === 1 ? -1 : 1;
+        }
+      }
+  implicit.shells = {};
+  implicit.bodies[body.id].shellIds = [];
+  validateGeometry(implicit, context);
+  expect(classifyBody(implicit, body.id)).toBe("closed-shell");
+  expect(bodyVolume(implicit, body.id)).toBeCloseTo(33, 9);
 });
 it("extrudes a concave L profile in either direction with the correct physical volume", async () => {
   useEditor.getState().replace(emptyProjectV2());
@@ -137,14 +162,12 @@ it("rejects a real intersection against a different face atomically, preserving 
     undo = useEditor.getState().canUndo,
     redo = useEditor.getState().canRedo,
     signature = useEditor.getState().savedSignature;
-  const result = await useEditor
-    .getState()
-    .editGeometry(ref, {
-      kind: "extrude-face",
-      faceId: face.id,
-      distance: 3,
-      side: 1,
-    });
+  const result = await useEditor.getState().editGeometry(ref, {
+    kind: "extrude-face",
+    faceId: face.id,
+    distance: 3,
+    side: 1,
+  });
   expect(result.status).toBe("rejected");
   if (result.status === "rejected")
     expect(result.error).toContain("пересекает");

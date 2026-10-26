@@ -6,9 +6,33 @@ import {
   parseProject,
   type ProjectV2,
 } from "@forma/document";
-import { topologyProject, firstRef } from "./fixtures/v2-project";
+import {
+  topologyProject,
+  firstRef,
+  componentProject,
+} from "./fixtures/v2-project";
+import { makeUnique } from "../packages/editor/src/structure";
 import { TopologyBridge } from "../packages/viewport/src/TopologyBridge";
 const project = () => useEditor.getState().project as ProjectV2;
+it("detaching a component remaps persisted occurrence references without altering its neighbour", () => {
+  const p = componentProject(),
+    ref = firstRef(p, "face"),
+    n = p.nodes["instance/two"];
+  if (n.kind === "legacy-primitive") throw Error("fixture");
+  ref.definitionId = n.definitionId;
+  ref.occurrencePath = [n.id];
+  p.references["reference/face"] = { id: "reference/face", target: ref };
+  validateProject(p);
+  const original = structuredClone(p.geometries[ref.geometryId]);
+  const did = makeUnique(p, n.id);
+  validateProject(p);
+  const next = p.references["reference/face"].target;
+  expect(next.definitionId).toBe(did);
+  expect(next.geometryId).not.toBe(ref.geometryId);
+  expect(next.entityId).not.toBe(ref.entityId);
+  expect(p.geometries[ref.geometryId]).toEqual(original);
+  expect(next.occurrencePath).toEqual([n.id]);
+});
 it("groups real scene geometry with stable IDs; shares, detaches and transforms instances through history", () => {
   const p = topologyProject();
   useEditor.getState().replace(p);

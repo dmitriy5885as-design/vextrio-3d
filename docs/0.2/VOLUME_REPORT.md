@@ -6,7 +6,7 @@
 
 S1–S6 и ребрендинг уже включены владельцем в `main` (merge `7e3f292`), исходный S6 commit — `5d98c48ea1a4919efd628161ca867e94f6a5441c`. Нельзя продолжать цепочку от старого закрытого PR как будто main остался на 0.1. Новая работа основана на актуальном main, существующий `deploy-pages.yml` сохранён. Автоматического merge не выполнялось.
 
-[Опубликованный редактор](https://dmitriy5885as-design.github.io/vextrio-3d/) отвечает HTTP 200, заголовок VEXTRIO 3D, asset base `/vextrio-3d/`. До принятия новой ветки сайт содержит S6, а не описанное ниже выдавливание.
+[Опубликованный редактор](https://dmitriy5885as-design.github.io/vextrio-3d/) отвечает HTTP 200, заголовок VEXTRIO 3D, asset base `/vextrio-3d/`. Найден отдельный deployment дефект: React img использовал `/vextrio.svg` (HTTP 404), тогда как `/vextrio-3d/vextrio.svg` отвечал 200. Путь исправлен через `import.meta.env.BASE_URL`; новый `pnpm check:pages` собирает production с префиксом и действительно открывает welcome/editor в Chromium, проверяя загрузку обоих логотипов и отсутствие HTTP/JS ошибок. До принятия новой ветки сайт содержит S6, а не описанное ниже выдавливание.
 
 Документ v2, GeometrySession/Delta, топология, render/picking, привязки и инструменты L/R подключены. Главные практические пробелы: отсутствовало объёмное моделирование, нельзя было создать native группу из нарисованной геометрии, отделить экземпляр или экспортировать настоящую топологию. README и справка всё ещё описывали часть реализованных функций как отсутствующие. Локальный Cargo отсутствует; готового проверенного Windows installer нет. Это не полноценная замена SketchUp.
 
@@ -62,12 +62,13 @@ Enter применяет отдельный проверенный delta чер�
 ## Проверки
 
 - `pnpm install --frozen-lockfile --ignore-scripts` — успешно; новая внутренняя зависимость file-io → geometry объявлена и lockfile обновлён.
-- `pnpm test` — **314/314**, 21 файл. Новые volume/structure/export тесты дополняют всю регрессию S1–S6.
+- `pnpm test` — **315/315**, 21 файл. Новые volume/structure/export тесты дополняют всю регрессию S1–S6.
 - `pnpm test:e2e` — **30/30**, Chromium, 6 workers, 1,1 минуты. Четыре новых сценария реально нажимают инструменты, рисуют мышью, вводят размеры, читают скачанные файлы, выполняют Undo/Redo и повторное открытие. Дополнительный запуск 5 сценариев проверил справку и записал `.v3d`-примеры.
 - `pnpm build` — успешно, TypeScript + Vite production build.
+- `pnpm check:pages` — успешно, production URL prefix, welcome/editor, логотипы, HTTP/JS ошибки.
 - `pnpm check:deps` — успешно, 12 workspaces, recursive imports/declarations/cycles.
 - В полном E2E-прогоне задержки S6 на этой машине: rectangle 406 ms, diagonal 425 ms при параллельных software-WebGL браузерах. Это наблюдение, не гарантия производительности на любых моделях.
-- `.github/workflows/verify.yml` добавляет Linux проверки и Windows NSIS artifact. **Наличие workflow не означает, что Windows сборка уже прошла**. Локально нет Cargo/Rust: native dialogs, установка/обновление, offline WebView2, ручная Windows приёмка и цифровая подпись не проверены.
+- `.github/workflows/verify.yml` добавляет Linux проверки и Windows NSIS artifact. Первая реальная [CI-проверка commit 78f5547](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/40329837918) завершилась успешно: Web, E2E и Windows NSIS. [Установщик](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/40329837918/artifacts/12655071852) `VEXTRIO 3D_0.1.0_x64-setup.exe`, 2,07 MiB; artifact ZIP SHA-256 `e9877c06c4624c136e8c59a817a51186936cea5884f5873fa153023ca706bd81`. Последующее уточнение ветки добавляет Pages smoke и запуск трёх native FileSession тестов через `cargo test --release`; результаты смотрите в checks PR. Локально нет Cargo/Rust: native dialogs, установка/обновление, offline WebView2, ручная Windows приёмка и цифровая подпись не проверены.
 
 ## Совместимость и следующие задачи
 

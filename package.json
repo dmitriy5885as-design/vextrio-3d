@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check:deps": "node scripts/check-deps.mjs",
+    "check:pages": "node scripts/check-pages.mjs",
     "desktop": "pnpm --filter @forma/desktop dev",
     "desktop:build": "pnpm --filter @forma/desktop build"
   },
