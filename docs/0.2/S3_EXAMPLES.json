@@ -1,0 +1,1120 @@
+{
+  "units": "metres",
+  "policyVersion": 1,
+  "cases": [
+    {
+      "name": "rectangle",
+      "input": [
+        [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            0,
+            0
+          ]
+        ],
+        [
+          [
+            4,
+            0,
+            0
+          ],
+          [
+            4,
+            3,
+            0
+          ]
+        ],
+        [
+          [
+            4,
+            3,
+            0
+          ],
+          [
+            0,
+            3,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            3,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ]
+      ],
+      "counts": {
+        "vertices": 4,
+        "edges": 4,
+        "coedges": 4,
+        "loops": 1,
+        "faces": 1,
+        "shells": 0,
+        "bodies": 1
+      },
+      "areas": [
+        12
+      ],
+      "model": {
+        "id": "example/geometry",
+        "ownerDefinitionId": "example/definition",
+        "representation": "planar-topology",
+        "vertices": {
+          "example/rectangle/vertex/0": {
+            "id": "example/rectangle/vertex/0",
+            "position": [
+              0,
+              0,
+              0
+            ]
+          },
+          "example/rectangle/vertex/1": {
+            "id": "example/rectangle/vertex/1",
+            "position": [
+              4,
+              0,
+              0
+            ]
+          },
+          "example/rectangle/vertex/2": {
+            "id": "example/rectangle/vertex/2",
+            "position": [
+              4,
+              3,
+              0
+            ]
+          },
+          "example/rectangle/vertex/3": {
+            "id": "example/rectangle/vertex/3",
+            "position": [
+              0,
+              3,
+              0
+            ]
+          }
+        },
+        "edges": {
+          "example/rectangle/edge/4": {
+            "id": "example/rectangle/edge/4",
+            "start": "example/rectangle/vertex/0",
+            "end": "example/rectangle/vertex/1",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/5": {
+            "id": "example/rectangle/edge/5",
+            "start": "example/rectangle/vertex/1",
+            "end": "example/rectangle/vertex/2",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/6": {
+            "id": "example/rectangle/edge/6",
+            "start": "example/rectangle/vertex/2",
+            "end": "example/rectangle/vertex/3",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/7": {
+            "id": "example/rectangle/edge/7",
+            "start": "example/rectangle/vertex/3",
+            "end": "example/rectangle/vertex/0",
+            "curve": {
+              "kind": "line"
+            }
+          }
+        },
+        "coedges": {
+          "example/rectangle/coedge/10": {
+            "id": "example/rectangle/coedge/10",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/4",
+            "direction": 1
+          },
+          "example/rectangle/coedge/11": {
+            "id": "example/rectangle/coedge/11",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/5",
+            "direction": 1
+          },
+          "example/rectangle/coedge/12": {
+            "id": "example/rectangle/coedge/12",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/6",
+            "direction": 1
+          },
+          "example/rectangle/coedge/13": {
+            "id": "example/rectangle/coedge/13",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/7",
+            "direction": 1
+          }
+        },
+        "loops": {
+          "example/rectangle/loop/9": {
+            "id": "example/rectangle/loop/9",
+            "coedgeIds": [
+              "example/rectangle/coedge/10",
+              "example/rectangle/coedge/11",
+              "example/rectangle/coedge/12",
+              "example/rectangle/coedge/13"
+            ]
+          }
+        },
+        "faces": {
+          "example/rectangle/face/8": {
+            "id": "example/rectangle/face/8",
+            "plane": {
+              "origin": [
+                0,
+                0,
+                0
+              ],
+              "u": [
+                0,
+                -1,
+                0
+              ],
+              "v": [
+                1,
+                0,
+                0
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ]
+            },
+            "outerLoopId": "example/rectangle/loop/9",
+            "innerLoopIds": [],
+            "frontMaterialId": "example/material",
+            "backMaterialId": "example/material"
+          }
+        },
+        "shells": {},
+        "bodies": {
+          "example/rectangle/body/14": {
+            "id": "example/rectangle/body/14",
+            "vertexIds": [
+              "example/rectangle/vertex/0",
+              "example/rectangle/vertex/1",
+              "example/rectangle/vertex/2",
+              "example/rectangle/vertex/3"
+            ],
+            "edgeIds": [
+              "example/rectangle/edge/4",
+              "example/rectangle/edge/5",
+              "example/rectangle/edge/6",
+              "example/rectangle/edge/7"
+            ],
+            "faceIds": [
+              "example/rectangle/face/8"
+            ],
+            "shellIds": []
+          }
+        }
+      },
+      "lineage": []
+    },
+    {
+      "name": "diagonal",
+      "input": [
+        [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            3,
+            0
+          ]
+        ]
+      ],
+      "counts": {
+        "vertices": 4,
+        "edges": 5,
+        "coedges": 6,
+        "loops": 2,
+        "faces": 2,
+        "shells": 0,
+        "bodies": 1
+      },
+      "areas": [
+        6,
+        6
+      ],
+      "model": {
+        "id": "example/geometry",
+        "ownerDefinitionId": "example/definition",
+        "representation": "planar-topology",
+        "vertices": {
+          "example/rectangle/vertex/0": {
+            "id": "example/rectangle/vertex/0",
+            "position": [
+              0,
+              0,
+              0
+            ]
+          },
+          "example/rectangle/vertex/1": {
+            "id": "example/rectangle/vertex/1",
+            "position": [
+              4,
+              0,
+              0
+            ]
+          },
+          "example/rectangle/vertex/2": {
+            "id": "example/rectangle/vertex/2",
+            "position": [
+              4,
+              3,
+              0
+            ]
+          },
+          "example/rectangle/vertex/3": {
+            "id": "example/rectangle/vertex/3",
+            "position": [
+              0,
+              3,
+              0
+            ]
+          }
+        },
+        "edges": {
+          "example/rectangle/edge/4": {
+            "id": "example/rectangle/edge/4",
+            "start": "example/rectangle/vertex/0",
+            "end": "example/rectangle/vertex/1",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/5": {
+            "id": "example/rectangle/edge/5",
+            "start": "example/rectangle/vertex/1",
+            "end": "example/rectangle/vertex/2",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/6": {
+            "id": "example/rectangle/edge/6",
+            "start": "example/rectangle/vertex/2",
+            "end": "example/rectangle/vertex/3",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/7": {
+            "id": "example/rectangle/edge/7",
+            "start": "example/rectangle/vertex/3",
+            "end": "example/rectangle/vertex/0",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/diagonal/edge/0": {
+            "id": "example/diagonal/edge/0",
+            "start": "example/rectangle/vertex/0",
+            "end": "example/rectangle/vertex/2",
+            "curve": {
+              "kind": "line"
+            }
+          }
+        },
+        "coedges": {
+          "example/diagonal/coedge/10": {
+            "id": "example/diagonal/coedge/10",
+            "loopId": "example/diagonal/loop/7",
+            "edgeId": "example/rectangle/edge/7",
+            "direction": 1
+          },
+          "example/diagonal/coedge/3": {
+            "id": "example/diagonal/coedge/3",
+            "loopId": "example/diagonal/loop/2",
+            "edgeId": "example/rectangle/edge/4",
+            "direction": 1
+          },
+          "example/diagonal/coedge/4": {
+            "id": "example/diagonal/coedge/4",
+            "loopId": "example/diagonal/loop/2",
+            "edgeId": "example/rectangle/edge/5",
+            "direction": 1
+          },
+          "example/diagonal/coedge/5": {
+            "id": "example/diagonal/coedge/5",
+            "loopId": "example/diagonal/loop/2",
+            "edgeId": "example/diagonal/edge/0",
+            "direction": -1
+          },
+          "example/diagonal/coedge/8": {
+            "id": "example/diagonal/coedge/8",
+            "loopId": "example/diagonal/loop/7",
+            "edgeId": "example/diagonal/edge/0",
+            "direction": 1
+          },
+          "example/diagonal/coedge/9": {
+            "id": "example/diagonal/coedge/9",
+            "loopId": "example/diagonal/loop/7",
+            "edgeId": "example/rectangle/edge/6",
+            "direction": 1
+          }
+        },
+        "loops": {
+          "example/diagonal/loop/2": {
+            "id": "example/diagonal/loop/2",
+            "coedgeIds": [
+              "example/diagonal/coedge/3",
+              "example/diagonal/coedge/4",
+              "example/diagonal/coedge/5"
+            ]
+          },
+          "example/diagonal/loop/7": {
+            "id": "example/diagonal/loop/7",
+            "coedgeIds": [
+              "example/diagonal/coedge/8",
+              "example/diagonal/coedge/9",
+              "example/diagonal/coedge/10"
+            ]
+          }
+        },
+        "faces": {
+          "example/diagonal/face/1": {
+            "id": "example/diagonal/face/1",
+            "plane": {
+              "origin": [
+                0,
+                0,
+                0
+              ],
+              "u": [
+                0,
+                -1,
+                0
+              ],
+              "v": [
+                1,
+                0,
+                0
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ]
+            },
+            "outerLoopId": "example/diagonal/loop/2",
+            "innerLoopIds": [],
+            "frontMaterialId": "example/material",
+            "backMaterialId": "example/material"
+          },
+          "example/diagonal/face/6": {
+            "id": "example/diagonal/face/6",
+            "plane": {
+              "origin": [
+                0,
+                0,
+                0
+              ],
+              "u": [
+                0,
+                -1,
+                0
+              ],
+              "v": [
+                1,
+                0,
+                0
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ]
+            },
+            "outerLoopId": "example/diagonal/loop/7",
+            "innerLoopIds": [],
+            "frontMaterialId": "example/material",
+            "backMaterialId": "example/material"
+          }
+        },
+        "shells": {},
+        "bodies": {
+          "example/rectangle/body/14": {
+            "id": "example/rectangle/body/14",
+            "vertexIds": [
+              "example/rectangle/vertex/0",
+              "example/rectangle/vertex/1",
+              "example/rectangle/vertex/2",
+              "example/rectangle/vertex/3"
+            ],
+            "edgeIds": [
+              "example/diagonal/edge/0",
+              "example/rectangle/edge/4",
+              "example/rectangle/edge/5",
+              "example/rectangle/edge/6",
+              "example/rectangle/edge/7"
+            ],
+            "faceIds": [
+              "example/diagonal/face/1",
+              "example/diagonal/face/6"
+            ],
+            "shellIds": []
+          }
+        }
+      },
+      "lineage": [
+        {
+          "operationId": "example/diagonal",
+          "kind": "coedge",
+          "retiredId": "example/rectangle/coedge/10",
+          "descendants": [
+            {
+              "id": "example/diagonal/coedge/3"
+            }
+          ],
+          "reason": "convert"
+        },
+        {
+          "operationId": "example/diagonal",
+          "kind": "coedge",
+          "retiredId": "example/rectangle/coedge/11",
+          "descendants": [
+            {
+              "id": "example/diagonal/coedge/4"
+            }
+          ],
+          "reason": "convert"
+        },
+        {
+          "operationId": "example/diagonal",
+          "kind": "coedge",
+          "retiredId": "example/rectangle/coedge/12",
+          "descendants": [
+            {
+              "id": "example/diagonal/coedge/9"
+            }
+          ],
+          "reason": "convert"
+        },
+        {
+          "operationId": "example/diagonal",
+          "kind": "coedge",
+          "retiredId": "example/rectangle/coedge/13",
+          "descendants": [
+            {
+              "id": "example/diagonal/coedge/10"
+            }
+          ],
+          "reason": "convert"
+        },
+        {
+          "operationId": "example/diagonal",
+          "kind": "loop",
+          "retiredId": "example/rectangle/loop/9",
+          "descendants": [
+            {
+              "id": "example/diagonal/loop/2"
+            },
+            {
+              "id": "example/diagonal/loop/7"
+            }
+          ],
+          "reason": "split"
+        },
+        {
+          "operationId": "example/diagonal",
+          "kind": "face",
+          "retiredId": "example/rectangle/face/8",
+          "descendants": [
+            {
+              "id": "example/diagonal/face/1"
+            },
+            {
+              "id": "example/diagonal/face/6"
+            }
+          ],
+          "reason": "split"
+        }
+      ]
+    },
+    {
+      "name": "cross",
+      "input": [
+        [
+          [
+            -2,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ]
+        ],
+        [
+          [
+            0,
+            -2,
+            0
+          ],
+          [
+            0,
+            2,
+            0
+          ]
+        ]
+      ],
+      "counts": {
+        "vertices": 5,
+        "edges": 4,
+        "coedges": 0,
+        "loops": 0,
+        "faces": 0,
+        "shells": 0,
+        "bodies": 1
+      },
+      "areas": [],
+      "model": {
+        "id": "example/geometry",
+        "ownerDefinitionId": "example/definition",
+        "representation": "planar-topology",
+        "vertices": {
+          "example/cross/vertex/0": {
+            "id": "example/cross/vertex/0",
+            "position": [
+              -2,
+              0,
+              0
+            ]
+          },
+          "example/cross/vertex/1": {
+            "id": "example/cross/vertex/1",
+            "position": [
+              2,
+              0,
+              0
+            ]
+          },
+          "example/cross/vertex/2": {
+            "id": "example/cross/vertex/2",
+            "position": [
+              0,
+              -2,
+              0
+            ]
+          },
+          "example/cross/vertex/3": {
+            "id": "example/cross/vertex/3",
+            "position": [
+              0,
+              2,
+              0
+            ]
+          },
+          "example/cross/vertex/4": {
+            "id": "example/cross/vertex/4",
+            "position": [
+              0,
+              0,
+              0
+            ]
+          }
+        },
+        "edges": {
+          "example/cross/edge/5": {
+            "id": "example/cross/edge/5",
+            "start": "example/cross/vertex/0",
+            "end": "example/cross/vertex/4",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/cross/edge/6": {
+            "id": "example/cross/edge/6",
+            "start": "example/cross/vertex/4",
+            "end": "example/cross/vertex/1",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/cross/edge/7": {
+            "id": "example/cross/edge/7",
+            "start": "example/cross/vertex/2",
+            "end": "example/cross/vertex/4",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/cross/edge/8": {
+            "id": "example/cross/edge/8",
+            "start": "example/cross/vertex/4",
+            "end": "example/cross/vertex/3",
+            "curve": {
+              "kind": "line"
+            }
+          }
+        },
+        "coedges": {},
+        "loops": {},
+        "faces": {},
+        "shells": {},
+        "bodies": {
+          "example/cross/body/9": {
+            "id": "example/cross/body/9",
+            "vertexIds": [
+              "example/cross/vertex/0",
+              "example/cross/vertex/1",
+              "example/cross/vertex/2",
+              "example/cross/vertex/3",
+              "example/cross/vertex/4"
+            ],
+            "edgeIds": [
+              "example/cross/edge/5",
+              "example/cross/edge/6",
+              "example/cross/edge/7",
+              "example/cross/edge/8"
+            ],
+            "faceIds": [],
+            "shellIds": []
+          }
+        }
+      },
+      "lineage": []
+    },
+    {
+      "name": "nested",
+      "input": [
+        [
+          [
+            1,
+            1,
+            0
+          ],
+          [
+            2,
+            1,
+            0
+          ]
+        ],
+        [
+          [
+            2,
+            1,
+            0
+          ],
+          [
+            2,
+            2,
+            0
+          ]
+        ],
+        [
+          [
+            2,
+            2,
+            0
+          ],
+          [
+            1,
+            2,
+            0
+          ]
+        ],
+        [
+          [
+            1,
+            2,
+            0
+          ],
+          [
+            1,
+            1,
+            0
+          ]
+        ]
+      ],
+      "counts": {
+        "vertices": 8,
+        "edges": 8,
+        "coedges": 12,
+        "loops": 3,
+        "faces": 2,
+        "shells": 0,
+        "bodies": 1
+      },
+      "areas": [
+        1,
+        11
+      ],
+      "model": {
+        "id": "example/geometry",
+        "ownerDefinitionId": "example/definition",
+        "representation": "planar-topology",
+        "vertices": {
+          "example/rectangle/vertex/0": {
+            "id": "example/rectangle/vertex/0",
+            "position": [
+              0,
+              0,
+              0
+            ]
+          },
+          "example/rectangle/vertex/1": {
+            "id": "example/rectangle/vertex/1",
+            "position": [
+              4,
+              0,
+              0
+            ]
+          },
+          "example/rectangle/vertex/2": {
+            "id": "example/rectangle/vertex/2",
+            "position": [
+              4,
+              3,
+              0
+            ]
+          },
+          "example/rectangle/vertex/3": {
+            "id": "example/rectangle/vertex/3",
+            "position": [
+              0,
+              3,
+              0
+            ]
+          },
+          "example/nested/vertex/0": {
+            "id": "example/nested/vertex/0",
+            "position": [
+              1,
+              1,
+              0
+            ]
+          },
+          "example/nested/vertex/1": {
+            "id": "example/nested/vertex/1",
+            "position": [
+              2,
+              1,
+              0
+            ]
+          },
+          "example/nested/vertex/2": {
+            "id": "example/nested/vertex/2",
+            "position": [
+              2,
+              2,
+              0
+            ]
+          },
+          "example/nested/vertex/3": {
+            "id": "example/nested/vertex/3",
+            "position": [
+              1,
+              2,
+              0
+            ]
+          }
+        },
+        "edges": {
+          "example/rectangle/edge/4": {
+            "id": "example/rectangle/edge/4",
+            "start": "example/rectangle/vertex/0",
+            "end": "example/rectangle/vertex/1",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/5": {
+            "id": "example/rectangle/edge/5",
+            "start": "example/rectangle/vertex/1",
+            "end": "example/rectangle/vertex/2",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/6": {
+            "id": "example/rectangle/edge/6",
+            "start": "example/rectangle/vertex/2",
+            "end": "example/rectangle/vertex/3",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/rectangle/edge/7": {
+            "id": "example/rectangle/edge/7",
+            "start": "example/rectangle/vertex/3",
+            "end": "example/rectangle/vertex/0",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/nested/edge/4": {
+            "id": "example/nested/edge/4",
+            "start": "example/nested/vertex/0",
+            "end": "example/nested/vertex/1",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/nested/edge/5": {
+            "id": "example/nested/edge/5",
+            "start": "example/nested/vertex/1",
+            "end": "example/nested/vertex/2",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/nested/edge/6": {
+            "id": "example/nested/edge/6",
+            "start": "example/nested/vertex/2",
+            "end": "example/nested/vertex/3",
+            "curve": {
+              "kind": "line"
+            }
+          },
+          "example/nested/edge/7": {
+            "id": "example/nested/edge/7",
+            "start": "example/nested/vertex/3",
+            "end": "example/nested/vertex/0",
+            "curve": {
+              "kind": "line"
+            }
+          }
+        },
+        "coedges": {
+          "example/rectangle/coedge/10": {
+            "id": "example/rectangle/coedge/10",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/4",
+            "direction": 1
+          },
+          "example/rectangle/coedge/11": {
+            "id": "example/rectangle/coedge/11",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/5",
+            "direction": 1
+          },
+          "example/rectangle/coedge/12": {
+            "id": "example/rectangle/coedge/12",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/6",
+            "direction": 1
+          },
+          "example/rectangle/coedge/13": {
+            "id": "example/rectangle/coedge/13",
+            "loopId": "example/rectangle/loop/9",
+            "edgeId": "example/rectangle/edge/7",
+            "direction": 1
+          },
+          "example/nested/coedge/10": {
+            "id": "example/nested/coedge/10",
+            "loopId": "example/nested/loop/9",
+            "edgeId": "example/nested/edge/7",
+            "direction": -1
+          },
+          "example/nested/coedge/11": {
+            "id": "example/nested/coedge/11",
+            "loopId": "example/nested/loop/9",
+            "edgeId": "example/nested/edge/6",
+            "direction": -1
+          },
+          "example/nested/coedge/12": {
+            "id": "example/nested/coedge/12",
+            "loopId": "example/nested/loop/9",
+            "edgeId": "example/nested/edge/5",
+            "direction": -1
+          },
+          "example/nested/coedge/13": {
+            "id": "example/nested/coedge/13",
+            "loopId": "example/nested/loop/9",
+            "edgeId": "example/nested/edge/4",
+            "direction": -1
+          },
+          "example/nested/coedge/16": {
+            "id": "example/nested/coedge/16",
+            "loopId": "example/nested/loop/15",
+            "edgeId": "example/nested/edge/4",
+            "direction": 1
+          },
+          "example/nested/coedge/17": {
+            "id": "example/nested/coedge/17",
+            "loopId": "example/nested/loop/15",
+            "edgeId": "example/nested/edge/5",
+            "direction": 1
+          },
+          "example/nested/coedge/18": {
+            "id": "example/nested/coedge/18",
+            "loopId": "example/nested/loop/15",
+            "edgeId": "example/nested/edge/6",
+            "direction": 1
+          },
+          "example/nested/coedge/19": {
+            "id": "example/nested/coedge/19",
+            "loopId": "example/nested/loop/15",
+            "edgeId": "example/nested/edge/7",
+            "direction": 1
+          }
+        },
+        "loops": {
+          "example/rectangle/loop/9": {
+            "id": "example/rectangle/loop/9",
+            "coedgeIds": [
+              "example/rectangle/coedge/10",
+              "example/rectangle/coedge/11",
+              "example/rectangle/coedge/12",
+              "example/rectangle/coedge/13"
+            ]
+          },
+          "example/nested/loop/15": {
+            "id": "example/nested/loop/15",
+            "coedgeIds": [
+              "example/nested/coedge/16",
+              "example/nested/coedge/17",
+              "example/nested/coedge/18",
+              "example/nested/coedge/19"
+            ]
+          },
+          "example/nested/loop/9": {
+            "id": "example/nested/loop/9",
+            "coedgeIds": [
+              "example/nested/coedge/10",
+              "example/nested/coedge/11",
+              "example/nested/coedge/12",
+              "example/nested/coedge/13"
+            ]
+          }
+        },
+        "faces": {
+          "example/nested/face/14": {
+            "id": "example/nested/face/14",
+            "plane": {
+              "origin": [
+                0,
+                0,
+                0
+              ],
+              "u": [
+                0,
+                -1,
+                0
+              ],
+              "v": [
+                1,
+                0,
+                0
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ]
+            },
+            "outerLoopId": "example/nested/loop/15",
+            "innerLoopIds": [],
+            "frontMaterialId": "example/material",
+            "backMaterialId": "example/material"
+          },
+          "example/nested/face/8": {
+            "id": "example/nested/face/8",
+            "plane": {
+              "origin": [
+                0,
+                0,
+                0
+              ],
+              "u": [
+                0,
+                -1,
+                0
+              ],
+              "v": [
+                1,
+                0,
+                0
+              ],
+              "normal": [
+                0,
+                0,
+                1
+              ]
+            },
+            "outerLoopId": "example/rectangle/loop/9",
+            "innerLoopIds": [
+              "example/nested/loop/9"
+            ],
+            "frontMaterialId": "example/material",
+            "backMaterialId": "example/material"
+          }
+        },
+        "shells": {},
+        "bodies": {
+          "example/rectangle/body/14": {
+            "id": "example/rectangle/body/14",
+            "vertexIds": [
+              "example/nested/vertex/0",
+              "example/nested/vertex/1",
+              "example/nested/vertex/2",
+              "example/nested/vertex/3",
+              "example/rectangle/vertex/0",
+              "example/rectangle/vertex/1",
+              "example/rectangle/vertex/2",
+              "example/rectangle/vertex/3"
+            ],
+            "edgeIds": [
+              "example/nested/edge/4",
+              "example/nested/edge/5",
+              "example/nested/edge/6",
+              "example/nested/edge/7",
+              "example/rectangle/edge/4",
+              "example/rectangle/edge/5",
+              "example/rectangle/edge/6",
+              "example/rectangle/edge/7"
+            ],
+            "faceIds": [
+              "example/nested/face/14",
+              "example/nested/face/8"
+            ],
+            "shellIds": []
+          }
+        }
+      },
+      "lineage": [
+        {
+          "operationId": "example/nested",
+          "kind": "face",
+          "retiredId": "example/rectangle/face/8",
+          "descendants": [
+            {
+              "id": "example/nested/face/8"
+            },
+            {
+              "id": "example/nested/face/14"
+            }
+          ],
+          "reason": "split"
+        }
+      ]
+    }
+  ]
+}

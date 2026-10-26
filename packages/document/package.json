@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@forma/shared": "workspace:*"
+    "@forma/shared": "workspace:*",
+    "@forma/geometry": "workspace:*"
   }
 }

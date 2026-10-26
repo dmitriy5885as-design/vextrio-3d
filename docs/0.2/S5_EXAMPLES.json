@@ -1,0 +1,101 @@
+{
+  "input": "4000,125 мм;0;0",
+  "dimensions": {
+    "point": [
+      4.000125,
+      0,
+      0
+    ]
+  },
+  "snaps": [
+    {
+      "cursor": [
+        0,
+        0,
+        0
+      ],
+      "kind": "endpoint",
+      "point": [
+        0,
+        0,
+        0
+      ],
+      "ref": {
+        "definitionId": "v2/root",
+        "geometryId": "precision/geometry",
+        "kind": "vertex",
+        "entityId": "precision/seed/vertex/0",
+        "occurrencePath": []
+      },
+      "stats": {
+        "visited": 1,
+        "inspected": 3,
+        "tested": 2,
+        "pairs": 0,
+        "truncated": false
+      }
+    },
+    {
+      "cursor": [
+        2,
+        0,
+        0
+      ],
+      "kind": "midpoint",
+      "point": [
+        2,
+        0,
+        0
+      ],
+      "ref": {
+        "definitionId": "v2/root",
+        "geometryId": "precision/geometry",
+        "kind": "edge",
+        "entityId": "precision/seed/edge/2",
+        "occurrencePath": []
+      },
+      "stats": {
+        "visited": 1,
+        "inspected": 3,
+        "tested": 1,
+        "pairs": 0,
+        "truncated": false
+      }
+    },
+    {
+      "cursor": [
+        1.23,
+        0.02,
+        0
+      ],
+      "kind": "edge",
+      "point": [
+        1.23,
+        0,
+        0
+      ],
+      "ref": {
+        "definitionId": "v2/root",
+        "geometryId": "precision/geometry",
+        "kind": "edge",
+        "entityId": "precision/seed/edge/2",
+        "occurrencePath": []
+      },
+      "stats": {
+        "visited": 1,
+        "inspected": 3,
+        "tested": 1,
+        "pairs": 0,
+        "truncated": false
+      }
+    }
+  ],
+  "index": {
+    "sources": 30000,
+    "visited": 25,
+    "inspected": 7,
+    "tested": 2,
+    "pairs": 0,
+    "truncated": false
+  }
+}

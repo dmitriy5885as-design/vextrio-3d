@@ -5,6 +5,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@forma/shared": "workspace:*"
+    "earcut": "3.0.2"
   }
 }

@@ -1,0 +1,432 @@
+{
+  "format": "forma",
+  "schemaVersion": 2,
+  "name": "Sketch v2",
+  "units": "m",
+  "camera": {
+    "position": [
+      7,
+      6,
+      10
+    ],
+    "target": [
+      2,
+      1.5,
+      0
+    ],
+    "projection": "perspective",
+    "zoom": 1
+  },
+  "rootDefinitionId": "v2/root",
+  "definitions": {
+    "v2/root": {
+      "id": "v2/root",
+      "name": "Сцена",
+      "kind": "scene",
+      "geometryId": null,
+      "childNodeIds": [
+        "instance/group",
+        "instance/two"
+      ]
+    },
+    "definition/component": {
+      "id": "definition/component",
+      "name": "Общий компонент",
+      "kind": "component",
+      "geometryId": "native/geometry",
+      "childNodeIds": []
+    },
+    "definition/group": {
+      "id": "definition/group",
+      "name": "Группа",
+      "kind": "group",
+      "geometryId": null,
+      "childNodeIds": [
+        "instance/one"
+      ]
+    }
+  },
+  "nodes": {
+    "instance/group": {
+      "id": "instance/group",
+      "name": "Группа слева",
+      "kind": "group",
+      "parentDefinitionId": "v2/root",
+      "definitionId": "definition/group",
+      "transform": {
+        "translation": [
+          -5,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "visible": true,
+      "locked": false
+    },
+    "instance/one": {
+      "id": "instance/one",
+      "name": "Компонент 1",
+      "kind": "component",
+      "parentDefinitionId": "definition/group",
+      "definitionId": "definition/component",
+      "transform": {
+        "translation": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "visible": true,
+      "locked": false
+    },
+    "instance/two": {
+      "id": "instance/two",
+      "name": "Компонент 2",
+      "kind": "component",
+      "parentDefinitionId": "v2/root",
+      "definitionId": "definition/component",
+      "transform": {
+        "translation": [
+          5,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "visible": true,
+      "locked": false
+    }
+  },
+  "geometries": {
+    "native/geometry": {
+      "id": "native/geometry",
+      "ownerDefinitionId": "definition/component",
+      "representation": "planar-topology",
+      "vertices": {
+        "fixture/insert/vertex/0": {
+          "id": "fixture/insert/vertex/0",
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        "fixture/insert/vertex/1": {
+          "id": "fixture/insert/vertex/1",
+          "position": [
+            4,
+            0,
+            0
+          ]
+        },
+        "fixture/insert/vertex/2": {
+          "id": "fixture/insert/vertex/2",
+          "position": [
+            4,
+            3,
+            0
+          ]
+        },
+        "fixture/insert/vertex/3": {
+          "id": "fixture/insert/vertex/3",
+          "position": [
+            0,
+            3,
+            0
+          ]
+        },
+        "fixture/insert/vertex/4": {
+          "id": "fixture/insert/vertex/4",
+          "position": [
+            1,
+            1,
+            0
+          ]
+        },
+        "fixture/insert/vertex/5": {
+          "id": "fixture/insert/vertex/5",
+          "position": [
+            2,
+            1,
+            0
+          ]
+        },
+        "fixture/insert/vertex/6": {
+          "id": "fixture/insert/vertex/6",
+          "position": [
+            2,
+            2,
+            0
+          ]
+        },
+        "fixture/insert/vertex/7": {
+          "id": "fixture/insert/vertex/7",
+          "position": [
+            1,
+            2,
+            0
+          ]
+        }
+      },
+      "edges": {
+        "fixture/insert/edge/10": {
+          "id": "fixture/insert/edge/10",
+          "start": "fixture/insert/vertex/2",
+          "end": "fixture/insert/vertex/3",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/11": {
+          "id": "fixture/insert/edge/11",
+          "start": "fixture/insert/vertex/3",
+          "end": "fixture/insert/vertex/0",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/12": {
+          "id": "fixture/insert/edge/12",
+          "start": "fixture/insert/vertex/4",
+          "end": "fixture/insert/vertex/5",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/13": {
+          "id": "fixture/insert/edge/13",
+          "start": "fixture/insert/vertex/5",
+          "end": "fixture/insert/vertex/6",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/14": {
+          "id": "fixture/insert/edge/14",
+          "start": "fixture/insert/vertex/6",
+          "end": "fixture/insert/vertex/7",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/15": {
+          "id": "fixture/insert/edge/15",
+          "start": "fixture/insert/vertex/7",
+          "end": "fixture/insert/vertex/4",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/8": {
+          "id": "fixture/insert/edge/8",
+          "start": "fixture/insert/vertex/0",
+          "end": "fixture/insert/vertex/1",
+          "curve": {
+            "kind": "line"
+          }
+        },
+        "fixture/insert/edge/9": {
+          "id": "fixture/insert/edge/9",
+          "start": "fixture/insert/vertex/1",
+          "end": "fixture/insert/vertex/2",
+          "curve": {
+            "kind": "line"
+          }
+        }
+      },
+      "coedges": {
+        "fixture/insert/coedge/18": {
+          "id": "fixture/insert/coedge/18",
+          "loopId": "fixture/insert/loop/17",
+          "edgeId": "fixture/insert/edge/8",
+          "direction": 1
+        },
+        "fixture/insert/coedge/19": {
+          "id": "fixture/insert/coedge/19",
+          "loopId": "fixture/insert/loop/17",
+          "edgeId": "fixture/insert/edge/9",
+          "direction": 1
+        },
+        "fixture/insert/coedge/20": {
+          "id": "fixture/insert/coedge/20",
+          "loopId": "fixture/insert/loop/17",
+          "edgeId": "fixture/insert/edge/10",
+          "direction": 1
+        },
+        "fixture/insert/coedge/21": {
+          "id": "fixture/insert/coedge/21",
+          "loopId": "fixture/insert/loop/17",
+          "edgeId": "fixture/insert/edge/11",
+          "direction": 1
+        },
+        "fixture/insert/coedge/23": {
+          "id": "fixture/insert/coedge/23",
+          "loopId": "fixture/insert/loop/22",
+          "edgeId": "fixture/insert/edge/15",
+          "direction": -1
+        },
+        "fixture/insert/coedge/24": {
+          "id": "fixture/insert/coedge/24",
+          "loopId": "fixture/insert/loop/22",
+          "edgeId": "fixture/insert/edge/14",
+          "direction": -1
+        },
+        "fixture/insert/coedge/25": {
+          "id": "fixture/insert/coedge/25",
+          "loopId": "fixture/insert/loop/22",
+          "edgeId": "fixture/insert/edge/13",
+          "direction": -1
+        },
+        "fixture/insert/coedge/26": {
+          "id": "fixture/insert/coedge/26",
+          "loopId": "fixture/insert/loop/22",
+          "edgeId": "fixture/insert/edge/12",
+          "direction": -1
+        }
+      },
+      "loops": {
+        "fixture/insert/loop/17": {
+          "id": "fixture/insert/loop/17",
+          "coedgeIds": [
+            "fixture/insert/coedge/18",
+            "fixture/insert/coedge/19",
+            "fixture/insert/coedge/20",
+            "fixture/insert/coedge/21"
+          ]
+        },
+        "fixture/insert/loop/22": {
+          "id": "fixture/insert/loop/22",
+          "coedgeIds": [
+            "fixture/insert/coedge/23",
+            "fixture/insert/coedge/24",
+            "fixture/insert/coedge/25",
+            "fixture/insert/coedge/26"
+          ]
+        }
+      },
+      "faces": {
+        "fixture/insert/face/16": {
+          "id": "fixture/insert/face/16",
+          "plane": {
+            "origin": [
+              0,
+              0,
+              0
+            ],
+            "u": [
+              0,
+              -1,
+              0
+            ],
+            "v": [
+              1,
+              0,
+              0
+            ],
+            "normal": [
+              0,
+              0,
+              1
+            ]
+          },
+          "outerLoopId": "fixture/insert/loop/17",
+          "innerLoopIds": [
+            "fixture/insert/loop/22"
+          ],
+          "frontMaterialId": "native/material",
+          "backMaterialId": "native/material"
+        }
+      },
+      "shells": {},
+      "bodies": {
+        "fixture/insert/body/33": {
+          "id": "fixture/insert/body/33",
+          "vertexIds": [
+            "fixture/insert/vertex/0",
+            "fixture/insert/vertex/1",
+            "fixture/insert/vertex/2",
+            "fixture/insert/vertex/3",
+            "fixture/insert/vertex/4",
+            "fixture/insert/vertex/5",
+            "fixture/insert/vertex/6",
+            "fixture/insert/vertex/7"
+          ],
+          "edgeIds": [
+            "fixture/insert/edge/10",
+            "fixture/insert/edge/11",
+            "fixture/insert/edge/12",
+            "fixture/insert/edge/13",
+            "fixture/insert/edge/14",
+            "fixture/insert/edge/15",
+            "fixture/insert/edge/8",
+            "fixture/insert/edge/9"
+          ],
+          "faceIds": [
+            "fixture/insert/face/16"
+          ],
+          "shellIds": []
+        }
+      }
+    }
+  },
+  "materials": {
+    "native/material": {
+      "id": "native/material",
+      "color": "#4dd5c0",
+      "roughness": 0.6,
+      "metalness": 0.1
+    }
+  },
+  "geometryPolicy": {
+    "version": 1,
+    "absoluteDistance": 1e-7,
+    "relativeDistance": 1e-12,
+    "angular": 1e-10,
+    "maxTransformCondition": 100000000
+  },
+  "references": {},
+  "provenance": [],
+  "extensions": {
+    "legacyFields": {},
+    "test:user": {
+      "note": "FORMA пользовательские данные",
+      "numbers": [
+        1,
+        2,
+        3
+      ]
+    }
+  }
+}

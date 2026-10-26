@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — S6 интерактивного Sketch
+
+- Настоящие L/линия и R/прямоугольник: мышь, точные размеры, автоматические грани и пересечения S3.
+- Общий ToolController: debounce preview, commit/continue, отмена/blur/pointercancel, epoch guard и защита двойных/повторных событий.
+- Атомарная seed geometry/material в общей delta Undo/Redo, world/local contexts и физические площади экземпляров.
+- Space/V и Shift selection по EntityRef, отдельный hover; компактный input dock для узких окон.
+- Origin Snap и узлы сетки на осях; исправлены интеграционные регрессии S5 и сохранение начала при смене единиц. [Отчёт S6](docs/0.2/S6_REPORT.md).
+
+## Unreleased — S5 точного позиционирования
+
+- Общий Snap Engine: topology points/edges/faces/holes/intersections, оси, сетка и parallel/perpendicular inference, CSS radius и hysteresis.
+- Snapshot world-space BVH, ограниченный поиск с диагностикой, perspective-correct on-edge и near/far clipping.
+- Разбор длины, XYZ и размеров preview: m/cm/mm, decimal comma, относительные/абсолютные координаты и ошибки несовместимых ограничений.
+- Полные affine локальные контексты, рабочие плоскости и реальный режим точной точки с применением к вершине через GeometrySession/Undo.
+- Успешное открытие сбрасывает старое topology selection. [Отчёт, демонстрация и проверки S5](docs/0.2/S5_REPORT.md).
+
+## Unreleased — S4 интеграции топологии
+
+- Production Document v2, безопасная явная миграция v1 и сохранение пользовательских полей, ID, материалов и размещения legacy объектов.
+- GeometrySession.prepare и forward/inverse команды в общей Undo/Redo; защита stale результатов, occurrence locks и persisted lineage.
+- Render/picking bridge с отверстиями, материалами сторон, affine размещением и каноническими entity ID/occurrencePath.
+- Реальные .v3d fixtures и браузерные проверки загрузки, выбора и повторного открытия. [Отчёт S4](docs/0.2/S4_REPORT.md); Windows/Cargo проверка остаётся открытой.
+
+## Unreleased — S1 надёжности для 0.2 Sketch
+
+- Общая валидация candidate до принятия документа/истории; отказ от нулевого масштаба и несериализуемых runtime-значений.
+- Раздельные lock/unlock intents, защита от mixed patch и заблокированных предков, атомарные ошибки Undo/Redo.
+- Browser download-started сохраняет dirty warning; отмена Save As не меняет имя.
+- Native open candidate/accept/reject сохраняет прежний путь до принятия валидного файла; Rust/Windows проверка требуется.
+- Golden v1 fixtures, постоянные regression tests и рекурсивная проверка зависимостей. [Результаты S1](docs/0.2/S1_REPORT.md).
+
 ## 0.1.0 — Foundation (разработка)
 
 - Создан pnpm-монорепозиторий, React/Vite/TypeScript, Vitest и Playwright.
@@ -9,3 +40,22 @@
 - Реализованы браузерные файлы .v3d; подготовлены нативные команды Tauri с атомарной записью.
 - Добавлены архитектурные документы и план 0.2.
 - Windows-сборка ожидает проверки в окружении Rust/MSVC.
+
+## Unreleased — S2 геометрического основания
+
+- Независимые topology tables/IDs, политика точности, плоскости/размещения, ownership и граф групп/компонентов.
+- Проверяемые delta/inverse/lineage, preview и защита от stale async результатов; local move-vertices harness.
+- PrimitiveAdapter перенесён в viewport; v1 и работающие инструменты сохранены. 59 новых unit tests; [отчёт S2](docs/0.2/S2_REPORT.md).
+
+## Unreleased — VEXTRIO 3D
+
+- Пользовательский бренд FORMA 3D заменён на VEXTRIO 3D; новый геометрический V и полный набор иконок.
+- Сохранены .v3d, format: "forma", пакеты и app identity; NSIS использует прежние registry keys с новым DisplayName.
+- Исторические записи выше сохранены. [Отчёт о ребрендинге](docs/branding/REPORT.md).
+
+## Unreleased — S3 Sketch
+
+- Настоящие 3D segment intersections, T/X/overlap, канонизация вершин и уникальные атомарные рёбра с provenance.
+- Плоское разбиение, автоматические bounded faces, диагонали, nested regions и holes с сохранением before fill state.
+- Атомарные GeometryDelta/Session, ID-stable Undo/Redo, numerical/resource rejection, 48 новых тестов и воспроизводимый JSON корпус. [Отчёт S3](docs/0.2/S3_REPORT.md).
+- Пользовательский v1 UI и .v3d не менялись; инструменты рисования остаются S6.

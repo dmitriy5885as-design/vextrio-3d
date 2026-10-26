@@ -6,6 +6,7 @@
   "type": "module",
   "dependencies": {
     "@forma/document": "workspace:*",
-    "@forma/shared": "workspace:*"
+    "@forma/shared": "workspace:*",
+    "@tauri-apps/api": "^2.12.4"
   }
 }

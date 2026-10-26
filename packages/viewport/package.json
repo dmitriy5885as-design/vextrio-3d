@@ -5,8 +5,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@forma/geometry": "workspace:*",
     "@forma/shared": "workspace:*",
-    "@forma/editor": "workspace:*"
+    "@forma/editor": "workspace:*",
+    "react": "^19.0.0",
+    "three": "^0.171.0",
+    "@forma/geometry": "workspace:*",
+    "@forma/document": "workspace:*",
+    "@forma/snapping": "workspace:*"
   }
 }

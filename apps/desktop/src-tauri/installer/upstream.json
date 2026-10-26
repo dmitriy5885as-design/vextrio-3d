@@ -1,0 +1,15 @@
+{
+  "version": "2.12.4",
+  "url": "https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.12.4/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi",
+  "sha256LF": "d00089d3b1a2c4a30d7b6e098079100cb8f25e980f84d4515aca4597b95e967d",
+  "changes": [
+    [
+      "!define UNINSTKEY \"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${PRODUCTNAME}\"",
+      "!define UNINSTKEY \"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FORMA\""
+    ],
+    [
+      "!define MANUPRODUCTKEY \"${MANUKEY}\\${PRODUCTNAME}\"",
+      "!define MANUPRODUCTKEY \"Software\\forma\\FORMA\""
+    ]
+  ]
+}

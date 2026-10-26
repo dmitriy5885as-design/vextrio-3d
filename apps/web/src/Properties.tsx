@@ -1,5 +1,8 @@
+import { getLegacyObjects, occurrenceMatrix } from "@forma/document";
+import { tessellateFace, tessellationArea } from "@forma/geometry";
+import { isGeometryLocked } from "@forma/editor";
 import { useEffect, useState } from "react";
-import { useEditor } from "@forma/editor";
+import { useEditor, isObjectLocked } from "@forma/editor";
 import { ru } from "@forma/ui";
 import { primitiveNames, type SceneObject } from "@forma/shared";
 import { ChevronDown, Box, Copy, Trash2 } from "lucide-react";
@@ -31,6 +34,7 @@ function NumberField({
           if (draft !== "" && Number.isFinite(n) && Math.abs(n) < 1e7)
             onCommit(n);
           else setDraft(String(value));
+          setDraft(String(Number(value.toFixed(4))));
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
@@ -41,9 +45,97 @@ function NumberField({
 }
 export function Properties() {
   const s = useEditor();
-  const o = s.project.objects.find((o) => o.id === s.selected);
+  const o = getLegacyObjects(s.project).find((o) => o.id === s.selected);
+  const objectLocked = o ? isObjectLocked(s.project, o.id) : false;
+  const ancestorLocked = o ? isObjectLocked(s.project, o.id, true) : false;
   const factor =
     s.project.units === "mm" ? 1000 : s.project.units === "cm" ? 100 : 1;
+  const ref = s.topologySelection;
+  if (s.project.schemaVersion === 2 && ref) {
+    const m = s.project.geometries[ref.geometryId],
+      name = {
+        vertex: "Вершина",
+        edge: "Ребро",
+        face: "Грань",
+        coedge: "Обход ребра",
+        loop: "Контур",
+        shell: "Оболочка",
+        body: "Тело",
+      }[ref.kind],
+      face = ref.kind === "face" ? m.faces[ref.entityId] : null,
+      edge = ref.kind === "edge" ? m.edges[ref.entityId] : null,
+      vertex = ref.kind === "vertex" ? m.vertices[ref.entityId] : null;
+    return (
+      <aside
+        className="properties"
+        data-testid="topology-selection"
+        data-kind={ref.kind}
+        data-entity-id={ref.entityId}
+      >
+        <div className="panel-heading">
+          Свойства <span className="micro">ТОПОЛОГИЯ</span>
+        </div>
+        <div className="property-group">
+          <h3>{name}</h3>
+          {s.topologySelections.length > 1 && (
+            <p>
+              Выбрано {s.topologySelections.length} · свойства последнего
+              элемента
+            </p>
+          )}
+          <p>Определение: {s.project.definitions[ref.definitionId].name}</p>
+          <p>
+            ID: <code>{ref.entityId}</code>
+          </p>
+          <p>
+            Геометрия: <code>{ref.geometryId}</code>
+          </p>
+          <p>Экземпляр: {ref.occurrencePath.join(" / ") || "Сцена"}</p>
+          {face && (
+            <p data-testid="face-area">
+              Площадь: {Number(tessellateFace(m, face).area.toFixed(8))} м² (в
+              определении)
+            </p>
+          )}
+          {edge && (
+            <p>
+              Вершины: {edge.start} → {edge.end}
+            </p>
+          )}
+          {face && ref.occurrencePath.length > 0 && (
+            <p data-testid="face-world-area">
+              Площадь экземпляра:{" "}
+              {Number(
+                tessellationArea(
+                  tessellateFace(m, face),
+                  occurrenceMatrix(s.project, ref.occurrencePath),
+                ).toFixed(8),
+              )}{" "}
+              м²
+            </p>
+          )}
+          {vertex && <p>Координаты: {vertex.position.join(", ")} м</p>}
+          {face && (
+            <button
+              className="start-card"
+              disabled={
+                s.topologySelections.length > 1 ||
+                isGeometryLocked(s.project, ref)
+              }
+              onClick={() =>
+                void s.editGeometry(ref, {
+                  kind: "delete-entities",
+                  entityIds: [ref.entityId],
+                })
+              }
+            >
+              Удалить грань
+            </button>
+          )}
+        </div>
+      </aside>
+    );
+  }
   function transform(
     key: keyof SceneObject["transform"],
     i: number,
@@ -52,7 +144,7 @@ export function Properties() {
     if (!o) return;
     const t = structuredClone(o.transform);
     t[key][i] = key === "position" ? value / factor : value;
-    if (key === "scale" && value <= 0) return;
+
     s.patch(o.id, { transform: t });
   }
   return (
@@ -70,7 +162,7 @@ export function Properties() {
               <input
                 aria-label="Название объекта"
                 className="object-name"
-                disabled={o.locked}
+                disabled={objectLocked}
                 value={o.name}
                 onChange={(e) =>
                   s.patch(o.id, { name: e.target.value.slice(0, 200) })
@@ -95,7 +187,7 @@ export function Properties() {
                     key={i}
                     value={key === "position" ? v * factor : v}
                     label={`${["Положение", "Вращение", "Масштаб"][k]} ${["X", "Y", "Z"][i]}`}
-                    disabled={o.locked}
+                    disabled={objectLocked}
                     onCommit={(n) => transform(key, i, n)}
                   />
                 ))}
@@ -121,7 +213,7 @@ export function Properties() {
               <input
                 aria-label="Цвет материала"
                 type="color"
-                disabled={o.locked}
+                disabled={objectLocked}
                 value={o.material.color}
                 onChange={(e) =>
                   s.patch(o.id, {
@@ -140,7 +232,7 @@ export function Properties() {
               min="0"
               max="1"
               step="0.01"
-              disabled={o.locked}
+              disabled={objectLocked}
               value={o.material.roughness}
               onChange={(e) =>
                 s.patch(o.id, {
@@ -160,7 +252,7 @@ export function Properties() {
               min="0"
               max="1"
               step="0.01"
-              disabled={o.locked}
+              disabled={objectLocked}
               value={o.material.metalness}
               onChange={(e) =>
                 s.patch(o.id, {
@@ -181,7 +273,7 @@ export function Properties() {
               type="checkbox"
               checked={o.visible}
               onChange={(e) => s.patch(o.id, { visible: e.target.checked })}
-              disabled={o.locked}
+              disabled={objectLocked}
             />
           </label>
           <label className="property-row">
@@ -189,15 +281,16 @@ export function Properties() {
             <input
               type="checkbox"
               checked={o.locked}
-              onChange={(e) => s.patch(o.id, { locked: e.target.checked })}
+              disabled={ancestorLocked}
+              onChange={(e) => s.setLocked(o.id, e.target.checked)}
             />
           </label>
           <div className="object-actions">
-            <button disabled={o.locked} onClick={s.duplicate}>
+            <button disabled={objectLocked} onClick={s.duplicate}>
               <Copy size={14} /> Дубликат
             </button>
             <button
-              disabled={o.locked}
+              disabled={objectLocked}
               onClick={s.remove}
               aria-label="Удалить объект"
             >

@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#161c28"/><path d="M14 18 36 6 55 17 34 29Z" fill="#4bb7ff"/><path d="M14 18 27 25 27 57 14 49Z" fill="#3478f6"/><path d="M27 25 34 29 34 20 55 17 55 28 40 36 40 42 27 49Z" fill="#168df4"/><path d="m27 37 13-7 13 7-13 8Z" fill="#4bb7ff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#172b40"/><stop offset="1" stop-color="#080e18"/></linearGradient>
+    <linearGradient id="blue" x2="1" y2="1"><stop stop-color="#d8f5ff"/><stop offset=".48" stop-color="#28b8ff"/><stop offset="1" stop-color="#1674ef"/></linearGradient>
+    <linearGradient id="mint" x2="0" y2="1"><stop stop-color="#60eced"/><stop offset="1" stop-color="#00aeaa"/></linearGradient>
+  </defs>
+  <rect x="2" y="2" width="124" height="124" rx="29" fill="url(#bg)" stroke="#2b6b8c" stroke-width="1.5"/>
+  <path d="M18 31 40 23 65 75 54 105Z" fill="url(#blue)"/>
+  <path d="M18 31 42 49 65 75 40 23Z" fill="#d1f3ff" opacity=".82"/>
+  <path d="M42 49 54 105 65 75Z" fill="#137ce9"/>
+  <path d="M54 105 77 105 112 31 88 23 65 75Z" fill="url(#mint)"/>
+  <path d="M88 23 79 57 112 31Z" fill="#23b4ff"/>
+  <path d="M79 57 65 75 77 105 112 31Z" fill="#00bbcb"/>
+  <path d="M54 105 65 75 77 105Z" fill="#0866b5"/>
+  <path d="M18 31 40 23 65 75 88 23 112 31M79 57 112 31" fill="none" stroke="#a1ecff" stroke-width=".7" opacity=".7"/>
+</svg>

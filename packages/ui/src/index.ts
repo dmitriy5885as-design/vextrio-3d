@@ -1,5 +1,5 @@
 export const brand = {
-  name: "FORMA",
+  name: "VEXTRIO 3D",
   slogan: "Придай идее форму",
   international: "Shape your ideas",
   colors: {

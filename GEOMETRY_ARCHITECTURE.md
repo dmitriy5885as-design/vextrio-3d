@@ -1,13 +1,13 @@
 # Геометрическое ядро
 
-Foundation реализует `GeometryAdapter` и `PrimitiveAdapter`: создание отображаемой сетки, локальные границы, ID геометрии и сериализация описания примитива. Трансформации принадлежат объекту документа и применяются слоем viewport. Произвольные операции возвращают явную ошибку. B-Rep, Push/Pull и булевы операции не имитируются и недоступны.
+[S6](docs/0.2/S6_REPORT.md) рисует через существующий insert-segments S3. Прямоугольник — четыре сегмента в одной транзакции; никакой PrimitiveAdapter не создаёт его документную геометрию. Preview использует GeometrySession.prepare без истории. Добавлено производное измерение physical area в affine occurrence; алгоритмы S3 не переписаны.
 
-Перед подключением OpenCascade.js контракт следует расширить: `GeometryHandle`, discriminated union результатов/ошибок, асинхронные операции, transform(handle, matrix), mesh(handle, tolerance), bounds(handle), serialize/deserialize, capabilities. Сетку передавать как массивы позиций, нормалей, индексов и карту entityId; не передавать Three.js-объекты между Worker и UI.
+[S5](docs/0.2/S5_REPORT.md) добавляет независимый Snap Engine и точный ввод поверх production топологии S4. BVH хранит производный world-space snapshot; source of truth остаётся GeometryModel. Перемещение принятой точкой проходит существующий GeometrySession и общую историю, не изменяет Three.js buffers как документ.
 
-OpenCascade работает в отдельном Worker с собственным WASM heap. Каждый запрос имеет ID и ревизию документа; запоздалые результаты предыдущих ревизий отбрасываются. Тесселяция кешируется по handle и точности. Освобождение TopoDS-объектов должно быть явным. Команда хранит обратимые параметры операции либо сериализованный B-Rep, но не указатели WASM.
+S2.1/S2.2 и S3.1/S3.2 реализованы отдельным pure TypeScript API в `packages/geometry`: topology entities/IDs, GeometryPolicy, математика плоскостей/размещений, validators, delta/inverse/lineage и async backend/session harness. Three.js, UI и DOM не являются зависимостями ядра. [Отчёт, проверки и границы S2](docs/0.2/S2_REPORT.md).
 
-## Устойчивые идентификаторы
+Прежний PrimitiveAdapter перенесён в viewport без изменения алгоритмов. Legacy-примитивы используют его локально. [S4](docs/0.2/S4_REPORT.md) подключает production Document v2, явную миграцию v1, GeometrySession.prepare к общей истории, TopologyBridge и entity picking с occurrencePath. Native topology — источник истины; треугольники Earcut используются только для отображения. Рисование — S6; S5 ещё не начат.
 
-Нельзя сохранять номер треугольника, индекс грани или адрес TopoDS_Shape как постоянную ссылку. После boolean, fillet или новой тесселяции порядок сущностей меняется. Нужна таблица семантических идентификаторов: operationId + исходная entityId + происхождение Generated/Modified/Deleted; при неоднозначности — геометрические признаки (тип поверхности, площадь, центр, смежность). Несколько кандидатов должны возвращать ambiguous-reference с запросом повторного выбора, а не молча назначать другую грань.
+Топологический closed-shell не означает solid. Validator S2 не заменяет будущую полную проверку arrangements и пересечений разных граней. Local backend поддерживает move-vertices, insert-segments, make-face и face-only delete; удаление рёбер пока возвращает UNSUPPORTED_OPERATION. [Результаты и ограничения S3](docs/0.2/S3_REPORT.md). OpenCascade.js станет отдельным representation/backend, не WASM pointer внутри JSON и не Mesh вместо документа.
 
-Версии ядра и схемы B-Rep хранятся отдельно от версии контейнера. Миграции работают на копии данных. Лицензии OpenCascade.js и его транзитивных компонентов необходимо проверить перед подключением и коммерческим распространением. Зависимость OpenCascade.js намеренно не установлена.
+Полная целевая архитектура: [0.2 ARCHITECTURE](docs/0.2/ARCHITECTURE.md), [контракты](docs/0.2/CONTRACTS.md), [этапы](docs/0.2/IMPLEMENTATION_PLAN.md).

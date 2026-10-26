@@ -1,3 +1,11 @@
+import { TopologyTree } from "./TopologyTree";
+import { PrecisionPanel } from "./PrecisionPanel";
+import { SketchPanel } from "./SketchPanel";
+import {
+  getLegacyObjects,
+  emptyProjectV2,
+  definitionOccurrences,
+} from "@forma/document";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowUpRight,
@@ -33,6 +41,7 @@ import {
   X,
   Trash2,
   Globe,
+  Pencil,
 } from "lucide-react";
 import { Viewport } from "@forma/viewport";
 import { useEditor, isDirty } from "@forma/editor";
@@ -40,10 +49,12 @@ import {
   browserFileAdapter,
   isDesktop,
   openNative,
+  acceptNativeOpen,
+  rejectNativeOpen,
   saveNative,
   resetNativeDestination,
 } from "@forma/file-io";
-import { emptyProject } from "@forma/document";
+
 import { primitiveNames, type Primitive } from "@forma/shared";
 import { ru } from "@forma/ui";
 import { shortcuts, toolLabels } from "@forma/tools";
@@ -81,51 +92,115 @@ export function App() {
     [menu, setMenu] = useState<string | null>(null),
     [query, setQuery] = useState(""),
     [structure, setStructure] = useState(true);
+  const removeSelected = () => {
+    if (s.topologySelections.length > 1) {
+      s.notify("Для удаления выберите одну грань.");
+      return;
+    }
+    const ref = s.topologySelection;
+    if (ref?.kind === "face")
+      void s.editGeometry(ref, {
+        kind: "delete-entities",
+        entityIds: [ref.entityId],
+      });
+    else s.remove();
+  };
+  const nativeContexts =
+    s.project.schemaVersion === 2
+      ? definitionOccurrences(s.project).filter(
+          (o) =>
+            s.project.schemaVersion === 2 &&
+            (o.path.length > 0 ||
+              s.project.definitions[o.definitionId].geometryId),
+        )
+      : [];
   const input = useRef<HTMLInputElement>(null);
+  const fileBusyRef = useRef(false);
+  const [fileBusy, setFileBusy] = useState(false);
+  const beginFile = () => {
+    if (fileBusyRef.current) return false;
+    fileBusyRef.current = true;
+    setFileBusy(true);
+    return true;
+  };
+  const endFile = () => {
+    fileBusyRef.current = false;
+    setFileBusy(false);
+  };
   const dirty = JSON.stringify(s.project) !== s.savedSignature;
   const safe = () =>
     !isDirty() ||
     window.confirm(
       "В проекте есть несохранённые изменения. Продолжить без сохранения?",
     );
-  const newProject = () => {
-    if (!safe()) return;
-    s.replace(emptyProject());
-    void resetNativeDestination();
-    setWelcome(false);
-  };
-  const save = async (as = false) => {
+  const newProject = async () => {
+    if (fileBusyRef.current || !safe() || !beginFile()) return;
     try {
-      if (as) {
-        const name = prompt("Название проекта", s.project.name);
-        if (name === null) return;
-        s.mutate("Название проекта", (p) => {
-          p.name = name.trim().slice(0, 200) || "Без названия";
-        });
-      }
-      const project = structuredClone(useEditor.getState().project);
-      if (isDesktop()) {
-        if (!(await saveNative(project, as))) return;
-      } else await browserFileAdapter.save(project);
-      s.markSaved(JSON.stringify(project));
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Не удалось сохранить проект");
+      await resetNativeDestination();
+      const result = s.replace(emptyProjectV2());
+      if (result.status === "rejected") throw Error(result.error);
+      setWelcome(false);
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Не удалось создать проект",
+      );
+    } finally {
+      endFile();
     }
   };
-  const open = () => {
+  const save = async (as = false) => {
+    if (!beginFile()) return;
+    try {
+      const startedProject = useEditor.getState().project;
+      const project = structuredClone(startedProject);
+      if (as) {
+        const name = prompt("Название проекта", project.name);
+        if (name === null) return;
+        project.name = name.trim().slice(0, 200) || "Без названия";
+      }
+      const result = isDesktop()
+        ? await saveNative(project, as)
+        : await browserFileAdapter.save(project);
+      if (result.status === "saved") {
+        if (as && useEditor.getState().project === startedProject)
+          s.mutate("Название проекта", (p) => {
+            p.name = project.name;
+          });
+        s.markSaved(JSON.stringify(project));
+      } else if (result.status === "download-started")
+        s.notify("Скачивание начато. Запись на диск не подтверждена.");
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Не удалось сохранить проект",
+      );
+    } finally {
+      endFile();
+    }
+  };
+  const open = async () => {
+    if (fileBusyRef.current) return;
     if (!isDesktop()) {
       input.current?.click();
       return;
     }
-    if (!safe()) return;
-    void openNative()
-      .then((project) => {
-        if (project) {
-          s.replace(project);
-          setWelcome(false);
-        }
-      })
-      .catch((e) => alert(String(e)));
+    if (!safe() || !beginFile()) return;
+    try {
+      const startedProject = useEditor.getState().project,
+        candidate = await openNative();
+      if (!candidate) return;
+      if (useEditor.getState().project !== startedProject) {
+        await rejectNativeOpen(candidate);
+        throw Error("Проект изменился во время открытия. Повторите открытие.");
+      }
+      const project = await acceptNativeOpen(candidate);
+      const result = s.replace(project);
+      if (result.status === "rejected") throw Error(result.error);
+      setWelcome(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Не удалось открыть файл");
+    } finally {
+      endFile();
+    }
   };
   useEffect(() => {
     const leave = (e: BeforeUnloadEvent) => {
@@ -147,7 +222,9 @@ export function App() {
         event.preventDefault();
         if (
           !isDirty() ||
-          globalThis.confirm("Есть несохранённые изменения. Закрыть FORMA?")
+          globalThis.confirm(
+            "Есть несохранённые изменения. Закрыть VEXTRIO 3D?",
+          )
         )
           await window.destroy();
       });
@@ -163,6 +240,7 @@ export function App() {
     const key = (e: KeyboardEvent) => {
       if (
         (e.target as HTMLElement).matches("input,textarea,select") ||
+        fileBusyRef.current ||
         modal ||
         welcome
       )
@@ -178,7 +256,8 @@ export function App() {
         if (key === "d") s.duplicate();
         return;
       }
-      if (key === "delete" || key === "backspace") s.remove();
+      if (key === "delete" || key === "backspace") removeSelected();
+      if (key === " ") e.preventDefault();
       if (key === "escape") {
         s.select(null);
         setMenu(null);
@@ -205,6 +284,11 @@ export function App() {
     }[]
   > = {
     Файл: [
+      {
+        label: "Преобразовать в v2",
+        action: () => s.upgradeProject(),
+        disabled: s.project.schemaVersion === 2,
+      },
       { label: "Новый проект", action: newProject, shortcut: "Ctrl N" },
       { label: "Открыть…", action: open, shortcut: "Ctrl O" },
       { label: "Сохранить", action: () => void save(), shortcut: "Ctrl S" },
@@ -235,7 +319,7 @@ export function App() {
       },
       {
         label: "Удалить",
-        action: s.remove,
+        action: removeSelected,
         shortcut: "Del",
         disabled: !s.selected,
       },
@@ -275,7 +359,13 @@ export function App() {
         action: () => s.setTool("translate"),
         shortcut: "G",
       },
-      { label: "Вращение", action: () => s.setTool("rotate"), shortcut: "R" },
+      { label: "Вращение", action: () => s.setTool("rotate"), shortcut: "E" },
+      { label: "Линия", action: () => s.setTool("line"), shortcut: "L" },
+      {
+        label: "Прямоугольник",
+        action: () => s.setTool("rectangle"),
+        shortcut: "R",
+      },
       { label: "Масштаб", action: () => s.setTool("scale"), shortcut: "S" },
       { label: "Push / Pull · в версии 0.3", action: () => {}, disabled: true },
     ],
@@ -287,11 +377,16 @@ export function App() {
       { label: "Настройки", action: () => setModal("settings") },
     ],
     Справка: [
-      { label: "О FORMA и управление", action: () => setModal("help") },
+      { label: "О VEXTRIO 3D и управление", action: () => setModal("help") },
     ],
   };
   return (
-    <div className={`app ${s.theme}`}>
+    <div className={`app ${s.theme}`} aria-busy={fileBusy}>
+      {fileBusy && (
+        <div className="file-busy-overlay" role="status">
+          Работа с файлом…
+        </div>
+      )}
       <input
         hidden
         ref={input}
@@ -301,10 +396,16 @@ export function App() {
         onChange={async (e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
-          if (!file || !safe()) return;
+          if (!file || fileBusyRef.current || !safe() || !beginFile()) return;
+          const startedProject = useEditor.getState().project;
           try {
             const project = await browserFileAdapter.open(file);
-            s.replace(project);
+            if (useEditor.getState().project !== startedProject)
+              throw Error(
+                "Проект изменился во время открытия. Повторите открытие.",
+              );
+            const result = s.replace(project);
+            if (result.status === "rejected") throw Error(result.error);
             setWelcome(false);
           } catch (error) {
             alert(
@@ -312,13 +413,15 @@ export function App() {
                 ? error.message
                 : "Не удалось открыть файл",
             );
+          } finally {
+            endFile();
           }
         }}
       />
       <header className="titlebar">
         <div className="brand">
-          <img src="/forma.svg" alt="" />
-          <strong>FORMA</strong>
+          <img src="/vextrio.svg" alt="" />
+          <strong>VEXTRIO 3D</strong>
           <span className="version">FOUNDATION</span>
         </div>
         <div className="project-title">
@@ -428,9 +531,15 @@ export function App() {
           <div>
             {(
               [
-                { tool: "select", icon: <MousePointer2 size={20} />, key: "V" },
+                {
+                  tool: "select",
+                  icon: <MousePointer2 size={20} />,
+                  key: "Space",
+                },
+                { tool: "line", icon: <Pencil size={20} />, key: "L" },
+                { tool: "rectangle", icon: <Square size={20} />, key: "R" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "G" },
-                { tool: "rotate", icon: <Rotate3D size={21} />, key: "R" },
+                { tool: "rotate", icon: <Rotate3D size={21} />, key: "E" },
                 { tool: "scale", icon: <Scaling size={20} />, key: "S" },
               ] as const
             ).map((t) => (
@@ -462,8 +571,8 @@ export function App() {
             </Button>
             <Button
               title="Удалить выделенное"
-              disabled={!s.selected}
-              onClick={s.remove}
+              disabled={!s.selected && s.topologySelection?.kind !== "face"}
+              onClick={removeSelected}
             >
               <Trash2 size={18} />
             </Button>
@@ -503,10 +612,10 @@ export function App() {
               <ChevronDown size={12} />
               <Layers size={14} />
               <strong>Сцена</strong>
-              <span>{s.project.objects.length}</span>
+              <span>{getLegacyObjects(s.project).length}</span>
             </div>
             <div className="object-list">
-              {s.project.objects
+              {getLegacyObjects(s.project)
                 .filter((o) =>
                   o.name
                     .toLocaleLowerCase()
@@ -530,30 +639,41 @@ export function App() {
                     </button>
                     <button
                       title={o.locked ? "Разблокировать" : "Заблокировать"}
-                      onClick={() => s.patch(o.id, { locked: !o.locked })}
+                      onClick={() => s.setLocked(o.id, !o.locked)}
                     >
                       {o.locked ? <Lock size={12} /> : <Unlock size={12} />}
                     </button>
                   </div>
                 ))}
-              {s.project.objects.length === 0 && (
-                <div className="empty-tree">
-                  Ваша сцена пока пуста.
-                  <br />
-                  Добавьте первую форму.
-                </div>
-              )}
+              <TopologyTree />
+              {getLegacyObjects(s.project).length === 0 &&
+                nativeContexts.length === 0 && (
+                  <div className="empty-tree">
+                    Ваша сцена пока пуста.
+                    <br />
+                    Добавьте первую форму.
+                  </div>
+                )}
             </div>
             <div className="structure-footer">
-              <Boxes size={14} /> {s.project.objects.length} объектов{" "}
+              <Boxes size={14} />{" "}
+              {getLegacyObjects(s.project).length + nativeContexts.length}{" "}
+              объектов{" "}
               <button title="Добавить куб" onClick={() => s.add("cube")}>
                 +
               </button>
             </div>
           </aside>
         )}
-        <section className="scene">
+        <section
+          className={`scene${s.tool === "line" || s.tool === "rectangle" ? " sketch-active" : ""}`}
+        >
           <Viewport />
+          {s.tool === "line" || s.tool === "rectangle" ? (
+            <SketchPanel />
+          ) : (
+            <PrecisionPanel />
+          )}
           <div className="viewport-header">
             <button onClick={() => s.view("projection")}>
               <View size={14} />
@@ -585,10 +705,16 @@ export function App() {
           </div>
           <div className="viewport-bottom">
             <span>
-              <MousePointer2 size={12} /> Выбор · ЛКМ
+              <MousePointer2 size={12} />{" "}
+              {s.tool === "line" || s.tool === "rectangle"
+                ? "ЛКМ · точка"
+                : "Выбор · ЛКМ · Shift"}
             </span>
             <span>
-              <Rotate3D size={13} /> Орбита · перетаскивание
+              <Rotate3D size={13} />{" "}
+              {s.tool === "line" || s.tool === "rectangle"
+                ? "ПКМ · орбита"
+                : "Орбита · перетаскивание"}
             </span>
             <span>
               <Hand size={13} /> Панорама · СКМ
@@ -610,8 +736,17 @@ export function App() {
           {s.message}
         </span>
         <span>{toolLabels[s.tool]}</span>
+        {s.topologySelections.length > 1 && (
+          <span data-testid="selection-count">
+            Выбрано: {s.topologySelections.length}
+          </span>
+        )}
         <span className="status-selection">
-          {s.selected ? "Выделен 1 объект" : "Нет выделения"}
+          {s.topologySelection
+            ? `Выбрана топология: ${s.topologySelection.entityId}`
+            : s.selected
+              ? "Выделен 1 объект"
+              : "Нет выделения"}
         </span>
         <span className="status-spacer" />
         <span>Привязка: {s.snap ? "0,25 м" : "выкл."}</span>
@@ -631,13 +766,13 @@ export function App() {
             <option value="mm">Миллиметры</option>
           </select>
         </label>
-        <span className="foundation">FORMA 0.1</span>
+        <span className="foundation">VEXTRIO 3D 0.1</span>
       </footer>
       {welcome && (
         <div className="modal-overlay welcome-overlay">
           <div className="welcome">
             <div className="welcome-art">
-              <img src="/forma.svg" alt="Знак FORMA" />
+              <img src="/vextrio.svg" alt="Знак VEXTRIO 3D" />
               <div className="art-grid" />
               <span>ОТ ЭСКИЗА К ВОЗМОЖНОСТЯМ</span>
               <h1>
@@ -650,10 +785,10 @@ export function App() {
                 <br />
                 проектирования и творчества.
               </p>
-              <small>FORMA 0.1 · FOUNDATION</small>
+              <small>VEXTRIO 3D 0.1 · FOUNDATION</small>
             </div>
             <div className="welcome-content">
-              <span className="eyebrow">FORMA EDITOR</span>
+              <span className="eyebrow">VEXTRIO 3D</span>
               <h2>Начнём с идеи</h2>
               <p>
                 Всё необходимое, чтобы создать
@@ -770,16 +905,18 @@ export function App() {
               <>
                 <span className="eyebrow">SHAPE YOUR IDEAS</span>
                 <h2>
-                  FORMA <small>0.1 Foundation</small>
+                  VEXTRIO 3D <small>0.1 Foundation</small>
                 </h2>
                 <p>
                   Создавайте примитивы, меняйте их форму и собирайте свои идеи в
                   пространстве.
                 </p>
                 <div className="help-grid">
-                  <kbd>V</kbd>
+                  <kbd>Space / V</kbd>
                   <span>Выделение</span>
-                  <kbd>G / R / S</kbd>
+                  <kbd>L / R</kbd>
+                  <span>Линия / прямоугольник</span>
+                  <kbd>G / E / S</kbd>
                   <span>Перемещение / вращение / масштаб</span>
                   <kbd>F</kbd>
                   <span>Фокус на выбранном объекте</span>
@@ -797,7 +934,8 @@ export function App() {
                 </div>
                 <p className="dialog-note">
                   Push/Pull, B-Rep и булевы операции запланированы для следующих
-                  версий. FORMA Pro и Edu — будущие редакции общей платформы.
+                  версий. Все основные инструменты VEXTRIO 3D останутся
+                  бесплатными.
                 </p>
               </>
             )}

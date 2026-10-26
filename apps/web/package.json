@@ -6,5 +6,20 @@
   "scripts": {
     "dev": "vite ../..",
     "build": "vite build ../.."
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.468.0",
+    "@forma/viewport": "workspace:*",
+    "@forma/editor": "workspace:*",
+    "@forma/file-io": "workspace:*",
+    "@forma/document": "workspace:*",
+    "@forma/shared": "workspace:*",
+    "@forma/ui": "workspace:*",
+    "@forma/tools": "workspace:*",
+    "@tauri-apps/api": "^2.12.4",
+    "@forma/geometry": "workspace:*",
+    "@forma/snapping": "workspace:*"
   }
 }

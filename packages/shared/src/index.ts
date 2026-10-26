@@ -31,6 +31,17 @@ export interface Project {
   camera: CameraData;
 }
 export const clone = <T>(value: T): T => structuredClone(value);
+export function freezeData<T>(value: T): T {
+  const queue: unknown[] = [value];
+  while (queue.length) {
+    const item = queue.pop();
+    if (item && typeof item === "object" && !Object.isFrozen(item)) {
+      for (const child of Object.values(item)) queue.push(child);
+      Object.freeze(item);
+    }
+  }
+  return value;
+}
 export const primitiveNames: Record<Primitive, string> = {
   cube: "Куб",
   sphere: "Сфера",

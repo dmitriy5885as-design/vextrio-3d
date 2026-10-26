@@ -1,8 +1,13 @@
 import type { TransformMode } from "@forma/shared";
-export const shortcuts: Record<string, TransformMode | "select"> = {
+export * from "./controller";
+export type ToolName = TransformMode | "select" | "line" | "rectangle";
+export const shortcuts: Record<string, ToolName> = {
   v: "select",
   g: "translate",
-  r: "rotate",
+  r: "rectangle",
+  e: "rotate",
+  l: "line",
+  " ": "select",
   s: "scale",
 };
 export const toolLabels = {
@@ -10,4 +15,6 @@ export const toolLabels = {
   translate: "Перемещение",
   rotate: "Вращение",
   scale: "Масштаб",
+  line: "Линия",
+  rectangle: "Прямоугольник",
 } as const;
