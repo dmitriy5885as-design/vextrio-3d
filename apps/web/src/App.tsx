@@ -420,7 +420,7 @@ export function App() {
       />
       <header className="titlebar">
         <div className="brand">
-          <img src="/vextrio.svg" alt="" />
+          <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
           <strong>VEXTRIO 3D</strong>
           <span className="version">FOUNDATION</span>
         </div>
@@ -772,7 +772,7 @@ export function App() {
         <div className="modal-overlay welcome-overlay">
           <div className="welcome">
             <div className="welcome-art">
-              <img src="/vextrio.svg" alt="Знак VEXTRIO 3D" />
+              <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="Знак VEXTRIO 3D" />
               <div className="art-grid" />
               <span>ОТ ЭСКИЗА К ВОЗМОЖНОСТЯМ</span>
               <h1>

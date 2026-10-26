@@ -1,5 +1,9 @@
 # VEXTRIO 3D · 0.1 Foundation
 
+## Открыть в браузере
+
+**[Запустить работающий прототип VEXTRIO 3D](https://dmitriy5885as-design.github.io/vextrio-3d/)** — без установки и регистрации.
+
 «Придай идее форму» · Shape your ideas.
 
 Локальный 3D-редактор на React, TypeScript и Three.js. Собственная сериализуемая модель документа; Web и Windows используют одинаковый редактор и формат `.v3d`.
