@@ -15,6 +15,7 @@ const server = await preview({
 let browser;
 try {
   browser = await chromium.launch({
+    channel: process.env.PLAYWRIGHT_CHANNEL,
     args: ["--use-angle=swiftshader", "--enable-webgl"],
   });
   const page = await browser.newPage({

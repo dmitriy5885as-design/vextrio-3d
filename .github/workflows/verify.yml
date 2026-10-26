@@ -24,7 +24,15 @@ jobs:
       - run: pnpm check:deps
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Select available Chrome or install Chromium
+        shell: bash
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "PLAYWRIGHT_CHANNEL=chrome" >> "$GITHUB_ENV"
+            google-chrome --version
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
       - run: pnpm test:e2e
       - run: pnpm check:pages
       - uses: actions/upload-artifact@v4

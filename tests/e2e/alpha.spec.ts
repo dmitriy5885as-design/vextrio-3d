@@ -20,6 +20,42 @@ async function save(page: Page) {
 }
 const distance = (c: any) =>
   Math.hypot(...c.position.map((n: number, i: number) => n - c.target[i]));
+test("keyboard navigation does not confirm a pending line or leave the drawing tool", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator(".start-card").first().click();
+  await page.keyboard.press("l");
+  const box = (await page.getByTestId("viewport").boundingBox())!,
+    camera = new PerspectiveCamera(45, box.width / box.height, 0.05, 10000);
+  camera.position.set(9, 7, 10);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  const point = (v: [number, number, number]) => {
+    const p = new Vector3(...v).project(camera);
+    return {
+      x: box.x + ((p.x + 1) * box.width) / 2,
+      y: box.y + ((1 - p.y) * box.height) / 2,
+    };
+  };
+  const start = point([0, 0, 0]),
+    end = point([2, 0, 0]);
+  await page.mouse.click(start.x, start.y);
+  await page.mouse.move(end.x, end.y, { steps: 5 });
+  const before = await save(page);
+  const top = page.getByRole("button", { name: "Вид сверху", exact: true });
+  await top.focus();
+  await top.press("Enter");
+  await expect(
+    page.getByLabel("Размер построения", { exact: true }),
+  ).toBeVisible();
+  const after = await save(page);
+  expect(after.geometries).toEqual(before.geometries);
+  await expect(
+    page.getByRole("button", { name: "Отменить", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+});
 test("orientation cube follows the real camera, preserves pan and framing, supports six views and drag without geometry or history changes", async ({
   page,
 }) => {
@@ -120,6 +156,7 @@ test("corrupt recovery is rejected and can be discarded without preventing a new
   await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {
       const r = indexedDB.open("vextrio-recovery", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("snapshots");
       r.onsuccess = () => {
         const db = r.result,
           tx = db.transaction("snapshots", "readwrite");

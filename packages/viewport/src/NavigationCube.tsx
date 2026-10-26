@@ -89,6 +89,9 @@ export function NavigationCube() {
       className="navigation-cube"
       aria-label="Ориентация камеры"
       data-testid="navigation-cube"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+      }}
     >
       <div className="navigation-heading">
         <span>ОРИЕНТАЦИЯ</span>
