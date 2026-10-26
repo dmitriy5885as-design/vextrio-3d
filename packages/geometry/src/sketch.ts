@@ -361,7 +361,13 @@ function regenerateFaces(
         ? [use]
         : (replacements.get(use.faceId) ?? []).map((faceId) => ({
             faceId,
-            orientation: use.orientation,
+            orientation: (use.orientation *
+              (dot(
+                model.faces[faceId].plane.normal,
+                before.faces[use.faceId].plane.normal,
+              ) >= 0
+                ? 1
+                : -1)) as 1 | -1,
           })),
     );
     if (!shell.faces.length) delete model.shells[shell.id];

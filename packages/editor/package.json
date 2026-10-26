@@ -1,6 +1,6 @@
 {
   "exports": "./src/index.ts",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.1",
   "name": "@forma/editor",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "zustand": "^5.0.0",
     "@forma/geometry": "workspace:*",
     "@forma/snapping": "workspace:*",
-    "@forma/tools":"workspace:*"
+    "@forma/tools": "workspace:*"
   }
 }

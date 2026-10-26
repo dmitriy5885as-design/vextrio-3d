@@ -1,6 +1,8 @@
 import { TopologyTree } from "./TopologyTree";
+import { useRecovery } from "./useRecovery";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
+import { ExtrudePanel } from "./ExtrudePanel";
 import {
   getLegacyObjects,
   emptyProjectV2,
@@ -43,10 +45,11 @@ import {
   Globe,
   Pencil,
 } from "lucide-react";
-import { Viewport } from "@forma/viewport";
+import { Viewport, NavigationCube } from "@forma/viewport";
 import { useEditor, isDirty } from "@forma/editor";
 import {
   browserFileAdapter,
+  downloadGeometry,
   isDesktop,
   openNative,
   acceptNativeOpen,
@@ -55,7 +58,12 @@ import {
   resetNativeDestination,
 } from "@forma/file-io";
 
-import { primitiveNames, type Primitive } from "@forma/shared";
+import {
+  APP_VERSION,
+  APP_RELEASE_LABEL,
+  primitiveNames,
+  type Primitive,
+} from "@forma/shared";
 import { ru } from "@forma/ui";
 import { shortcuts, toolLabels } from "@forma/tools";
 import { Properties } from "./Properties";
@@ -87,6 +95,7 @@ function Button({
 }
 export function App() {
   const s = useEditor();
+  const recovery = useRecovery();
   const [welcome, setWelcome] = useState(true),
     [modal, setModal] = useState<"settings" | "help" | null>(null),
     [menu, setMenu] = useState<string | null>(null),
@@ -259,6 +268,7 @@ export function App() {
       if (key === "delete" || key === "backspace") removeSelected();
       if (key === " ") e.preventDefault();
       if (key === "escape") {
+        if (s.tool === "extrude") s.setTool("select");
         s.select(null);
         setMenu(null);
       }
@@ -297,6 +307,26 @@ export function App() {
         action: () => void save(true),
         shortcut: "Ctrl Shift S",
       },
+      ...(!isDesktop()
+        ? (["obj", "stl"] as const).map((format) => ({
+            label: `Экспорт ${format.toUpperCase()}${format === "stl" ? " (мм)" : " (м)"}…`,
+            action: () => {
+              try {
+                downloadGeometry(s.project, format);
+                useEditor.setState({
+                  message: `Начато скачивание ${format.toUpperCase()}. Проверьте файл в загрузках.`,
+                });
+              } catch (e) {
+                useEditor.setState({
+                  message:
+                    e instanceof Error
+                      ? e.message
+                      : "Не удалось экспортировать.",
+                });
+              }
+            },
+          }))
+        : []),
     ],
     Правка: [
       {
@@ -422,7 +452,7 @@ export function App() {
         <div className="brand">
           <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
           <strong>VEXTRIO 3D</strong>
-          <span className="version">FOUNDATION</span>
+          <span className="version">{APP_RELEASE_LABEL}</span>
         </div>
         <div className="project-title">
           <span className={dirty ? "unsaved-dot" : "saved-dot"} />
@@ -432,7 +462,7 @@ export function App() {
         </div>
         <div className="local-badge">
           <span className="mint-dot" /> Локальный проект{" "}
-          <span className="version">v0.1.0</span>
+          <span className="version">v{APP_VERSION}</span>
         </div>
       </header>
       <nav className="menubar">
@@ -538,6 +568,7 @@ export function App() {
                 },
                 { tool: "line", icon: <Pencil size={20} />, key: "L" },
                 { tool: "rectangle", icon: <Square size={20} />, key: "R" },
+                { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "G" },
                 { tool: "rotate", icon: <Rotate3D size={21} />, key: "E" },
                 { tool: "scale", icon: <Scaling size={20} />, key: "S" },
@@ -671,6 +702,8 @@ export function App() {
           <Viewport />
           {s.tool === "line" || s.tool === "rectangle" ? (
             <SketchPanel />
+          ) : s.tool === "extrude" ? (
+            <ExtrudePanel />
           ) : (
             <PrecisionPanel />
           )}
@@ -684,22 +717,7 @@ export function App() {
             </button>
             <span>Объёмный вид</span>
           </div>
-          <div className="view-cube">
-            <button
-              onClick={() => s.view("top")}
-              title="Вид сверху"
-              aria-label="Вид сверху"
-            >
-              ВЕРХ
-            </button>
-            <div>
-              <button onClick={() => s.view("front")}>ФРОНТ</button>
-              <button onClick={() => s.view("right")}>ПРАВО</button>
-            </div>
-            <button className="iso" onClick={() => s.view("iso")}>
-              Изометрия ↗
-            </button>
-          </div>
+          <NavigationCube />
           <div className="scene-caption">
             <span className="mint-dot" /> ПРОСТРАНСТВО ДЛЯ ВАШИХ ИДЕЙ
           </div>
@@ -731,6 +749,22 @@ export function App() {
         <Properties />
       </main>
       <footer className="statusbar">
+        <span
+          className="recovery-status"
+          data-testid="recovery-status"
+          role="status"
+          title={
+            recovery.error ||
+            "Последняя локальная автокопия: " +
+              new Date(recovery.savedAt).toLocaleTimeString()
+          }
+        >
+          {recovery.error
+            ? "Автокопия: ошибка"
+            : recovery.savedAt
+              ? "Автокопия ✓"
+              : ""}
+        </span>
         <span className="status-message">
           <span className="mint-dot" />
           {s.message}
@@ -766,13 +800,16 @@ export function App() {
             <option value="mm">Миллиметры</option>
           </select>
         </label>
-        <span className="foundation">VEXTRIO 3D 0.1</span>
+        <span className="foundation">VEXTRIO 3D {APP_VERSION}</span>
       </footer>
       {welcome && (
         <div className="modal-overlay welcome-overlay">
           <div className="welcome">
             <div className="welcome-art">
-              <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="Знак VEXTRIO 3D" />
+              <img
+                src={`${import.meta.env.BASE_URL}vextrio.svg`}
+                alt="Знак VEXTRIO 3D"
+              />
               <div className="art-grid" />
               <span>ОТ ЭСКИЗА К ВОЗМОЖНОСТЯМ</span>
               <h1>
@@ -785,11 +822,45 @@ export function App() {
                 <br />
                 проектирования и творчества.
               </p>
-              <small>VEXTRIO 3D 0.1 · FOUNDATION</small>
+              <small>VEXTRIO 3D {APP_RELEASE_LABEL}</small>
             </div>
             <div className="welcome-content">
               <span className="eyebrow">VEXTRIO 3D</span>
               <h2>Начнём с идеи</h2>
+              {(recovery.snapshot || recovery.error) && (
+                <div className="recovery-card" data-testid="recovery-card">
+                  <strong>Локальная автокопия</strong>
+                  {recovery.snapshot && (
+                    <p>
+                      {recovery.snapshot.project.name} ·{" "}
+                      {new Date(recovery.snapshot.savedAt).toLocaleString()}
+                    </p>
+                  )}
+                  {recovery.error && <p role="alert">{recovery.error}</p>}
+                  <div>
+                    {recovery.snapshot && (
+                      <button
+                        disabled={recovery.busy}
+                        onClick={async () => {
+                          if (await recovery.restore()) setWelcome(false);
+                        }}
+                      >
+                        Восстановить проект
+                      </button>
+                    )}
+                    <button
+                      disabled={recovery.busy}
+                      onClick={() => void recovery.discard()}
+                    >
+                      Удалить автокопию
+                    </button>
+                  </div>
+                  <small>
+                    Последний редактируемый проект в этом браузере. Файл на
+                    диске не перезаписывается.
+                  </small>
+                </div>
+              )}
               <p>
                 Всё необходимое, чтобы создать
                 <br />
@@ -801,7 +872,7 @@ export function App() {
                 </span>
                 <span>
                   <strong>Новый проект</strong>
-                  <small>Чистый лист. Безграничные возможности.</small>
+                  <small>Линии, грани и точные размеры.</small>
                 </span>
                 <ArrowUpRight size={18} />
               </button>
@@ -905,17 +976,20 @@ export function App() {
               <>
                 <span className="eyebrow">SHAPE YOUR IDEAS</span>
                 <h2>
-                  VEXTRIO 3D <small>0.1 Foundation</small>
+                  VEXTRIO 3D <small>{APP_RELEASE_LABEL}</small>
                 </h2>
                 <p>
-                  Создавайте примитивы, меняйте их форму и собирайте свои идеи в
-                  пространстве.
+                  Нарисуйте прямоугольник (R), выберите его грань (Space),
+                  задайте высоту (P). Сгруппируйте результат и собирайте модель
+                  из независимых частей.
                 </p>
                 <div className="help-grid">
                   <kbd>Space / V</kbd>
                   <span>Выделение</span>
                   <kbd>L / R</kbd>
                   <span>Линия / прямоугольник</span>
+                  <kbd>P</kbd>
+                  <span>Вытянуть / вдавить выбранную грань</span>
                   <kbd>G / E / S</kbd>
                   <span>Перемещение / вращение / масштаб</span>
                   <kbd>F</kbd>
@@ -933,9 +1007,10 @@ export function App() {
                   </span>
                 </div>
                 <p className="dialog-note">
-                  Push/Pull, B-Rep и булевы операции запланированы для следующих
-                  версий. Все основные инструменты VEXTRIO 3D останутся
-                  бесплатными.
+                  Выдавливание поддерживает плоские контуры и ограниченные
+                  углубления. Сквозные вырезы и булевы операции пока не
+                  поддерживаются. Экспорт OBJ/STL — в меню «Файл» браузерной
+                  версии. Основные инструменты остаются бесплатными.
                 </p>
               </>
             )}

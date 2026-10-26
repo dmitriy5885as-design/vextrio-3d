@@ -36,8 +36,16 @@ export function discoverPlanes(
   context: ValidationContext,
   declared: PlaneFrame | null = null,
 ): PlaneFrame[] {
+  const usedByFaces = new Set(
+    Object.values(model.coedges).map((c) => c.edgeId),
+  );
   const planes: PlaneFrame[] = [],
-    edges = Object.values(model.edges);
+    // A solid's arbitrary edge pairs describe many diagonal planes inside the
+    // volume, not sketch supports. Retain face planes and infer only from loose
+    // sketch wires; otherwise even a box invents internal faces/plane budgets.
+    edges = Object.values(model.edges).filter(
+      (e) => !Object.keys(model.shells).length || !usedByFaces.has(e.id),
+    );
   function include(p: PlaneFrame) {
     if (
       !planes.some(

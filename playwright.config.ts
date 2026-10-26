@@ -4,7 +4,10 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:5173",
     viewport: { width: 1440, height: 900 },
-    launchOptions: { args: ["--use-angle=swiftshader", "--enable-webgl"] },
+    launchOptions: {
+      channel: process.env.PLAYWRIGHT_CHANNEL,
+      args: ["--use-angle=swiftshader", "--enable-webgl"],
+    },
   },
   webServer: {
     command: "npm run dev",

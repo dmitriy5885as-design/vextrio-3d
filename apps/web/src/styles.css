@@ -473,42 +473,121 @@ hr {
   color: #d1dcee;
   pointer-events: auto;
 }
-.view-cube {
+.navigation-cube {
   position: absolute;
-  top: 21px;
-  right: 23px;
-  width: 85px;
-  text-align: center;
-  transform: rotate(-5deg);
+  top: 16px;
+  right: 16px;
+  width: 156px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  box-shadow: 0 5px 20px #0002;
+  user-select: none;
+  z-index: 3;
 }
-.view-cube button {
-  background: #24334ae6;
-  border: 1px solid #50617d;
-  color: #afbed5;
-  padding: 7px;
-  font-size: 8px;
-  letter-spacing: 0.6px;
-}
-.view-cube > button:first-child {
-  width: 57px;
-  transform: skewX(-22deg);
-  margin-left: 8px;
-}
-.view-cube > div {
+.navigation-heading {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px 0;
+  color: var(--muted);
+  font-size: 8px;
+  letter-spacing: 1.4px;
 }
-.view-cube > div button {
-  width: 43px;
-  height: 36px;
-}
-.view-cube button.iso {
+.navigation-heading button {
+  font-size: 20px;
   background: none;
   border: 0;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0 4px;
+}
+.navigation-cube svg {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.navigation-cube svg:active {
+  cursor: grabbing;
+}
+.cube-shadow {
+  fill: #0002;
+}
+.cube-face {
+  cursor: pointer;
+  outline: none;
+}
+.cube-face polygon {
+  fill: color-mix(in srgb, var(--panel) 85%, var(--text) 15%);
+  stroke: #768ba8;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+.cube-face text {
+  fill: var(--text);
+  font-size: 6.8px;
+  text-anchor: middle;
+  pointer-events: none;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.cube-face:hover polygon,
+.cube-face:focus polygon {
+  fill: #3478f688;
+  stroke: #68b8ff;
+  stroke-width: 2;
+}
+.cube-face.cube-active polygon {
+  fill: #3478f655;
+  stroke: #4dd5c0;
+  stroke-width: 1.8;
+}
+.cube-corner {
+  fill: transparent;
+  cursor: pointer;
+  outline: none;
+}
+.cube-corner:hover,
+.cube-corner:focus {
+  fill: #4dd5c0;
+  stroke: #f2f5fa;
+  stroke-width: 1;
+}
+.cube-axis line {
+  stroke-width: 1.6;
+}
+.cube-axis text {
   font-size: 9px;
-  letter-spacing: 0;
-  margin-top: 5px;
-  color: #8e9eb7;
+  font-weight: 700;
+}
+.cube-drag-hint {
+  fill: var(--muted);
+  font-size: 7px;
+  text-anchor: middle;
+}
+.navigation-actions {
+  display: flex;
+  border-top: 1px solid var(--border);
+  padding: 5px;
+  gap: 3px;
+}
+.navigation-actions select,
+.navigation-actions button {
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 4px;
+}
+.navigation-actions select {
+  flex: 1;
+  width: 95px;
+}
+.navigation-actions button {
+  cursor: pointer;
 }
 .scene-caption {
   position: absolute;
@@ -1113,4 +1192,69 @@ hr {
   color: #f2f5fa;
   cursor: progress;
   backdrop-filter: blur(2px);
+}
+.recovery-card {
+  border: 1px solid #3478f666;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  background: #3478f610;
+}
+.recovery-card p {
+  font-size: 12px;
+  margin: 6px 0;
+}
+.recovery-card small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.recovery-card > div {
+  display: flex;
+  gap: 6px;
+}
+.recovery-card button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px;
+  cursor: pointer;
+}
+.recovery-status {
+  color: var(--mint, #4dd5c0);
+  font-size: 9px;
+}
+.welcome {
+  max-height: calc(100vh - 36px);
+}
+.welcome-content {
+  min-height: 0;
+  overflow-y: auto;
+}
+.cube-edge {
+  stroke: transparent;
+  stroke-width: 7;
+  pointer-events: stroke;
+  cursor: pointer;
+  outline: none;
+}
+.cube-edge:hover,
+.cube-edge:focus {
+  stroke: #4dd5c0aa;
+  stroke-width: 4;
+}
+@media (max-width: 1100px) {
+  .navigation-cube {
+    width: 132px;
+    right: 10px;
+    top: 10px;
+  }
+  .navigation-heading {
+    font-size: 7px;
+  }
+  .navigation-actions select {
+    font-size: 8px;
+  }
 }

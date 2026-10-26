@@ -9,6 +9,20 @@ import { PrimitiveAdapter } from "./PrimitiveAdapter";
 export class TopologyBridge {
   readonly root = new THREE.Group();
   readonly pickables: THREE.Object3D[] = [];
+  readonly placements = new Map<string, THREE.Group>();
+  findPlacement(path: string[]) {
+    return this.placements.get(JSON.stringify(path));
+  }
+  resetPlacements() {
+    for (const group of this.placements.values()) {
+      const n = this.document.nodes[group.userData.nativeNodeId];
+      if (n.kind !== "legacy-primitive") {
+        group.position.fromArray(n.transform.translation);
+        group.quaternion.fromArray(n.transform.rotation);
+        group.scale.fromArray(n.transform.scale);
+      }
+    }
+  }
   readonly legacy = new Map<
     string,
     THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[]
@@ -159,6 +173,8 @@ export class TopologyBridge {
         continue;
       }
       const group = new THREE.Group();
+      group.userData.nativeNodeId = key;
+      this.placements.set(JSON.stringify([...path, key]), group);
       group.position.fromArray(n.transform.translation);
       group.quaternion.fromArray(n.transform.rotation);
       group.scale.fromArray(n.transform.scale);

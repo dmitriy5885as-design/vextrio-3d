@@ -11,6 +11,7 @@ import {
   precisionFrame,
   sketchController,
   sketchPlane,
+  useVolumePreview,
 } from "@forma/editor";
 import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
@@ -65,6 +66,35 @@ export function Viewport() {
       THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
     >();
     let topology: TopologyBridge | null = null;
+    let volumeBridge: TopologyBridge | null = null;
+    let renderedVolumeDocument: import("@forma/document").ProjectV2 | null =
+      null;
+    const refreshVolume = () => {
+      const preview = useVolumePreview.getState(),
+        state = useEditor.getState(),
+        wanted =
+          preview.document &&
+          state.tool === "extrude" &&
+          preview.revision === state.revision
+            ? preview.document
+            : null;
+      if (wanted === renderedVolumeDocument) {
+        if (topology) topology.root.visible = !volumeBridge;
+        return;
+      }
+      if (volumeBridge) {
+        scene.remove(volumeBridge.root);
+        volumeBridge.dispose();
+        volumeBridge = null;
+      }
+      if (wanted) {
+        volumeBridge = new TopologyBridge(wanted, state.revision);
+        scene.add(volumeBridge.root);
+      }
+      renderedVolumeDocument = wanted;
+      if (topology) topology.root.visible = !volumeBridge;
+      requestRender();
+    };
     let snapEngine: SnapEngine | null = null;
     let snapDocument: import("@forma/document").ProjectV2 | null = null;
     let outline: THREE.BoxHelper | null = null;
@@ -141,9 +171,27 @@ export function Viewport() {
     function switchCamera(projection: string) {
       const next = projection === "orthographic" ? ortho : perspective;
       if (next === camera) return;
+      const distance = camera.position.distanceTo(controls.target),
+        height =
+          camera === ortho
+            ? 20 / camera.zoom
+            : (2 *
+                distance *
+                Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) /
+              camera.zoom;
       next.position.copy(camera.position);
       next.quaternion.copy(camera.quaternion);
-      next.zoom = 1;
+      next.zoom = next === ortho ? 20 / height : 1;
+      if (next === perspective)
+        next.position
+          .copy(camera.position)
+          .sub(controls.target)
+          .normalize()
+          .multiplyScalar(
+            height /
+              (2 * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))),
+          )
+          .add(controls.target);
       next.updateProjectionMatrix();
       camera = next;
       controls.object = camera;
@@ -259,10 +307,19 @@ export function Viewport() {
       const selected = getLegacyObjects(s.project).find(
         (o) => o.id === s.selected,
       );
-      const mesh = s.selected
-        ? (topology?.findLegacy(s.selected, s.selectedPath) ??
-          meshes.get(s.selected))
-        : undefined;
+      const nativePath = s.topologySelection?.occurrencePath;
+      // TransformControls is reliable for placements directly under the scene.
+      // Nested affine editing remains available through numeric properties.
+      const native =
+        nativePath?.length === 1
+          ? topology?.findPlacement(nativePath)
+          : undefined;
+      const mesh =
+        native ??
+        (s.selected
+          ? (topology?.findLegacy(s.selected, s.selectedPath) ??
+            meshes.get(s.selected))
+          : undefined);
       if (outline) {
         scene.remove(outline);
         outline.geometry.dispose();
@@ -275,9 +332,12 @@ export function Viewport() {
       }
       if (
         mesh &&
-        selected &&
-        !isObjectLocked(s.project, selected.id) &&
-        selected.visible &&
+        ((native &&
+          !isObjectLocked(s.project, native.userData.nativeNodeId) &&
+          native.visible) ||
+          (selected &&
+            !isObjectLocked(s.project, selected.id) &&
+            selected.visible)) &&
         (s.tool === "translate" || s.tool === "rotate" || s.tool === "scale")
       ) {
         if (transform.object !== mesh) transform.attach(mesh);
@@ -286,6 +346,7 @@ export function Viewport() {
       transform.setTranslationSnap(s.snap ? 0.25 : null);
       transform.setRotationSnap(s.snap ? Math.PI / 12 : null);
       transform.setScaleSnap(s.snap ? 0.1 : null);
+      refreshVolume();
       requestRender();
     }
     const saveCamera = () => {
@@ -317,16 +378,29 @@ export function Viewport() {
         const mesh = transform.object;
         if (mesh) {
           const s = useEditor.getState();
-          const result = s.patch(mesh.userData.id, {
-            transform: {
-              position: mesh.position.toArray() as Vec3,
-              rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z].map(
-                THREE.MathUtils.radToDeg,
-              ) as Vec3,
-              scale: mesh.scale.toArray() as Vec3,
-            },
-          });
-          if (result.status === "rejected") sync();
+          const result = mesh.userData.nativeNodeId
+            ? s.patchNode(mesh.userData.nativeNodeId, {
+                transform: {
+                  translation: mesh.position.toArray() as Vec3,
+                  rotation: mesh.quaternion.toArray(),
+                  scale: mesh.scale.toArray() as Vec3,
+                },
+              })
+            : s.patch(mesh.userData.id, {
+                transform: {
+                  position: mesh.position.toArray() as Vec3,
+                  rotation: [
+                    mesh.rotation.x,
+                    mesh.rotation.y,
+                    mesh.rotation.z,
+                  ].map(THREE.MathUtils.radToDeg) as Vec3,
+                  scale: mesh.scale.toArray() as Vec3,
+                },
+              });
+          if (result.status === "rejected") {
+            topology?.resetPlacements();
+            sync();
+          }
         }
       }
     });
@@ -343,6 +417,7 @@ export function Viewport() {
       downGeneration = sketchController.generation;
     };
     const pointerUp = (e: PointerEvent) => {
+      if (useEditor.getState().tool === "extrude" && volumeBridge) return;
       if (downTool !== sketchController.state.tool) return;
       if (sketchController.state.tool) return;
       if (
@@ -360,6 +435,9 @@ export function Viewport() {
       }
       const rect = renderer.domElement.getBoundingClientRect();
       const ray = new THREE.Raycaster();
+      // File opening / navigation can precede the next render frame. Picking
+      // must use the current camera rather than the last rendered matrix.
+      camera.updateMatrixWorld(true);
       ray.setFromCamera(
         new THREE.Vector2(
           ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -785,39 +863,59 @@ export function Viewport() {
           switchCamera(camera === ortho ? "perspective" : "orthographic");
           saveCamera();
         } else {
-          let target = new THREE.Vector3();
-          let distance = 14;
-          if (view === "focus") {
+          let target = controls.target.clone();
+          let distance = camera.position.distanceTo(target);
+          if (view === "focus" || view === "reset") {
             const mesh = state.selected
               ? (topology?.findLegacy(state.selected, state.selectedPath) ??
                 meshes.get(state.selected))
               : state.topologySelection
-                ? topology?.root
+                ? (topology?.findPlacement(
+                    state.topologySelection.occurrencePath,
+                  ) ?? topology?.root)
                 : null;
-            if (mesh) {
-              const box = new THREE.Box3().setFromObject(mesh);
+            const box = new THREE.Box3();
+            if (view === "reset") {
+              if (topology) box.expandByObject(topology.root);
+              for (const m of meshes.values())
+                if (m.visible) box.expandByObject(m);
+            } else if (mesh) box.setFromObject(mesh);
+            if (!box.isEmpty()) {
               box.getCenter(target);
               distance = Math.max(
                 3,
                 box.getSize(new THREE.Vector3()).length() * 1.7,
               );
+              if (camera === ortho)
+                camera.zoom =
+                  20 /
+                  Math.max(1, box.getSize(new THREE.Vector3()).length() * 1.25);
+            } else {
+              target.set(0, 0, 0);
+              distance = 14;
             }
           }
           const directions: Record<string, Vec3> = {
             top: [0, 1, 0.0001],
             front: [0, 0, 1],
             right: [1, 0, 0],
+            left: [-1, 0, 0],
+            back: [0, 0, -1],
+            bottom: [0, -1, 0.0001],
             iso: [1, 0.8, 1],
             reset: [1, 0.8, 1],
             focus: [1, 0.8, 1],
           };
           camera.position.copy(
-            new THREE.Vector3(...(directions[view] ?? directions.iso))
+            new THREE.Vector3(
+              ...(state.cameraRequest.direction ??
+                directions[view] ??
+                directions.iso),
+            )
               .normalize()
               .multiplyScalar(distance)
               .add(target),
           );
-          camera.zoom = 1;
           camera.updateProjectionMatrix();
           controls.target.copy(target);
           controls.update();
@@ -837,9 +935,12 @@ export function Viewport() {
       )
         sync();
     });
+    const unsubscribeVolume = useVolumePreview.subscribe(() => refreshVolume());
     return () => {
       disposed = true;
       unsubscribe();
+      unsubscribeVolume();
+      volumeBridge?.dispose();
       unsubscribePrecision();
       unsubscribeSketch();
       window.removeEventListener("blur", cancelDrawing);
