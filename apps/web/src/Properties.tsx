@@ -6,7 +6,7 @@ import {
 import { tessellateFace, tessellationArea, bodyVolume } from "@forma/geometry";
 import { isGeometryLocked } from "@forma/editor";
 import { useEffect, useState } from "react";
-import { useEditor, isObjectLocked } from "@forma/editor";
+import { useEditor, isObjectLocked, usePrecision } from "@forma/editor";
 import { ru } from "@forma/ui";
 import { primitiveNames, type SceneObject } from "@forma/shared";
 import { ChevronDown, Box, Copy, Trash2 } from "lucide-react";
@@ -49,12 +49,16 @@ function NumberField({
 }
 export function Properties() {
   const s = useEditor();
+  const precision = usePrecision();
   const o = getLegacyObjects(s.project).find((o) => o.id === s.selected);
   const objectLocked = o ? isObjectLocked(s.project, o.id) : false;
   const ancestorLocked = o ? isObjectLocked(s.project, o.id, true) : false;
   const factor =
     s.project.units === "mm" ? 1000 : s.project.units === "cm" ? 100 : 1;
   const ref = s.topologySelection;
+  const inContext =
+    !!ref &&
+    JSON.stringify(ref.occurrencePath) === JSON.stringify(precision.path);
   const [paintShared, setPaintShared] = useState(false);
   useEffect(
     () => setPaintShared(false),
@@ -106,6 +110,19 @@ export function Properties() {
             Геометрия: <code>{ref.geometryId}</code>
           </p>
           <p>Экземпляр: {ref.occurrencePath.join(" / ") || "Сцена"}</p>
+          {!inContext && ref.occurrencePath.length > precision.path.length && (
+            <button
+              className="start-card"
+              onClick={() =>
+                precision.configure({
+                  path: ref.occurrencePath.slice(0, precision.path.length + 1),
+                  sharedEditConfirmed: true,
+                })
+              }
+            >
+              Войти в группу для редактирования
+            </button>
+          )}
           {face && (
             <p data-testid="face-area">
               Площадь: {Number(tessellateFace(m, face).area.toFixed(8))} м² (в
@@ -169,6 +186,7 @@ export function Properties() {
                 aria-label="Цвет выбранной грани"
                 value={s.project.materials[face.frontMaterialId].color}
                 disabled={
+                  !inContext ||
                   isGeometryLocked(s.project, ref) ||
                   (sharedFace && !paintShared)
                 }
@@ -267,6 +285,7 @@ export function Properties() {
             <button
               className="start-card"
               disabled={
+                !inContext ||
                 s.topologySelections.length > 1 ||
                 isGeometryLocked(s.project, ref)
               }
@@ -284,6 +303,7 @@ export function Properties() {
             <button
               className="start-card"
               disabled={
+                !inContext ||
                 s.topologySelections.length !== 1 ||
                 isGeometryLocked(s.project, ref)
               }

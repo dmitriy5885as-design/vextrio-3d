@@ -4,6 +4,7 @@ import {
   useVolumePreview,
   isGeometryLocked,
   GeometryDocumentCommand,
+  usePushPull,
 } from "@forma/editor";
 import {
   geometryContext,
@@ -21,6 +22,7 @@ import {
   subtract,
   bodyVolume,
   classifyBody,
+  extrusionStop,
   type GeometryIntent,
 } from "@forma/geometry";
 import { parseDimension } from "@forma/snapping";
@@ -38,6 +40,13 @@ export function ExtrudePanel() {
     ref = s.topologySelection?.kind === "face" ? s.topologySelection : null;
   const active = s.tool === "extrude";
   const previewState = useVolumePreview();
+  const pointer = usePushPull(),
+    inFlight = useRef(false),
+    commitRef = useRef<() => Promise<void>>(async () => {}),
+    handledCommit = useRef(pointer.commitId);
+  useEffect(() => {
+    if (pointer.gesture) setText(String(pointer.gesture.distance) + "m");
+  }, [pointer.gesture?.distance, pointer.gesture?.ref.entityId]);
   // Capture the visible sheet side when the face/context changes, not while
   // orbiting the preview, so the confirmed result cannot flip with the camera.
   const outwardSide = useMemo(() => {
@@ -61,7 +70,7 @@ export function ExtrudePanel() {
       kind: "extrude-face",
       faceId: ref.entityId,
       distance: parseDimension(text, p.units, true),
-      side: outwardSide as 1 | -1,
+      side: pointer.gesture?.side ?? (outwardSide as 1 | -1),
     };
   }
   useEffect(() => {
@@ -70,6 +79,7 @@ export function ExtrudePanel() {
     setError("");
     setPending(false);
     if (!active || p.schemaVersion !== 2 || !ref) return;
+    if (pointer.gesture && Number(text.replace(/m$/, "")) === 0) return;
     let session: GeometrySession | undefined;
     const timer = setTimeout(async () => {
       try {
@@ -131,30 +141,36 @@ export function ExtrudePanel() {
   useEffect(() => {
     setShared(false);
   }, [ref?.entityId, JSON.stringify(ref?.occurrencePath)]);
-  if (!active || p.schemaVersion !== 2) return null;
-  const occurrences = ref
-    ? definitionOccurrences(p).filter(
-        (o) => o.definitionId === ref.definitionId,
-      ).length
-    : 0;
+  const occurrences =
+    ref && p.schemaVersion === 2
+      ? definitionOccurrences(p).filter(
+          (o) => o.definitionId === ref.definitionId,
+        ).length
+      : 0;
   const preview = previewState.document;
   const body =
-    ref && preview
-      ? Object.values(preview.geometries[ref.geometryId].bodies).find((b) =>
-          b.faceIds.includes(ref.entityId as never),
-        )
+    ref && preview && p.schemaVersion === 2
+      ? preview.geometries[ref.geometryId].bodies[
+          Object.values(p.geometries[ref.geometryId].bodies).find((b) =>
+            b.faceIds.includes(ref.entityId as never),
+          )?.id ?? ""
+        ]
       : null;
-  const volume =
-    body && preview && ref
-      ? bodyVolume(
-          preview.geometries[ref.geometryId],
-          body.id,
-          occurrenceMatrix(preview, ref.occurrencePath),
-        )
-      : null;
+  const volume = useMemo(
+    () =>
+      body && preview && ref
+        ? bodyVolume(
+            preview.geometries[ref.geometryId],
+            body.id,
+            occurrenceMatrix(preview, ref.occurrencePath),
+          )
+        : null,
+    [body, preview, ref?.geometryId, JSON.stringify(ref?.occurrencePath)],
+  );
   const commit = async () => {
     if (
       !ref ||
+      inFlight.current ||
       busy ||
       pending ||
       error ||
@@ -163,7 +179,10 @@ export function ExtrudePanel() {
     )
       return;
     const ticket = generation.current;
+    const wasPointer = !!pointer.gesture;
     try {
+      inFlight.current = true;
+      if (wasPointer) usePushPull.setState({ committing: true });
       setBusy(true);
       const result = await s.editGeometry(
         ref,
@@ -174,14 +193,54 @@ export function ExtrudePanel() {
       );
       if (result.status === "rejected") throw Error(result.error);
       useVolumePreview.setState({ document: null });
-      useEditor.getState().setTool("select");
-      useEditor.getState().selectEntity(ref);
+      usePushPull.getState().cancel();
+      if (!wasPointer) useEditor.getState().setTool("select");
+      const after = useEditor.getState().project;
+      useEditor
+        .getState()
+        .selectEntity(
+          !wasPointer &&
+            after.schemaVersion === 2 &&
+            after.geometries[ref.geometryId].faces[ref.entityId]
+            ? ref
+            : null,
+        );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось изменить объём");
     } finally {
+      inFlight.current = false;
+      usePushPull.setState({ committing: false });
       setBusy(false);
     }
   };
+  commitRef.current = commit;
+  useEffect(() => {
+    if (pointer.commitId === handledCommit.current || pending) return;
+    handledCommit.current = pointer.commitId;
+    if (error || !ref || (occurrences > 1 && !shared)) {
+      usePushPull.setState({ committing: false });
+      return;
+    }
+    void commitRef.current();
+  }, [pointer.commitId, pending, error, ref?.entityId, shared]);
+  const limit = useMemo(
+    () =>
+      ref && p.schemaVersion === 2
+        ? extrusionStop(
+            p.geometries[ref.geometryId],
+            p.geometries[ref.geometryId].faces[ref.entityId],
+            outwardSide as 1 | -1,
+            geometryContext(p, ref.geometryId, true, ref.occurrencePath),
+          )
+        : null,
+    [
+      s.revision,
+      ref?.entityId,
+      JSON.stringify(ref?.occurrencePath),
+      outwardSide,
+    ],
+  );
+  if (!active || p.schemaVersion !== 2) return null;
   return (
     <div className="sketch-panel" data-testid="extrude-panel">
       <div className="sketch-title">
@@ -189,10 +248,17 @@ export function ExtrudePanel() {
         <button onClick={() => s.setTool("select")}>Отмена · Esc</button>
       </div>
       {!ref ? (
-        <p>Выберите грань в сцене. Затем задайте высоту.</p>
+        <p>
+          Щёлкните грань, переместите мышь, щёлкните ещё раз. Или предварительно
+          выберите грань и введите размер.
+        </p>
       ) : (
         <>
-          <p>Положительная высота — наружу; отрицательная — обратно.</p>
+          <p>
+            {pointer.gesture
+              ? "Переместите мышь и щёлкните для завершения. Можно ввести точную глубину."
+              : "Положительная высота — наружу; отрицательная — обратно."}
+          </p>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -208,6 +274,8 @@ export function ExtrudePanel() {
                 disabled={busy}
                 aria-invalid={!!error}
                 onChange={(e) => setText(e.target.value)}
+                onFocus={() => usePushPull.setState({ editing: true })}
+                onBlur={() => usePushPull.setState({ editing: false })}
                 onKeyDown={(e) => {
                   if (e.repeat && e.key === "Enter") e.preventDefault();
                   if (e.key === "Escape") {
@@ -230,6 +298,12 @@ export function ExtrudePanel() {
               Применить · Enter
             </button>
           </form>
+          {limit && (
+            <button onClick={() => setText(String(limit.distance) + "m")}>
+              До противоположной грани · {Number((-limit.distance).toFixed(6))}{" "}
+              м
+            </button>
+          )}
           {occurrences > 1 && (
             <label>
               <input

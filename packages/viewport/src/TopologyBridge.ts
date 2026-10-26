@@ -337,6 +337,48 @@ export class TopologyBridge {
     }
     return null;
   }
+  pickFace(ray: THREE.Raycaster, path?: string[]) {
+    this.root.updateMatrixWorld(true);
+    const visible = (o: THREE.Object3D) => {
+      for (let n: THREE.Object3D | null = o; n; n = n.parent)
+        if (!n.visible) return false;
+      return true;
+    };
+    const objects = this.pickables.filter(
+      (o) =>
+        o instanceof THREE.Mesh &&
+        o.userData.entityRef?.kind === "face" &&
+        visible(o) &&
+        (!path ||
+          JSON.stringify(o.userData.entityRef.occurrencePath) ===
+            JSON.stringify(path)),
+    );
+    const hit = ray.intersectObjects(objects, false)[0];
+    return hit
+      ? {
+          ref: structuredClone(hit.object.userData.entityRef) as EntityRef,
+          point: hit.point.toArray() as Vec3,
+        }
+      : null;
+  }
+  editingContext(path: string[]) {
+    for (const o of this.pickables) {
+      const p =
+          o.userData.entityRef?.occurrencePath ??
+          o.userData.baseRef?.occurrencePath ??
+          o.userData.occurrencePath ??
+          [],
+        inside = !path.length || path.every((id, i) => p[i] === id);
+      const materials = (o as THREE.Mesh).material;
+      for (const material of Array.isArray(materials)
+        ? materials
+        : [materials]) {
+        material.opacity = inside ? 1 : 0.22;
+        material.transparent = !inside;
+        material.depthWrite = inside;
+      }
+    }
+  }
   dispose() {
     for (const r of this.resources) r.dispose();
     this.resources.clear();

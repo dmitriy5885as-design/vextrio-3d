@@ -63,6 +63,7 @@ test("orientation cube follows the real camera, preserves pan and framing, suppo
   const canvas = page.getByTestId("viewport"),
     box = (await canvas.boundingBox())!;
   await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.7);
+  await page.keyboard.down("Shift");
   await page.mouse.down({ button: "middle" });
   await page.mouse.move(
     box.x + box.width * 0.5 + 40,
@@ -70,6 +71,7 @@ test("orientation cube follows the real camera, preserves pan and framing, suppo
     { steps: 5 },
   );
   await page.mouse.up({ button: "middle" });
+  await page.keyboard.up("Shift");
   const before = await save(page);
   for (const view of ["top", "bottom", "front", "back", "left", "right"]) {
     await page

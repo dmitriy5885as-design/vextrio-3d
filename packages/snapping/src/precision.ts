@@ -150,8 +150,15 @@ export function resolvePrecision(input: PrecisionInput): PrecisionResult {
     if (parts.length !== 2)
       throw Error("Введите ширину; высоту прямоугольника.");
     const [width, height] = parts.map((p) => parseDimension(p, unit));
-    const u = multiply(plane.u, width),
-      v = multiply(plane.v, height);
+    assertVector(input.direction);
+    const u = multiply(
+        plane.u,
+        width * (dot(input.direction, plane.u) < -1e-9 ? -1 : 1),
+      ),
+      v = multiply(
+        plane.v,
+        height * (dot(input.direction, plane.v) < -1e-9 ? -1 : 1),
+      );
     point = add(add(anchor, u), v);
     rectangle = {
       width,

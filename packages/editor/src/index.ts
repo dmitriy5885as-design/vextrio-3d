@@ -5,9 +5,11 @@ import {
   type SketchReply,
   type ToolName,
 } from "@forma/tools";
+import { usePushPull } from "./pushpull";
 import { usePrecision, precisionFrame } from "./precision";
 export * from "./precision";
 export * from "./volume-preview";
+export * from "./pushpull";
 export { GeometryDocumentCommand } from "./geometry-command";
 import {
   clone,
@@ -933,6 +935,9 @@ usePrecision.subscribe((s, previous) => {
     sketchController.cancel();
 });
 useEditor.subscribe((s, previous) => {
+  const gesture = usePushPull.getState().gesture;
+  if (gesture && (s.tool !== "extrude" || s.revision !== gesture.revision))
+    usePushPull.getState().cancel();
   if (s.revision !== previous.revision) {
     const a = s.project,
       b = previous.project;
@@ -954,7 +959,7 @@ useEditor.subscribe((s, previous) => {
     const draw = s.tool === "line" || s.tool === "rectangle";
     if (draw) {
       const p = usePrecision.getState();
-      const path = s.topologySelection?.occurrencePath ?? p.path;
+      const path = p.path;
       usePrecision.getState().configure({
         enabled: true,
         ...(JSON.stringify(path) !== JSON.stringify(p.path) ? { path } : {}),

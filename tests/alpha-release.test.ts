@@ -14,7 +14,7 @@ it("ships a consistent alpha version without changing compatibility identifiers"
       readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8"),
     ),
     cargo = readFileSync("apps/desktop/src-tauri/Cargo.toml", "utf8");
-  expect(APP_VERSION).toBe("0.2.0-alpha.1");
+  expect(APP_VERSION).toBe("0.2.0-alpha.2");
   expect(root.version).toBe(APP_VERSION);
   expect(tauri.version).toBe(APP_VERSION);
   expect(cargo).toContain(`version = "${APP_VERSION}"`);

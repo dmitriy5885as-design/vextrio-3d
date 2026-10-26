@@ -1,4 +1,5 @@
 import { TopologyTree } from "./TopologyTree";
+import { EditContext } from "./EditContext";
 import { useRecovery } from "./useRecovery";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
@@ -273,6 +274,11 @@ export function App() {
         setMenu(null);
       }
       if (key === "f") s.view("focus");
+      if (e.shiftKey && key === "z") {
+        e.preventDefault();
+        s.view("reset");
+        return;
+      }
       if (shortcuts[key]) s.setTool(shortcuts[key]);
     };
     window.addEventListener("keydown", key);
@@ -387,9 +393,9 @@ export function App() {
       {
         label: "Перемещение",
         action: () => s.setTool("translate"),
-        shortcut: "G",
+        shortcut: "M",
       },
-      { label: "Вращение", action: () => s.setTool("rotate"), shortcut: "E" },
+      { label: "Вращение", action: () => s.setTool("rotate"), shortcut: "Q" },
       { label: "Линия", action: () => s.setTool("line"), shortcut: "L" },
       {
         label: "Прямоугольник",
@@ -397,7 +403,13 @@ export function App() {
         shortcut: "R",
       },
       { label: "Масштаб", action: () => s.setTool("scale"), shortcut: "S" },
-      { label: "Push / Pull · в версии 0.3", action: () => {}, disabled: true },
+      {
+        label: "Вытянуть / вдавить",
+        action: () => s.setTool("extrude"),
+        shortcut: "P",
+      },
+      { label: "Орбита", action: () => s.setTool("orbit"), shortcut: "O" },
+      { label: "Панорама", action: () => s.setTool("pan"), shortcut: "H" },
     ],
     Окно: [
       {
@@ -569,8 +581,8 @@ export function App() {
                 { tool: "line", icon: <Pencil size={20} />, key: "L" },
                 { tool: "rectangle", icon: <Square size={20} />, key: "R" },
                 { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
-                { tool: "translate", icon: <Move3D size={21} />, key: "G" },
-                { tool: "rotate", icon: <Rotate3D size={21} />, key: "E" },
+                { tool: "translate", icon: <Move3D size={21} />, key: "M" },
+                { tool: "rotate", icon: <Rotate3D size={21} />, key: "Q" },
                 { tool: "scale", icon: <Scaling size={20} />, key: "S" },
               ] as const
             ).map((t) => (
@@ -718,6 +730,7 @@ export function App() {
             <span>Объёмный вид</span>
           </div>
           <NavigationCube />
+          <EditContext />
           <div className="scene-caption">
             <span className="mint-dot" /> ПРОСТРАНСТВО ДЛЯ ВАШИХ ИДЕЙ
           </div>
@@ -735,7 +748,7 @@ export function App() {
                 : "Орбита · перетаскивание"}
             </span>
             <span>
-              <Hand size={13} /> Панорама · СКМ
+              <Hand size={13} /> Орбита · СКМ · Shift: панорама
             </span>
           </div>
           <button
@@ -990,7 +1003,7 @@ export function App() {
                   <span>Линия / прямоугольник</span>
                   <kbd>P</kbd>
                   <span>Вытянуть / вдавить выбранную грань</span>
-                  <kbd>G / E / S</kbd>
+                  <kbd>M / Q / S</kbd>
                   <span>Перемещение / вращение / масштаб</span>
                   <kbd>F</kbd>
                   <span>Фокус на выбранном объекте</span>
@@ -1002,15 +1015,16 @@ export function App() {
                   <span>Удалить объект</span>
                   <kbd>Мышь</kbd>
                   <span>
-                    Перетаскивание — орбита, колесо — зум, средняя кнопка —
-                    панорама
+                    Средняя кнопка — орбита, колесо — зум, Shift + средняя
+                    кнопка — панорама
                   </span>
                 </div>
                 <p className="dialog-note">
                   Выдавливание поддерживает плоские контуры и ограниченные
-                  углубления. Сквозные вырезы и булевы операции пока не
-                  поддерживаются. Экспорт OBJ/STL — в меню «Файл» браузерной
-                  версии. Основные инструменты остаются бесплатными.
+                  углубления и сквозные окна между параллельными гранями. Проёмы
+                  до края стены и общие булевы операции пока не поддерживаются.
+                  Экспорт OBJ/STL — в меню «Файл» браузерной версии. Основные
+                  инструменты остаются бесплатными.
                 </p>
               </>
             )}

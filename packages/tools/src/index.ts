@@ -1,12 +1,14 @@
 import type { TransformMode } from "@forma/shared";
 export * from "./controller";
 export type ToolName =
-  TransformMode | "select" | "line" | "rectangle" | "extrude";
+  TransformMode | "select" | "line" | "rectangle" | "extrude" | "orbit" | "pan";
 export const shortcuts: Record<string, ToolName> = {
   v: "select",
-  g: "translate",
+  m: "translate",
+  q: "rotate",
+  o: "orbit",
+  h: "pan",
   r: "rectangle",
-  e: "rotate",
   l: "line",
   p: "extrude",
   " ": "select",
@@ -20,4 +22,6 @@ export const toolLabels = {
   line: "Линия",
   rectangle: "Прямоугольник",
   extrude: "Вытянуть / вдавить",
+  orbit: "Орбита",
+  pan: "Панорама",
 } as const;
