@@ -192,6 +192,9 @@ importers:
       '@forma/document':
         specifier: workspace:*
         version: link:../document
+      '@forma/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@forma/shared':
         specifier: workspace:*
         version: link:../shared

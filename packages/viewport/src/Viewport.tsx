@@ -11,6 +11,7 @@ import {
   precisionFrame,
   sketchController,
   sketchPlane,
+  useVolumePreview,
 } from "@forma/editor";
 import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
@@ -65,6 +66,35 @@ export function Viewport() {
       THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
     >();
     let topology: TopologyBridge | null = null;
+    let volumeBridge: TopologyBridge | null = null;
+    let renderedVolumeDocument: import("@forma/document").ProjectV2 | null =
+      null;
+    const refreshVolume = () => {
+      const preview = useVolumePreview.getState(),
+        state = useEditor.getState(),
+        wanted =
+          preview.document &&
+          state.tool === "extrude" &&
+          preview.revision === state.revision
+            ? preview.document
+            : null;
+      if (wanted === renderedVolumeDocument) {
+        if (topology) topology.root.visible = !volumeBridge;
+        return;
+      }
+      if (volumeBridge) {
+        scene.remove(volumeBridge.root);
+        volumeBridge.dispose();
+        volumeBridge = null;
+      }
+      if (wanted) {
+        volumeBridge = new TopologyBridge(wanted, state.revision);
+        scene.add(volumeBridge.root);
+      }
+      renderedVolumeDocument = wanted;
+      if (topology) topology.root.visible = !volumeBridge;
+      requestRender();
+    };
     let snapEngine: SnapEngine | null = null;
     let snapDocument: import("@forma/document").ProjectV2 | null = null;
     let outline: THREE.BoxHelper | null = null;
@@ -259,10 +289,19 @@ export function Viewport() {
       const selected = getLegacyObjects(s.project).find(
         (o) => o.id === s.selected,
       );
-      const mesh = s.selected
-        ? (topology?.findLegacy(s.selected, s.selectedPath) ??
-          meshes.get(s.selected))
-        : undefined;
+      const nativePath = s.topologySelection?.occurrencePath;
+      // TransformControls is reliable for placements directly under the scene.
+      // Nested affine editing remains available through numeric properties.
+      const native =
+        nativePath?.length === 1
+          ? topology?.findPlacement(nativePath)
+          : undefined;
+      const mesh =
+        native ??
+        (s.selected
+          ? (topology?.findLegacy(s.selected, s.selectedPath) ??
+            meshes.get(s.selected))
+          : undefined);
       if (outline) {
         scene.remove(outline);
         outline.geometry.dispose();
@@ -275,9 +314,12 @@ export function Viewport() {
       }
       if (
         mesh &&
-        selected &&
-        !isObjectLocked(s.project, selected.id) &&
-        selected.visible &&
+        ((native &&
+          !isObjectLocked(s.project, native.userData.nativeNodeId) &&
+          native.visible) ||
+          (selected &&
+            !isObjectLocked(s.project, selected.id) &&
+            selected.visible)) &&
         (s.tool === "translate" || s.tool === "rotate" || s.tool === "scale")
       ) {
         if (transform.object !== mesh) transform.attach(mesh);
@@ -286,6 +328,7 @@ export function Viewport() {
       transform.setTranslationSnap(s.snap ? 0.25 : null);
       transform.setRotationSnap(s.snap ? Math.PI / 12 : null);
       transform.setScaleSnap(s.snap ? 0.1 : null);
+      refreshVolume();
       requestRender();
     }
     const saveCamera = () => {
@@ -317,16 +360,29 @@ export function Viewport() {
         const mesh = transform.object;
         if (mesh) {
           const s = useEditor.getState();
-          const result = s.patch(mesh.userData.id, {
-            transform: {
-              position: mesh.position.toArray() as Vec3,
-              rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z].map(
-                THREE.MathUtils.radToDeg,
-              ) as Vec3,
-              scale: mesh.scale.toArray() as Vec3,
-            },
-          });
-          if (result.status === "rejected") sync();
+          const result = mesh.userData.nativeNodeId
+            ? s.patchNode(mesh.userData.nativeNodeId, {
+                transform: {
+                  translation: mesh.position.toArray() as Vec3,
+                  rotation: mesh.quaternion.toArray(),
+                  scale: mesh.scale.toArray() as Vec3,
+                },
+              })
+            : s.patch(mesh.userData.id, {
+                transform: {
+                  position: mesh.position.toArray() as Vec3,
+                  rotation: [
+                    mesh.rotation.x,
+                    mesh.rotation.y,
+                    mesh.rotation.z,
+                  ].map(THREE.MathUtils.radToDeg) as Vec3,
+                  scale: mesh.scale.toArray() as Vec3,
+                },
+              });
+          if (result.status === "rejected") {
+            topology?.resetPlacements();
+            sync();
+          }
         }
       }
     });
@@ -343,6 +399,7 @@ export function Viewport() {
       downGeneration = sketchController.generation;
     };
     const pointerUp = (e: PointerEvent) => {
+      if (useEditor.getState().tool === "extrude" && volumeBridge) return;
       if (downTool !== sketchController.state.tool) return;
       if (sketchController.state.tool) return;
       if (
@@ -837,9 +894,12 @@ export function Viewport() {
       )
         sync();
     });
+    const unsubscribeVolume = useVolumePreview.subscribe(() => refreshVolume());
     return () => {
       disposed = true;
       unsubscribe();
+      unsubscribeVolume();
+      volumeBridge?.dispose();
       unsubscribePrecision();
       unsubscribeSketch();
       window.removeEventListener("blur", cancelDrawing);

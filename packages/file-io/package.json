@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@forma/geometry": "workspace:*",
     "@forma/document": "workspace:*",
     "@forma/shared": "workspace:*",
     "@tauri-apps/api": "^2.12.4"

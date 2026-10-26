@@ -23,7 +23,9 @@ import {
   type PreparedGeometryChange,
 } from "./transactions";
 import { prepareSketch } from "./sketch";
+import { prepareExtrusion } from "./volume";
 export type GeometryIntent =
+  | { kind: "extrude-face"; faceId: string; distance: number; side: 1 | -1 }
   | {
       kind: "move-vertices";
       positions: { vertexId: Id<"vertex">; position: Vec3 }[];
@@ -118,6 +120,17 @@ export function createLocalGeometryBackend(
       };
       try {
         validateGeometry(model, { ...context, policy: request.policy });
+        if (intent.kind === "extrude-face") {
+          const change = prepareExtrusion(
+            model,
+            intent.faceId,
+            intent.distance,
+            intent.side,
+            { ...context, policy: request.policy },
+            reply.operationId,
+          );
+          return { ...reply, status: "proposed", change };
+        }
         if (intent.kind !== "move-vertices") {
           const change = prepareSketch(
             model,

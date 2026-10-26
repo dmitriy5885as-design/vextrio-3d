@@ -7,6 +7,8 @@ import {
 } from "@forma/tools";
 import { usePrecision, precisionFrame } from "./precision";
 export * from "./precision";
+export * from "./volume-preview";
+export { GeometryDocumentCommand } from "./geometry-command";
 import {
   clone,
   freezeData,
@@ -43,6 +45,12 @@ import {
   tessellationArea,
 } from "@forma/geometry";
 import { GeometryDocumentCommand } from "./geometry-command";
+import {
+  groupSceneGeometry,
+  copyInstance,
+  makeUnique,
+  removeInstance,
+} from "./structure";
 import { isGeometryLocked } from "./permissions";
 import { CommandHistory, SnapshotCommand } from "@forma/commands";
 import {
@@ -64,6 +72,10 @@ interface EditorState {
   project: Project;
   selected: string | null;
   upgradeProject: () => CommandResult;
+  groupScene: (kind?: "group" | "component") => CommandResult;
+  copyInstance: (nodeId: string) => CommandResult;
+  makeUnique: (nodeId: string) => CommandResult;
+  removeInstance: (nodeId: string) => CommandResult;
   patchNode: (
     key: string,
     patch: Partial<
@@ -174,6 +186,38 @@ export const useEditor = create<EditorState>((set, get) => {
     fn: (candidate: ProjectV1) => void,
     action: MutationAction = { kind: "edit" },
   ) => commitDocument(label, (p) => mutateLegacy(p, fn), action);
+  const structure = (
+    label: string,
+    fn: (p: import("@forma/document").ProjectV2) => void,
+  ): CommandResult => {
+    if (transactionInProgress)
+      return reject(Error("Другая команда выполняется."));
+    transactionInProgress = true;
+    try {
+      const before = get().project;
+      if (before.schemaVersion !== 2)
+        throw Error("Для групп нужен документ v2.");
+      const candidate = clone(before);
+      fn(candidate);
+      validateProject(candidate);
+      const project = history.run(
+        new SnapshotCommand(label, before, candidate),
+        before,
+      );
+      set({
+        project: freezeData(project),
+        revision: get().revision + 1,
+        canUndo: history.canUndo,
+        canRedo: history.canRedo,
+        message: label,
+      });
+      return { status: "applied" };
+    } catch (e) {
+      return reject(e);
+    } finally {
+      transactionInProgress = false;
+    }
+  };
   const pendingGeometry = new Set<GeometrySession>();
   const cancelGeometry = () => {
     for (const session of pendingGeometry) session.cancelAll();
@@ -198,8 +242,64 @@ export const useEditor = create<EditorState>((set, get) => {
     canUndo: false,
     canRedo: false,
     mutate: (label, fn) => commit(label, fn),
-    patchNode: (key, patch) =>
-      commitDocument(
+    groupScene: (kind = "group") => {
+      let ref: EntityRef | null = null;
+      const result = structure(
+        "Создана " + (kind === "group" ? "группа" : "компонент"),
+        (p) => {
+          ref = groupSceneGeometry(p, kind, get().topologySelection);
+        },
+      );
+      if (result.status === "applied" && ref) get().selectEntity(ref);
+      return result;
+    },
+    removeInstance: (key) =>
+      structure("Удалена сборка", (p) => {
+        if (isObjectLocked(p, key)) throw Error("Объект заблокирован.");
+        removeInstance(p, key);
+      }),
+    copyInstance: (key) => {
+      const selection = get().topologySelection;
+      let newKey = "";
+      const result = structure("Создан связанный экземпляр", (p) => {
+        if (isObjectLocked(p, key)) throw Error("Объект заблокирован.");
+        newKey = copyInstance(p, key);
+      });
+      if (result.status === "applied" && selection)
+        get().selectEntity({ ...selection, occurrencePath: [newKey] });
+      return result;
+    },
+    makeUnique: (key) => {
+      let did = "";
+      const result = structure("Экземпляр стал независимым", (p) => {
+        if (isObjectLocked(p, key)) throw Error("Объект заблокирован.");
+        did = makeUnique(p, key);
+      });
+      if (result.status === "applied") {
+        const p = get().project;
+        if (p.schemaVersion === 2) {
+          const gid = p.definitions[did].geometryId;
+          if (gid) {
+            const g = p.geometries[gid],
+              face = Object.keys(g.faces)[0],
+              edge = Object.keys(g.edges)[0],
+              vertex = Object.keys(g.vertices)[0];
+            if (face || edge || vertex)
+              get().selectEntity({
+                definitionId: did,
+                geometryId: gid,
+                kind: face ? "face" : edge ? "edge" : "vertex",
+                entityId: face ?? edge ?? vertex,
+                occurrencePath: [key],
+              });
+          }
+        }
+      }
+      return result;
+    },
+    patchNode: (key, patch) => {
+      const selected = get().topologySelection;
+      const result = commitDocument(
         "Изменение узла",
         (p) => {
           if (
@@ -217,7 +317,18 @@ export const useEditor = create<EditorState>((set, get) => {
           Object.assign(p.nodes[key], clone(patch));
         },
         { kind: "native-node", id: key },
-      ),
+      );
+      if (result.status === "applied" && selected && patch.visible !== false) {
+        const p = get().project;
+        if (p.schemaVersion === 2) {
+          try {
+            validateEntityRef(p, selected);
+            get().selectEntity(selected);
+          } catch {}
+        }
+      }
+      return result;
+    },
     setNodeLocked: (key, locked) =>
       commitDocument(
         locked ? "Узел заблокирован" : "Узел разблокирован",

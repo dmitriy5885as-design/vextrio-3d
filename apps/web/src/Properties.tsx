@@ -1,5 +1,5 @@
 import { getLegacyObjects, occurrenceMatrix } from "@forma/document";
-import { tessellateFace, tessellationArea } from "@forma/geometry";
+import { tessellateFace, tessellationArea, bodyVolume } from "@forma/geometry";
 import { isGeometryLocked } from "@forma/editor";
 import { useEffect, useState } from "react";
 import { useEditor, isObjectLocked } from "@forma/editor";
@@ -97,6 +97,27 @@ export function Properties() {
               определении)
             </p>
           )}
+          {face &&
+            (() => {
+              const body = Object.values(m.bodies).find((b) =>
+                  b.faceIds.includes(face.id),
+                ),
+                volume = body
+                  ? bodyVolume(
+                      m,
+                      body.id,
+                      occurrenceMatrix(
+                        s.project as import("@forma/document").ProjectV2,
+                        ref.occurrencePath,
+                      ),
+                    )
+                  : null;
+              return volume === null ? null : (
+                <p data-testid="body-volume">
+                  Объём тела: {Number(volume.toFixed(8))} м³
+                </p>
+              );
+            })()}
           {edge && (
             <p>
               Вершины: {edge.start} → {edge.end}
@@ -115,6 +136,93 @@ export function Properties() {
             </p>
           )}
           {vertex && <p>Координаты: {vertex.position.join(", ")} м</p>}
+          {ref.occurrencePath.length === 0 ? (
+            <button className="start-card" onClick={() => s.groupScene()}>
+              Сгруппировать всю геометрию сцены
+            </button>
+          ) : (
+            (() => {
+              const p = s.project;
+              if (p.schemaVersion !== 2) return null;
+              const key = ref.occurrencePath.at(-1)!,
+                node = p.nodes[key];
+              if (node.kind === "legacy-primitive") return null;
+              const locked = isObjectLocked(p, key),
+                definition = p.definitions[node.definitionId],
+                shared =
+                  Object.values(p.nodes).filter(
+                    (n) =>
+                      n.kind !== "legacy-primitive" &&
+                      n.definitionId === definition.id,
+                  ).length > 1;
+              return (
+                <div className="property-group">
+                  <h3>{node.name}</h3>
+                  {(["translation", "scale"] as const).map((field) => (
+                    <div key={field}>
+                      <label>
+                        {field === "translation"
+                          ? "Положение группы"
+                          : "Масштаб группы"}
+                      </label>
+                      <div className="vector-fields">
+                        {node.transform[field].map((v, i) => (
+                          <NumberField
+                            key={i}
+                            value={field === "translation" ? v * factor : v}
+                            label={`${field === "translation" ? "Положение группы" : "Масштаб группы"} ${["X", "Y", "Z"][i]}`}
+                            disabled={locked}
+                            onCommit={(value) => {
+                              const transform = structuredClone(node.transform);
+                              transform[field][i] =
+                                field === "translation"
+                                  ? value / factor
+                                  : value;
+                              s.patchNode(key, { transform });
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {node.parentDefinitionId === p.rootDefinitionId &&
+                    !definition.childNodeIds.length && (
+                      <button
+                        className="start-card"
+                        disabled={locked}
+                        onClick={() => s.copyInstance(key)}
+                      >
+                        Создать связанный экземпляр
+                      </button>
+                    )}
+                  {shared && !definition.childNodeIds.length && (
+                    <button
+                      className="start-card"
+                      disabled={locked}
+                      onClick={() => s.makeUnique(key)}
+                    >
+                      Сделать независимым
+                    </button>
+                  )}
+                  {node.parentDefinitionId === p.rootDefinitionId &&
+                    !definition.childNodeIds.length && (
+                      <button
+                        className="start-card"
+                        disabled={locked}
+                        onClick={() => s.removeInstance(key)}
+                      >
+                        Удалить сборку
+                      </button>
+                    )}
+                  <p>
+                    {shared
+                      ? "Общая геометрия: изменение формы затронет все связанные экземпляры."
+                      : "Независимая геометрия."}
+                  </p>
+                </div>
+              );
+            })()
+          )}
           {face && (
             <button
               className="start-card"
@@ -130,6 +238,18 @@ export function Properties() {
               }
             >
               Удалить грань
+            </button>
+          )}
+          {face && (
+            <button
+              className="start-card"
+              disabled={
+                s.topologySelections.length !== 1 ||
+                isGeometryLocked(s.project, ref)
+              }
+              onClick={() => s.setTool("extrude")}
+            >
+              Вытянуть / вдавить (P)
             </button>
           )}
         </div>

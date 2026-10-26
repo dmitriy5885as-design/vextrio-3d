@@ -1,6 +1,7 @@
 import { TopologyTree } from "./TopologyTree";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
+import { ExtrudePanel } from "./ExtrudePanel";
 import {
   getLegacyObjects,
   emptyProjectV2,
@@ -47,6 +48,7 @@ import { Viewport } from "@forma/viewport";
 import { useEditor, isDirty } from "@forma/editor";
 import {
   browserFileAdapter,
+  downloadGeometry,
   isDesktop,
   openNative,
   acceptNativeOpen,
@@ -259,6 +261,7 @@ export function App() {
       if (key === "delete" || key === "backspace") removeSelected();
       if (key === " ") e.preventDefault();
       if (key === "escape") {
+        if (s.tool === "extrude") s.setTool("select");
         s.select(null);
         setMenu(null);
       }
@@ -297,6 +300,26 @@ export function App() {
         action: () => void save(true),
         shortcut: "Ctrl Shift S",
       },
+      ...(!isDesktop()
+        ? (["obj", "stl"] as const).map((format) => ({
+            label: `Экспорт ${format.toUpperCase()}${format === "stl" ? " (мм)" : " (м)"}…`,
+            action: () => {
+              try {
+                downloadGeometry(s.project, format);
+                useEditor.setState({
+                  message: `Начато скачивание ${format.toUpperCase()}. Проверьте файл в загрузках.`,
+                });
+              } catch (e) {
+                useEditor.setState({
+                  message:
+                    e instanceof Error
+                      ? e.message
+                      : "Не удалось экспортировать.",
+                });
+              }
+            },
+          }))
+        : []),
     ],
     Правка: [
       {
@@ -422,7 +445,7 @@ export function App() {
         <div className="brand">
           <img src="/vextrio.svg" alt="" />
           <strong>VEXTRIO 3D</strong>
-          <span className="version">FOUNDATION</span>
+          <span className="version">SKETCH · PREVIEW</span>
         </div>
         <div className="project-title">
           <span className={dirty ? "unsaved-dot" : "saved-dot"} />
@@ -538,6 +561,7 @@ export function App() {
                 },
                 { tool: "line", icon: <Pencil size={20} />, key: "L" },
                 { tool: "rectangle", icon: <Square size={20} />, key: "R" },
+                { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "G" },
                 { tool: "rotate", icon: <Rotate3D size={21} />, key: "E" },
                 { tool: "scale", icon: <Scaling size={20} />, key: "S" },
@@ -671,6 +695,8 @@ export function App() {
           <Viewport />
           {s.tool === "line" || s.tool === "rectangle" ? (
             <SketchPanel />
+          ) : s.tool === "extrude" ? (
+            <ExtrudePanel />
           ) : (
             <PrecisionPanel />
           )}
@@ -785,7 +811,7 @@ export function App() {
                 <br />
                 проектирования и творчества.
               </p>
-              <small>VEXTRIO 3D 0.1 · FOUNDATION</small>
+              <small>VEXTRIO 3D 0.1 · SKETCH · PREVIEW</small>
             </div>
             <div className="welcome-content">
               <span className="eyebrow">VEXTRIO 3D</span>
@@ -801,7 +827,7 @@ export function App() {
                 </span>
                 <span>
                   <strong>Новый проект</strong>
-                  <small>Чистый лист. Безграничные возможности.</small>
+                  <small>Линии, грани и точные размеры.</small>
                 </span>
                 <ArrowUpRight size={18} />
               </button>
@@ -905,17 +931,20 @@ export function App() {
               <>
                 <span className="eyebrow">SHAPE YOUR IDEAS</span>
                 <h2>
-                  VEXTRIO 3D <small>0.1 Foundation</small>
+                  VEXTRIO 3D <small>Sketch Preview</small>
                 </h2>
                 <p>
-                  Создавайте примитивы, меняйте их форму и собирайте свои идеи в
-                  пространстве.
+                  Нарисуйте прямоугольник (R), выберите его грань (Space),
+                  задайте высоту (P). Сгруппируйте результат и собирайте модель
+                  из независимых частей.
                 </p>
                 <div className="help-grid">
                   <kbd>Space / V</kbd>
                   <span>Выделение</span>
                   <kbd>L / R</kbd>
                   <span>Линия / прямоугольник</span>
+                  <kbd>P</kbd>
+                  <span>Вытянуть / вдавить выбранную грань</span>
                   <kbd>G / E / S</kbd>
                   <span>Перемещение / вращение / масштаб</span>
                   <kbd>F</kbd>
@@ -933,9 +962,10 @@ export function App() {
                   </span>
                 </div>
                 <p className="dialog-note">
-                  Push/Pull, B-Rep и булевы операции запланированы для следующих
-                  версий. Все основные инструменты VEXTRIO 3D останутся
-                  бесплатными.
+                  Выдавливание поддерживает плоские контуры и ограниченные
+                  углубления. Сквозные вырезы и булевы операции пока не
+                  поддерживаются. Экспорт OBJ/STL — в меню «Файл» браузерной
+                  версии. Основные инструменты остаются бесплатными.
                 </p>
               </>
             )}
