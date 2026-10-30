@@ -37,6 +37,23 @@ function sheared() {
   b.transform.scale = [1, 1.5, 1];
   return p;
 }
+it("can pick the canonical face behind numeric preview without exposing hidden descendants", () => {
+  const bridge = new TopologyBridge(topologyProject(), 0),
+    ray = new THREE.Raycaster(
+      new THREE.Vector3(3, 1.5, 10),
+      new THREE.Vector3(0, 0, -1),
+    );
+  const original = bridge.pickFace(ray);
+  expect(original?.ref.kind).toBe("face");
+  bridge.root.visible = false;
+  expect(bridge.pickFace(ray)).toBeNull();
+  expect(bridge.pickFace(ray, [], true)?.ref).toEqual(original?.ref);
+  bridge.root.traverse((o) => {
+    if (o.userData.entityRef?.kind === "face") o.visible = false;
+  });
+  expect(bridge.pickFace(ray, [], true)).toBeNull();
+  bridge.dispose();
+});
 it("composes a full occurrence path with shear identically to Three.js, without importing it into core", () => {
   const p = sheared(),
     matrix = occurrenceMatrix(p, ["instance/group", "instance/one"]),

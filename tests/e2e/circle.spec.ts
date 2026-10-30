@@ -56,8 +56,17 @@ test("C accepts an exact radius, creates native edges/face, extrudes and roundtr
   expect(Object.keys(g.faces)).toHaveLength(1);
   for (const v of Object.values(g.vertices) as any[])
     expect(Math.hypot(...v.position)).toBeCloseTo(1, 8);
-  await page.keyboard.press("p");
+  await page.keyboard.press("Space");
   await click(page, [0.2, 0, 0.1]);
+  await expect(page.getByTestId("face-area")).toContainText("3.10582854");
+  await page.keyboard.press("p");
+  await expect(page.getByTestId("volume-preview")).toContainText(
+    "9.31748562 м³",
+  );
+  await click(page, [0.2, 0, 0.1]);
+  await expect(page.getByTestId("extrude-panel")).toContainText(
+    "Переместите мышь и щёлкните для завершения",
+  );
   const height = page.getByLabel("Высота выдавливания", { exact: true });
   await height.fill("2m");
   await expect(page.getByTestId("volume-preview")).toContainText(

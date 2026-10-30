@@ -454,7 +454,9 @@ export function Viewport() {
           p = s.project;
         if (p.schemaVersion !== 2 || !topology) return;
         const ray = cursorRay(e.clientX, e.clientY),
-          hit = topology.pickFace(ray, usePrecision.getState().path);
+          // Numeric preview hides only the render root. A new pointer gesture
+          // still picks the original canonical face, never preview geometry.
+          hit = topology.pickFace(ray, usePrecision.getState().path, true);
         if (!hit) {
           s.notify(
             "Щёлкните грань в активном контексте. Для группы сначала войдите двойным щелчком.",
