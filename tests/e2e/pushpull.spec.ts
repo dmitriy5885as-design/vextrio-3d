@@ -238,6 +238,7 @@ for (const grouped of [false, true])
     );
     // Moving and cancellation do not remove the threshold or add a history item.
     await page.keyboard.press("Escape");
+    if (grouped) await expect(page.getByTestId("edit-context")).toBeVisible();
     expect((await save(page)).geometries).toEqual(before.geometries);
     await page.keyboard.press("p");
     await click(page, [1.5, 1, 0.2]);

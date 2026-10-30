@@ -610,7 +610,7 @@ export function Viewport() {
     el.append(marker);
     const previewGeometry = new THREE.BufferGeometry().setAttribute(
         "position",
-        new THREE.Float32BufferAttribute(new Float32Array(15), 3).setUsage(
+        new THREE.Float32BufferAttribute(new Float32Array(129 * 3), 3).setUsage(
           THREE.DynamicDrawUsage,
         ),
       ),
@@ -952,10 +952,14 @@ export function Viewport() {
     };
     const cancelPrecision = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if ((event.target as HTMLElement).matches("input,select,textarea"))
+          return;
+        const activeTool = useEditor.getState().tool;
         const path = usePrecision.getState().path;
-        if (
+        if (activeTool === "extrude") useEditor.getState().setTool("select");
+        else if (
           !sketchController.state.start &&
-          useEditor.getState().tool === "select" &&
+          activeTool === "select" &&
           path.length
         )
           usePrecision
@@ -972,6 +976,13 @@ export function Viewport() {
     renderer.domElement.addEventListener("pointercancel", pointerLeave);
     window.addEventListener("keydown", cancelPrecision);
     const cancelDrawing = () => {
+      // A confirmed command is no longer a preview. Changing window focus
+      // (including a save/download) must not discard its queued geometry.
+      if (
+        usePushPull.getState().committing ||
+        sketchController.state.phase === "Commit"
+      )
+        return;
       usePushPull.getState().cancel();
       if (sketchController.state.tool) sketchController.cancel();
       usePrecision.getState().clear();

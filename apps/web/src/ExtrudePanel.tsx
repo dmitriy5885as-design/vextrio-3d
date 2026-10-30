@@ -42,7 +42,9 @@ export function ExtrudePanel() {
   const previewState = useVolumePreview();
   const pointer = usePushPull(),
     inFlight = useRef(false),
-    commitRef = useRef<() => Promise<void>>(async () => {}),
+    commitRef = useRef<(fromPointer?: boolean) => Promise<void>>(
+      async () => {},
+    ),
     handledCommit = useRef(pointer.commitId);
   useEffect(() => {
     if (pointer.gesture) setText(String(pointer.gesture.distance) + "m");
@@ -167,28 +169,53 @@ export function ExtrudePanel() {
         : null,
     [body, preview, ref?.geometryId, JSON.stringify(ref?.occurrencePath)],
   );
-  const commit = async () => {
+  const commit = async (fromPointer = false) => {
     if (
       !ref ||
       inFlight.current ||
       busy ||
-      pending ||
-      error ||
+      (!fromPointer && (pending || error)) ||
       s.topologySelections.length !== 1 ||
       (occurrences > 1 && !shared)
-    )
+    ) {
+      if (fromPointer && !inFlight.current && !busy)
+        usePushPull.setState({ committing: false });
       return;
+    }
     const ticket = generation.current;
+    const gesture = fromPointer ? usePushPull.getState().gesture : null;
+    if (fromPointer && !gesture) {
+      usePushPull.setState({ committing: false });
+      return;
+    }
     const wasPointer = !!pointer.gesture;
     try {
+      if (
+        gesture &&
+        (gesture.ref.entityId !== ref.entityId ||
+          gesture.ref.geometryId !== ref.geometryId ||
+          JSON.stringify(gesture.ref.occurrencePath) !==
+            JSON.stringify(ref.occurrencePath))
+      )
+        throw Error("Контекст подтверждённой операции изменился.");
       inFlight.current = true;
       if (wasPointer) usePushPull.setState({ committing: true });
       setBusy(true);
       const result = await s.editGeometry(
         ref,
-        intent(),
+        gesture
+          ? {
+              kind: "extrude-face",
+              faceId: ref.entityId,
+              distance: gesture.distance,
+              side: gesture.side,
+            }
+          : intent(),
         () =>
-          ticket === generation.current &&
+          (gesture
+            ? usePushPull.getState().gesture === gesture &&
+              usePushPull.getState().committing
+            : ticket === generation.current) &&
           useEditor.getState().tool === "extrude",
       );
       if (result.status === "rejected") throw Error(result.error);
@@ -215,14 +242,14 @@ export function ExtrudePanel() {
   };
   commitRef.current = commit;
   useEffect(() => {
-    if (pointer.commitId === handledCommit.current || pending) return;
+    if (pointer.commitId === handledCommit.current) return;
     handledCommit.current = pointer.commitId;
-    if (error || !ref || (occurrences > 1 && !shared)) {
+    if (!ref || (occurrences > 1 && !shared)) {
       usePushPull.setState({ committing: false });
       return;
     }
-    void commitRef.current();
-  }, [pointer.commitId, pending, error, ref?.entityId, shared]);
+    void commitRef.current(true);
+  }, [pointer.commitId, ref?.entityId, shared]);
   const limit = useMemo(
     () =>
       ref && p.schemaVersion === 2
@@ -280,7 +307,9 @@ export function ExtrudePanel() {
                   if (e.repeat && e.key === "Enter") e.preventDefault();
                   if (e.key === "Escape") {
                     e.preventDefault();
+                    e.stopPropagation();
                     s.setTool("select");
+                    s.select(null);
                   }
                 }}
               />

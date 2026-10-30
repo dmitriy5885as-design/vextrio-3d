@@ -15,7 +15,7 @@ import {
   type PlaneName,
   type CoordinateSystem,
 } from "@forma/snapping";
-import { subtract, length } from "@forma/geometry";
+import { subtract, length, multiply, dot } from "@forma/geometry";
 import "./sketch.css";
 export function SketchPanel() {
   const editor = useEditor(),
@@ -65,35 +65,67 @@ export function SketchPanel() {
     count = occurrences.filter((o) => o.definitionId === definitionId).length;
   const mode: PrecisionInput["mode"] = coordinates
     ? "coordinates"
-    : state.tool === "line"
+    : state.tool === "line" || state.tool === "circle"
       ? "length"
       : "rectangle";
   const submit = async () => {
     try {
       const frame = precisionFrame(p, precision),
         plane = sketchPlane();
+      if (state.tool === "circle" && /^\d+s$/i.test(text.trim())) {
+        const count = Number(text.trim().slice(0, -1));
+        const accepted = sketchController.setCircleSides(count, plane);
+        if (accepted) {
+          setText("");
+          usePrecision.setState({ editing: false, exact: false, error: "" });
+          input.current?.blur();
+        }
+        return;
+      }
       if (!state.start && mode !== "coordinates")
         throw Error(
           "Сначала задайте начальную точку щелчком или координатами.",
         );
+      let direction =
+        (precision.target ?? state.target)
+          ? subtract(
+              (precision.target ?? state.target)!,
+              state.start ?? precision.anchor,
+            )
+          : ([0, 0, 0] as [number, number, number]);
+      if (state.tool === "circle") {
+        direction = subtract(
+          direction,
+          multiply(plane.normal, dot(direction, plane.normal)),
+        );
+        if (length(direction) <= 1e-7) direction = plane.u;
+      }
       const result = resolvePrecision({
         text,
         mode,
         relative: false,
         unit: p.units,
         anchor: state.start ?? precision.anchor,
-        direction:
-          (precision.target ?? state.target)
-            ? subtract(
-                (precision.target ?? state.target)!,
-                state.start ?? precision.anchor,
-              )
-            : [0, 0, 0],
+        direction,
         matrix: frame.matrix,
         plane,
         system: precision.system,
         axis: precision.axis,
       });
+      if (
+        state.tool === "circle" &&
+        state.start &&
+        length(subtract(result.point, state.start)) <= 1e-7
+      )
+        throw Error("Радиус должен быть больше геометрического допуска.");
+      if (
+        state.tool === "circle" &&
+        state.start &&
+        Math.abs(dot(subtract(result.point, state.start), plane.normal)) > 1e-7
+      )
+        throw Error(
+          "Радиус должен лежать в рабочей плоскости. Снимите фиксацию другой оси.",
+        );
       usePrecision.setState({
         target: result.point,
         rectangle: result.rectangle ?? null,
@@ -127,7 +159,11 @@ export function SketchPanel() {
     >
       <div className="sketch-title">
         <strong>
-          {state.tool === "line" ? "Линия · L" : "Прямоугольник · R"}
+          {state.tool === "line"
+            ? "Линия · L"
+            : state.tool === "circle"
+              ? "Окружность · C"
+              : "Прямоугольник · R"}
         </strong>
         <button
           title="Завершить рисование"
@@ -142,8 +178,12 @@ export function SketchPanel() {
           : state.start
             ? state.tool === "line"
               ? "Укажите конец отрезка"
-              : "Укажите противоположный угол"
-            : "Щёлкните начальную точку"}
+              : state.tool === "circle"
+                ? "Укажите радиус или введите размер"
+                : "Укажите противоположный угол"
+            : state.tool === "circle"
+              ? "Щёлкните центр окружности"
+              : "Щёлкните начальную точку"}
       </p>
       <form
         onSubmit={(e) => {
@@ -156,7 +196,9 @@ export function SketchPanel() {
             {mode === "coordinates"
               ? "X; Y; Z"
               : mode === "length"
-                ? "Длина"
+                ? state.tool === "circle"
+                  ? "Радиус"
+                  : "Длина"
                 : "Ширина; высота"}
           </span>
           <input
@@ -167,7 +209,9 @@ export function SketchPanel() {
               mode === "coordinates"
                 ? "=0;0;0"
                 : mode === "length"
-                  ? "4000 мм"
+                  ? state.tool === "circle"
+                    ? "1000 мм · 48s — сегменты"
+                    : "4000 мм"
                   : "4000 мм;3000 мм"
             }
             aria-invalid={!!error}
@@ -195,6 +239,46 @@ export function SketchPanel() {
           Enter · подтвердить
         </button>
       </form>
+      {state.tool === "circle" && (
+        <label>
+          Сегментов{" "}
+          <select
+            aria-label="Сегменты окружности"
+            value={state.circleSides}
+            disabled={state.phase === "Commit"}
+            onChange={(e) =>
+              sketchController.setCircleSides(
+                Number(e.target.value),
+                sketchPlane(),
+              )
+            }
+          >
+            {[
+              ...new Set([
+                3,
+                4,
+                6,
+                8,
+                12,
+                16,
+                24,
+                32,
+                48,
+                64,
+                96,
+                128,
+                state.circleSides,
+              ]),
+            ]
+              .sort((a, b) => a - b)
+              .map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
       <label className="sketch-toggle">
         <input
           type="checkbox"
@@ -211,8 +295,8 @@ export function SketchPanel() {
       {precision.target && (
         <output data-testid="drawing-target">
           {precision.target.map((n) => formatDimension(n, p.units)).join("; ")}
-          {state.start && state.tool === "line"
-            ? ` · ${formatDimension(length(subtract(precision.target, state.start)), p.units)}`
+          {state.start && (state.tool === "line" || state.tool === "circle")
+            ? ` · ${state.tool === "circle" ? "R " : ""}${formatDimension(length(subtract(precision.target, state.start)), p.units)}`
             : ""}
         </output>
       )}

@@ -1,7 +1,18 @@
 import type { TransformMode } from "@forma/shared";
+import type { SketchTool } from "./controller";
 export * from "./controller";
 export type ToolName =
-  TransformMode | "select" | "line" | "rectangle" | "extrude" | "orbit" | "pan";
+  | TransformMode
+  | "select"
+  | "line"
+  | "rectangle"
+  | "circle"
+  | "extrude"
+  | "orbit"
+  | "pan";
+export function isSketchTool(tool: ToolName): tool is SketchTool {
+  return tool === "line" || tool === "rectangle" || tool === "circle";
+}
 export const shortcuts: Record<string, ToolName> = {
   v: "select",
   m: "translate",
@@ -9,6 +20,7 @@ export const shortcuts: Record<string, ToolName> = {
   o: "orbit",
   h: "pan",
   r: "rectangle",
+  c: "circle",
   l: "line",
   p: "extrude",
   " ": "select",
@@ -21,6 +33,7 @@ export const toolLabels = {
   scale: "Масштаб",
   line: "Линия",
   rectangle: "Прямоугольник",
+  circle: "Окружность",
   extrude: "Вытянуть / вдавить",
   orbit: "Орбита",
   pan: "Панорама",

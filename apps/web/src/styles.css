@@ -299,6 +299,9 @@ hr {
   padding: 12px 8px;
   background: var(--bg);
   flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
 .tool-rail .icon-button {
   width: 37px;

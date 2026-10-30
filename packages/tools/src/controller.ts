@@ -6,9 +6,11 @@ import {
   dot,
   length,
   assertVector,
+  cross,
+  validatePlane,
 } from "@forma/geometry";
 import type { WorkPlane } from "@forma/snapping";
-export type SketchTool = "line" | "rectangle";
+export type SketchTool = "line" | "rectangle" | "circle";
 export type ToolPhase =
   "Idle" | "Hover" | "Start" | "Preview" | "Commit" | "Continue" | "Finish";
 export interface SketchStats {
@@ -26,6 +28,7 @@ export interface ToolState {
   error: string;
   preview: "pending" | "valid" | "invalid" | null;
   stats: SketchStats | null;
+  circleSides: number;
 }
 export type SketchReply =
   | { status: "applied" | "noop" | "preview"; stats?: SketchStats }
@@ -46,6 +49,7 @@ export function sketchSegments(
   target: Vec3,
   plane: WorkPlane,
   tolerance = 1e-7,
+  circleSides = 24,
 ): [Vec3, Vec3][] {
   assertVector(start);
   assertVector(target);
@@ -61,7 +65,33 @@ export function sketchSegments(
     Math.abs(dot(delta, plane.normal)) >
     Math.max(tolerance, length(delta) * 1e-12)
   )
-    throw Error("Угол прямоугольника должен лежать в рабочей плоскости.");
+    throw Error("Точка должна лежать в рабочей плоскости.");
+  if (tool === "circle") {
+    validatePlane(plane);
+    if (!Number.isInteger(circleSides) || circleSides < 3 || circleSides > 128)
+      throw Error("Число сегментов должно быть целым от 3 до 128.");
+    const radius = Math.hypot(u, v);
+    if (radius <= tolerance)
+      throw Error("Радиус должен быть больше геометрического допуска.");
+    const radial = multiply(
+        add(multiply(plane.u, u), multiply(plane.v, v)),
+        1 / radius,
+      ),
+      tangent = cross(plane.normal, radial);
+    const points = Array.from({ length: circleSides }, (_, i) => {
+      const angle = (2 * Math.PI * i) / circleSides;
+      const p = add(
+        start,
+        add(
+          multiply(radial, radius * Math.cos(angle)),
+          multiply(tangent, radius * Math.sin(angle)),
+        ),
+      );
+      assertVector(p);
+      return p;
+    });
+    return points.map((p, i) => [p, points[(i + 1) % points.length]]);
+  }
   if (Math.abs(u) <= tolerance || Math.abs(v) <= tolerance)
     throw Error("Ширина и высота должны быть больше геометрического допуска.");
   const a = add(start, multiply(plane.u, u)),
@@ -84,6 +114,7 @@ export class ToolController {
     error: "",
     preview: null,
     stats: null,
+    circleSides: 24,
   };
   private listeners = new Set<(s: ToolState) => void>();
   private epoch = 0;
@@ -111,6 +142,17 @@ export class ToolController {
   activate(tool: SketchTool | null) {
     this.cancel();
     this.publish({ tool });
+  }
+  setCircleSides(count: number, plane: WorkPlane) {
+    if (this.state.phase === "Commit") return false;
+    if (!Number.isInteger(count) || count < 3 || count > 128) {
+      this.publish({ error: "Число сегментов должно быть целым от 3 до 128." });
+      return false;
+    }
+    this.publish({ circleSides: count, error: "" });
+    if (this.state.tool === "circle" && this.state.start && this.state.target)
+      this.move(this.state.target, plane);
+    return true;
   }
   cancel() {
     this.epoch++;
@@ -152,6 +194,8 @@ export class ToolController {
         this.state.start,
         target,
         plane,
+        1e-7,
+        this.state.circleSides,
       );
       this.publish({
         phase: "Preview",
@@ -233,7 +277,14 @@ export class ToolController {
       tool = this.state.tool;
     let segments: [Vec3, Vec3][];
     try {
-      segments = sketchSegments(tool, this.state.start, target, plane);
+      segments = sketchSegments(
+        tool,
+        this.state.start,
+        target,
+        plane,
+        1e-7,
+        this.state.circleSides,
+      );
     } catch (e) {
       this.publish({
         error: e instanceof Error ? e.message : "Ошибка построения",
@@ -257,7 +308,7 @@ export class ToolController {
         return;
       }
       const finish =
-        tool === "rectangle" ||
+        tool !== "line" ||
         (this.origin && length(subtract(target, this.origin)) <= 1e-7);
       this.publish({
         phase: finish ? "Finish" : "Continue",
