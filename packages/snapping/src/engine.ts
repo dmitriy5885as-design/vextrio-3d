@@ -160,7 +160,9 @@ const priority: Record<SnapKind, number> = {
   axis: 3,
   parallel: 4,
   perpendicular: 4,
-  edge: 5,
+  // A real boundary wins over a nearby grid node promoted onto a world axis.
+  // Otherwise thin walls snap to the grid behind their visible lower edge.
+  edge: 2.25,
   face: 6,
   grid: 7,
   origin: 2,
