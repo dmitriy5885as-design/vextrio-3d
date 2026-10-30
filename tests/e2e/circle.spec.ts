@@ -45,9 +45,9 @@ test("C accepts an exact radius, creates native edges/face, extrudes and roundtr
   const input = page.getByLabel("Размер построения", { exact: true });
   await input.fill("1000mm");
   await input.press("Enter");
-  await expect(page.getByTestId("sketch-panel")).toHaveAttribute(
-    "data-phase",
-    "Finish",
+  await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+    "data-topology-faces",
+    "1",
   );
   const circle = await save(page),
     g = Object.values(circle.geometries)[0] as any;
@@ -145,9 +145,9 @@ test("draws a circular contour on a real wall and pushes a true round opening th
   const input = page.getByLabel("Размер построения", { exact: true });
   await input.fill("4m;0.2m");
   await input.press("Enter");
-  await expect(page.getByTestId("sketch-panel")).toHaveAttribute(
-    "data-phase",
-    "Finish",
+  await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+    "data-topology-faces",
+    "1",
   );
   await page.keyboard.press("p");
   await click(page, [2, 0, 0.1]);
@@ -163,9 +163,9 @@ test("draws a circular contour on a real wall and pushes a true round opening th
   await click(page, [2, 1.5, 0.2]);
   await input.fill("50cm");
   await input.press("Enter");
-  await expect(page.getByTestId("sketch-panel")).toHaveAttribute(
-    "data-phase",
-    "Finish",
+  await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+    "data-topology-faces",
+    "7",
   );
   await page.keyboard.press("p");
   await click(page, [2, 1.5, 0.2]);

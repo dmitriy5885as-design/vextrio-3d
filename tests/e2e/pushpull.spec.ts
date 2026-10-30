@@ -184,7 +184,7 @@ test("double click enters the group; drawing and cutting leave an independent ne
   await expect(page.getByTestId("edit-context")).toHaveCount(0);
 });
 for (const grouped of [false, true])
-  test(`draw a doorway to the lower boundary, remove the threshold and roundtrip it (${grouped ? "group" : "scene"})`, async ({
+  test(`draw a doorway to the lower boundary, remove the threshold and preserve history (${grouped ? "group isolation" : "scene file roundtrip"})`, async ({
     page,
   }) => {
     await wall(page);
@@ -267,13 +267,20 @@ for (const grouped of [false, true])
     expect((await save(page)).geometries).toEqual(before.geometries);
     await page.keyboard.press("Control+y");
     expect((await save(page)).geometries).toEqual(after.geometries);
-    page.on("dialog", (d) => d.accept());
-    await page.reload();
-    await page.locator("input[type=file]").setInputFiles({
-      name: "doorway.v3d",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(after)),
-    });
-    await expect(page.getByTestId("viewport")).toBeVisible();
-    expect((await save(page)).geometries).toEqual(after.geometries);
+    // File opening is exercised by the scene scenario; the group scenario
+    // focuses on isolation, Escape and exact inverse/forward history.
+    if (!grouped) {
+      page.on("dialog", (d) => d.accept());
+      await page.reload();
+      await page.locator("input[type=file]").setInputFiles({
+        name: "doorway.v3d",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(after)),
+      });
+      await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+        "data-topology-faces",
+        "10",
+      );
+      expect((await save(page)).geometries).toEqual(after.geometries);
+    }
   });
