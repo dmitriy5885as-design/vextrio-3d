@@ -33,6 +33,7 @@ import {
 import { contextPlane, metric, inRegion } from "./sketch-common";
 import { segmentIntersections } from "./intersections";
 import { tessellateFace } from "./tessellate";
+import { extrusionStop } from "./through";
 const unit = (p: Vec3) => multiply(p, 1 / length(p));
 export const linear = (v: Vec3, m: AffineTransform): Vec3 => [
   m[0] * v[0] + m[4] * v[1] + m[8] * v[2],
@@ -261,6 +262,18 @@ export function prepareExtrusion(
     );
   const changed = new Set<string>();
   const closed = classifyBody(before, body.id) === "closed-shell";
+  const stop =
+    closed && distance < 0 ? extrusionStop(before, f, side, context) : null;
+  const through =
+    stop &&
+    Math.abs(distance - stop.distance) <= metric(before, context).tolerance
+      ? stop
+      : null;
+  if (stop && distance < stop.distance - metric(before, context).tolerance)
+    throw new GeometryError(
+      "INVALID_TOPOLOGY",
+      `Достигнута противоположная грань: ${-stop.distance} м. Для сквозного проёма укажите эту глубину.`,
+    );
   const orientation =
     body.shellIds
       .flatMap((s) => before.shells[s].faces)
@@ -457,8 +470,28 @@ export function prepareExtrusion(
   target.vertexIds.push(...topVertices.values());
   target.edgeIds.push(...topEdges.values(), ...vertical.values());
   target.faceIds.push(...newFaces);
+  if (through) {
+    const back = m.faces[through.faceId],
+      loop = m.loops[f.outerLoopId];
+    if (dot(f.plane.normal, back.plane.normal) > 0) {
+      loop.coedgeIds.reverse();
+      for (const cid of loop.coedgeIds)
+        m.coedges[cid].direction = m.coedges[cid].direction === 1 ? -1 : 1;
+    }
+    back.innerLoopIds.push(f.outerLoopId);
+    delete m.faces[f.id];
+    target.faceIds = target.faceIds.filter((id) => id !== f.id);
+    shell.faces = shell.faces.filter((u) => u.faceId !== f.id);
+    changed.add(back.id);
+    changed.delete(f.id);
+  }
   validateGeometry(m, context);
   assertFaceContacts(m, changed, context);
+  if (through && classifyBody(m, body.id) !== "closed-shell")
+    throw new GeometryError(
+      "INVALID_TOPOLOGY",
+      "Сквозной вырез не сохранил замкнутую оболочку.",
+    );
   if (body.faceIds.length === 1 && classifyBody(m, body.id) !== "closed-shell")
     throw new GeometryError(
       "INVALID_TOPOLOGY",
@@ -470,5 +503,19 @@ export function prepareExtrusion(
       "INVALID_TOPOLOGY",
       "Операция не изменила геометрию.",
     );
-  return { forward, inverse: invertDelta(forward), lineage: [] };
+  return {
+    forward,
+    inverse: invertDelta(forward),
+    lineage: through
+      ? [
+          {
+            operationId,
+            kind: "face",
+            retiredId: f.id,
+            descendants: [],
+            reason: "delete",
+          },
+        ]
+      : [],
+  };
 }

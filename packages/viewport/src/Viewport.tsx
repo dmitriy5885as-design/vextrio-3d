@@ -1,5 +1,17 @@
 import { TopologyBridge } from "./TopologyBridge";
-import { getLegacyObjects } from "@forma/document";
+import {
+  getLegacyObjects,
+  occurrenceMatrix,
+  geometryContext,
+  definitionAtPath,
+} from "@forma/document";
+import {
+  affinePlane,
+  dot,
+  subtract,
+  extrusionStop,
+  classifyBody,
+} from "@forma/geometry";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -12,6 +24,7 @@ import {
   sketchController,
   sketchPlane,
   useVolumePreview,
+  usePushPull,
 } from "@forma/editor";
 import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
@@ -55,7 +68,7 @@ export function Viewport() {
     controls.maxDistance = 2000;
     controls.mouseButtons = {
       LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.PAN,
+      MIDDLE: THREE.MOUSE.ROTATE,
       RIGHT: THREE.MOUSE.ROTATE,
     };
     const transform = new TransformControls(camera, renderer.domElement);
@@ -89,6 +102,7 @@ export function Viewport() {
       }
       if (wanted) {
         volumeBridge = new TopologyBridge(wanted, state.revision);
+        volumeBridge.editingContext(usePrecision.getState().path);
         scene.add(volumeBridge.root);
       }
       renderedVolumeDocument = wanted;
@@ -347,6 +361,7 @@ export function Viewport() {
       transform.setRotationSnap(s.snap ? Math.PI / 12 : null);
       transform.setScaleSnap(s.snap ? 0.1 : null);
       refreshVolume();
+      topology?.editingContext(usePrecision.getState().path);
       requestRender();
     }
     const saveCamera = () => {
@@ -412,11 +427,75 @@ export function Viewport() {
       downTool = sketchController.state.tool,
       downGeneration = sketchController.generation;
     const pointerDown = (e: PointerEvent) => {
+      inferDrawingPlane(e.clientX, e.clientY);
       down = { x: e.clientX, y: e.clientY };
       downTool = sketchController.state.tool;
       downGeneration = sketchController.generation;
     };
     const pointerUp = (e: PointerEvent) => {
+      if (
+        useEditor.getState().tool === "orbit" ||
+        useEditor.getState().tool === "pan"
+      )
+        return;
+      if (useEditor.getState().tool === "extrude") {
+        if (
+          e.button !== 0 ||
+          dragging ||
+          Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
+        )
+          return;
+        const g = usePushPull.getState().gesture;
+        if (g) {
+          usePushPull.getState().confirm();
+          return;
+        }
+        const s = useEditor.getState(),
+          p = s.project;
+        if (p.schemaVersion !== 2 || !topology) return;
+        const ray = cursorRay(e.clientX, e.clientY),
+          hit = topology.pickFace(ray, usePrecision.getState().path);
+        if (!hit) {
+          s.notify(
+            "Щёлкните грань в активном контексте. Для группы сначала войдите двойным щелчком.",
+          );
+          return;
+        }
+        const model = p.geometries[hit.ref.geometryId],
+          face = model.faces[hit.ref.entityId],
+          plane = affinePlane(
+            face.plane,
+            occurrenceMatrix(p, hit.ref.occurrencePath),
+          ),
+          body = Object.values(model.bodies).find((b) =>
+            b.faceIds.includes(face.id),
+          );
+        const side =
+          body && classifyBody(model, body.id) === "closed-shell"
+            ? (body.shellIds
+                .flatMap((id) => model.shells[id].faces)
+                .find((u) => u.faceId === face.id)?.orientation ?? 1)
+            : dot(subtract(p.camera.position, plane.origin), plane.normal) >= 0
+              ? 1
+              : -1;
+        s.selectEntity(hit.ref);
+        usePushPull.getState().begin({
+          ref: hit.ref,
+          anchor: hit.point,
+          normal: plane.normal.map((n) => n * side) as Vec3,
+          side,
+          revision: s.revision,
+          limit:
+            extrusionStop(
+              model,
+              face,
+              side,
+              geometryContext(p, model.id, true, hit.ref.occurrencePath),
+            )?.distance ?? null,
+          distance: 0,
+        });
+        return;
+      }
       if (useEditor.getState().tool === "extrude" && volumeBridge) return;
       if (downTool !== sketchController.state.tool) return;
       if (sketchController.state.tool) return;
@@ -459,7 +538,15 @@ export function Viewport() {
           useEditor.getState().selectEntity(result.ref, e.shiftKey);
         else if (result && "legacyId" in result)
           useEditor.getState().selectOccurrence(result.legacyId, result.path);
-        else useEditor.getState().selectEntity(null, e.shiftKey);
+        else {
+          useEditor.getState().selectEntity(null, e.shiftKey);
+          const path = usePrecision.getState().path;
+          if (path.length)
+            usePrecision.getState().configure({
+              path: path.slice(0, -1),
+              sharedEditConfirmed: false,
+            });
+        }
         return;
       }
       const hit = ray.intersectObjects(
@@ -470,6 +557,30 @@ export function Viewport() {
     };
     renderer.domElement.addEventListener("pointerdown", pointerDown);
     renderer.domElement.addEventListener("pointerup", pointerUp);
+    const enterGroup = (e: MouseEvent) => {
+      const s = useEditor.getState(),
+        p = s.project;
+      if (s.tool !== "select" || p.schemaVersion !== 2 || !topology) return;
+      const hit = topology.pickFace(cursorRay(e.clientX, e.clientY)),
+        path = usePrecision.getState().path;
+      if (
+        !hit ||
+        hit.ref.occurrencePath.length <= path.length ||
+        !path.every((id, i) => hit.ref.occurrencePath[i] === id)
+      )
+        return;
+      const next = hit.ref.occurrencePath.slice(0, path.length + 1),
+        node = p.nodes[next.at(-1)!];
+      if (isObjectLocked(p, node.id)) return;
+      definitionAtPath(p, next);
+      usePrecision.getState().configure({
+        path: next,
+        sharedEditConfirmed: node.kind === "component",
+      });
+      topology.editingContext(next);
+      s.notify("Редактирование: " + node.name + " · Esc — выйти");
+    };
+    renderer.domElement.addEventListener("dblclick", enterGroup);
     const drawingClick = (e: MouseEvent) => {
       if (
         downTool !== sketchController.state.tool ||
@@ -483,6 +594,7 @@ export function Viewport() {
         Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
       )
         return;
+      inferDrawingPlane(e.clientX, e.clientY);
       updatePrecision(e.clientX, e.clientY);
       void sketchController.click(
         usePrecision.getState().target,
@@ -551,9 +663,14 @@ export function Viewport() {
       preview.visible = !!(enabled && p.target);
       planeGuide.visible = enabled;
       precisionAxes.visible = enabled;
-      controls.mouseButtons.LEFT = enabled
-        ? (null as unknown as THREE.MOUSE)
-        : THREE.MOUSE.ROTATE;
+      controls.mouseButtons.LEFT =
+        useEditor.getState().tool === "extrude"
+          ? (null as unknown as THREE.MOUSE)
+          : useEditor.getState().tool === "pan"
+            ? THREE.MOUSE.PAN
+            : enabled
+              ? (null as unknown as THREE.MOUSE)
+              : THREE.MOUSE.ROTATE;
       transform.enabled = !enabled;
       if (enabled) {
         try {
@@ -703,12 +820,92 @@ export function Viewport() {
         });
       }
     }
+    function cursorRay(x: number, y: number) {
+      const rect = renderer.domElement.getBoundingClientRect(),
+        ray = new THREE.Raycaster();
+      camera.updateMatrixWorld(true);
+      ray.setFromCamera(
+        new THREE.Vector2(
+          ((x - rect.left) / rect.width) * 2 - 1,
+          1 - ((y - rect.top) / rect.height) * 2,
+        ),
+        camera,
+      );
+      return ray;
+    }
+    let inferredPlane: import("@forma/geometry").PlaneFrame | null = null;
+    function inferDrawingPlane(x: number, y: number) {
+      if (
+        !sketchController.state.tool ||
+        sketchController.state.start ||
+        !topology
+      )
+        return;
+      const p = useEditor.getState().project;
+      if (p.schemaVersion !== 2) return;
+      const hit = topology.pickFace(
+        cursorRay(x, y),
+        usePrecision.getState().contextOnly
+          ? usePrecision.getState().path
+          : undefined,
+      );
+      if (!hit) {
+        if (
+          inferredPlane &&
+          usePrecision.getState().planeOverride === inferredPlane
+        ) {
+          inferredPlane = null;
+          usePrecision.getState().configure({ planeOverride: null });
+        }
+        return;
+      }
+      const plane = affinePlane(
+          p.geometries[hit.ref.geometryId].faces[hit.ref.entityId].plane,
+          occurrenceMatrix(p, hit.ref.occurrencePath),
+        ),
+        old = usePrecision.getState().planeOverride;
+      if (!old || JSON.stringify(old) !== JSON.stringify(plane)) {
+        inferredPlane = plane;
+        usePrecision.getState().configure({ planeOverride: plane });
+      }
+    }
     const pointerMove = (event: PointerEvent) => {
       lastCursor = [event.clientX, event.clientY];
       if (!hoverFrame)
         hoverFrame = requestAnimationFrame(() => {
           hoverFrame = 0;
           if (lastCursor) {
+            const gesture = usePushPull.getState().gesture;
+            if (useEditor.getState().tool === "extrude" && gesture) {
+              if (gesture.revision !== useEditor.getState().revision) {
+                usePushPull.getState().cancel();
+                return;
+              }
+              const ray = cursorRay(...lastCursor),
+                n = new THREE.Vector3(...gesture.normal),
+                d = ray.ray.origin
+                  .clone()
+                  .sub(new THREE.Vector3(...gesture.anchor)),
+                c = n.dot(ray.ray.direction),
+                den = 1 - c * c;
+              const value =
+                den > 1e-4
+                  ? (d.dot(n) - d.dot(ray.ray.direction) * c) / den
+                  : (projectPoint(gesture.anchor).y -
+                      (lastCursor[1] -
+                        renderer.domElement.getBoundingClientRect().top)) *
+                    (camera instanceof THREE.PerspectiveCamera
+                      ? (2 *
+                          camera.position.distanceTo(
+                            new THREE.Vector3(...gesture.anchor),
+                          ) *
+                          Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
+                        renderer.domElement.clientHeight
+                      : 20 / camera.zoom / renderer.domElement.clientHeight);
+              usePushPull.getState().move(value);
+              return;
+            }
+            inferDrawingPlane(...lastCursor);
             if (usePrecision.getState().enabled) updatePrecision(...lastCursor);
             else if (useEditor.getState().tool === "select" && topology) {
               const rect = renderer.domElement.getBoundingClientRect(),
@@ -755,6 +952,16 @@ export function Viewport() {
     };
     const cancelPrecision = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        const path = usePrecision.getState().path;
+        if (
+          !sketchController.state.start &&
+          useEditor.getState().tool === "select" &&
+          path.length
+        )
+          usePrecision
+            .getState()
+            .configure({ path: path.slice(0, -1), sharedEditConfirmed: false });
+        usePushPull.getState().cancel();
         sketchController.cancel();
         usePrecision.getState().clear();
         snapEngine?.reset();
@@ -765,6 +972,7 @@ export function Viewport() {
     renderer.domElement.addEventListener("pointercancel", pointerLeave);
     window.addEventListener("keydown", cancelPrecision);
     const cancelDrawing = () => {
+      usePushPull.getState().cancel();
       if (sketchController.state.tool) sketchController.cancel();
       usePrecision.getState().clear();
     };
@@ -779,6 +987,8 @@ export function Viewport() {
     };
     controls.addEventListener("change", refreshPrecision);
     const unsubscribePrecision = usePrecision.subscribe((state, previous) => {
+      topology?.editingContext(state.path);
+      volumeBridge?.editingContext(state.path);
       if (
         state.editing &&
         !previous.editing &&
@@ -945,6 +1155,7 @@ export function Viewport() {
       unsubscribeSketch();
       window.removeEventListener("blur", cancelDrawing);
       renderer.domElement.removeEventListener("click", drawingClick);
+      renderer.domElement.removeEventListener("dblclick", enterGroup);
       cancelAnimationFrame(hoverFrame);
       window.removeEventListener("keydown", cancelPrecision);
       controls.removeEventListener("change", refreshPrecision);

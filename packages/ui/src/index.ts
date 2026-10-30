@@ -21,5 +21,5 @@ export const ru = {
     "Справка",
   ],
   units: { m: "м", cm: "см", mm: "мм" },
-  version: "0.2.0-alpha.1",
+  version: "0.2.0-alpha.2",
 };

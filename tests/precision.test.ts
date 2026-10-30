@@ -38,22 +38,20 @@ it("rejects a pending precise edit after the interaction context changes without
     v = Object.values(g.vertices)[0];
   useEditor.getState().replace(p);
   let active = true;
-  const pending = useEditor
-    .getState()
-    .editGeometry(
-      {
-        definitionId: p.rootDefinitionId,
-        geometryId: g.id,
-        entityId: v.id,
-        kind: "vertex",
-        occurrencePath: [],
-      },
-      {
-        kind: "move-vertices",
-        positions: [{ vertexId: v.id, position: [-1, 0, 0] }],
-      },
-      () => active,
-    );
+  const pending = useEditor.getState().editGeometry(
+    {
+      definitionId: p.rootDefinitionId,
+      geometryId: g.id,
+      entityId: v.id,
+      kind: "vertex",
+      occurrencePath: [],
+    },
+    {
+      kind: "move-vertices",
+      positions: [{ vertexId: v.id, position: [-1, 0, 0] }],
+    },
+    () => active,
+  );
   active = false;
   expect((await pending).status).toBe("rejected");
   expect(useEditor.getState().project).toEqual(p);
@@ -163,6 +161,24 @@ it("previews a physical 4 by 3 metre rectangle on an affine-derived orthonormal 
   expect(() =>
     resolvePrecision({ ...base(), mode: "rectangle", text: "1;-2" }),
   ).toThrow();
+});
+it("keeps typed rectangle dimensions in the cursor quadrant", () => {
+  for (const x of [-1, 1])
+    for (const y of [-1, 1]) {
+      const result = resolvePrecision({
+        ...base(),
+        plane: workPlane("XY"),
+        direction: [x, y, 0],
+        mode: "rectangle",
+        text: "4000mm;3000mm",
+      });
+      const corners = result.rectangle!.corners;
+      expect(corners[2].map((v, i) => v - corners[0][i])).toEqual([
+        4 * x,
+        3 * y,
+        0,
+      ]);
+    }
 });
 it("uses the full nested sheared occurrence matrix for local input and inverse editing", () => {
   const p = componentProject(),

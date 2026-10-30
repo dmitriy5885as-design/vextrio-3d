@@ -8,4 +8,5 @@ export * from "./intersections";
 export * from "./sketch";
 export * from "./tessellate";
 export * from "./volume";
+export * from "./through";
 export * from "./affine";

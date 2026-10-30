@@ -198,6 +198,18 @@ test("native parent visibility and shared-definition locks participate in real e
   ).toBeDisabled();
   await page.keyboard.press("Control+z");
   await clickWorld(page, doc, [-2, 1.5, 0]);
+  await page
+    .getByRole("button", {
+      name: "Войти в группу для редактирования",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", {
+      name: "Войти в группу для редактирования",
+      exact: true,
+    })
+    .click();
   await expect(
     page.getByRole("button", { name: "Удалить грань", exact: true }),
   ).toBeEnabled();
