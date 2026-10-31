@@ -608,6 +608,24 @@ function finishArrangement(
   return { forward, inverse: invertDelta(forward), lineage };
 }
 
+/** Only free wires may change before the shared arrangement. Surface movement
+ * keeps the dedicated fold path; copying/mutating faces is not inferred here. */
+export function canArrangeWireMove(
+  before: GeometryModel,
+  moved: GeometryModel,
+) {
+  for (const table of ["faces", "loops", "coedges"] as const)
+    if (canonical(before[table]) !== canonical(moved[table])) return false;
+  for (const co of Object.values(before.coedges)) {
+    const edge = before.edges[co.edgeId];
+    if (canonical(edge) !== canonical(moved.edges[edge.id])) return false;
+    for (const v of [edge.start, edge.end])
+      if (canonical(before.vertices[v]) !== canonical(moved.vertices[v]))
+        return false;
+  }
+  return true;
+}
+
 /** Canonicalise a moved wire graph against its original arrangement. The
  * original cells prevent a deleted face from being refilled by an unrelated move. */
 export function prepareWireMoveArrangement(
@@ -618,13 +636,13 @@ export function prepareWireMoveArrangement(
 ): PreparedGeometryChange {
   validateGeometry(before, context);
   validateGeometry(moved, context);
-  if (Object.keys(before.faces).length || Object.keys(moved.faces).length)
+  if (!canArrangeWireMove(before, moved))
     throw new GeometryError(
       "UNSUPPORTED_OPERATION",
-      "Wire arrangement requires a surface-free geometry context",
+      "Перемещение свободных линий не должно изменять исходные поверхности.",
     );
   const split = splitSegments(moved, [], context, operationId);
-  regenerateFaces(
+  const replacements = regenerateFaces(
     before,
     before,
     split.model,
@@ -647,7 +665,7 @@ export function prepareWireMoveArrangement(
     before,
     split.model,
     split.lineage,
-    new Map(),
+    replacements,
     vertexAliases,
     operationId,
   );
