@@ -243,6 +243,12 @@ export function Viewport() {
               topology.dispose();
             }
             topology = next;
+            el.dataset.topologyEdges = String(
+              Object.values(s.project.geometries).reduce(
+                (n, g) => n + Object.keys(g.edges).length,
+                0,
+              ),
+            );
             el.dataset.topologyFaces = String(
               Object.values(s.project.geometries).reduce(
                 (n, g) => n + Object.keys(g.faces).length,
@@ -270,6 +276,7 @@ export function Viewport() {
         topology.dispose();
         topology = null;
         delete el.dataset.topologyFaces;
+        delete el.dataset.topologyEdges;
       }
       const objects =
         s.project.schemaVersion === 1 ? getLegacyObjects(s.project) : [];
@@ -845,13 +852,22 @@ export function Viewport() {
         return;
       const p = useEditor.getState().project;
       if (p.schemaVersion !== 2) return;
-      const hit = topology.pickFace(
+      const rect = renderer.domElement.getBoundingClientRect(),
+        threshold =
+          camera instanceof THREE.PerspectiveCamera
+            ? (camera.position.distanceTo(controls.target) *
+                Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                12) /
+              rect.height
+            : (((ortho.top - ortho.bottom) / camera.zoom) * 6) / rect.height;
+      const faceRef = topology.drawingFace(
         cursorRay(x, y),
+        threshold,
         usePrecision.getState().contextOnly
           ? usePrecision.getState().path
           : undefined,
       );
-      if (!hit) {
+      if (!faceRef) {
         if (
           inferredPlane &&
           usePrecision.getState().planeOverride === inferredPlane
@@ -862,8 +878,8 @@ export function Viewport() {
         return;
       }
       const plane = affinePlane(
-          p.geometries[hit.ref.geometryId].faces[hit.ref.entityId].plane,
-          occurrenceMatrix(p, hit.ref.occurrencePath),
+          p.geometries[faceRef.geometryId].faces[faceRef.entityId].plane,
+          occurrenceMatrix(p, faceRef.occurrencePath),
         ),
         old = usePrecision.getState().planeOverride;
       if (!old || JSON.stringify(old) !== JSON.stringify(plane)) {

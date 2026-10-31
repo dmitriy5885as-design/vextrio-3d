@@ -8,9 +8,11 @@ import {
   assertVector,
   cross,
   validatePlane,
+  arcChordFrame,
+  arcProfile,
 } from "@forma/geometry";
 import type { WorkPlane } from "@forma/snapping";
-export type SketchTool = "line" | "rectangle" | "circle";
+export type SketchTool = "line" | "rectangle" | "circle" | "arc";
 export type ToolPhase =
   "Idle" | "Hover" | "Start" | "Preview" | "Commit" | "Continue" | "Finish";
 export interface SketchStats {
@@ -29,6 +31,8 @@ export interface ToolState {
   preview: "pending" | "valid" | "invalid" | null;
   stats: SketchStats | null;
   circleSides: number;
+  arcSides: number;
+  arcEnd: Vec3 | null;
 }
 export type SketchReply =
   | { status: "applied" | "noop" | "preview"; stats?: SketchStats }
@@ -44,7 +48,7 @@ export interface ToolHost {
   ) => Promise<SketchReply>;
 }
 export function sketchSegments(
-  tool: SketchTool,
+  tool: Exclude<SketchTool, "arc">,
   start: Vec3,
   target: Vec3,
   plane: WorkPlane,
@@ -115,6 +119,8 @@ export class ToolController {
     preview: null,
     stats: null,
     circleSides: 24,
+    arcSides: 12,
+    arcEnd: null,
   };
   private listeners = new Set<(s: ToolState) => void>();
   private epoch = 0;
@@ -154,6 +160,33 @@ export class ToolController {
       this.move(this.state.target, plane);
     return true;
   }
+  setArcSides(count: number, plane: WorkPlane) {
+    if (this.state.phase === "Commit") return false;
+    if (!Number.isInteger(count) || count < 2 || count > 128) {
+      this.publish({
+        error: "Число сегментов дуги должно быть целым от 2 до 128.",
+      });
+      return false;
+    }
+    this.publish({ arcSides: count, error: "" });
+    if (
+      this.state.tool === "arc" &&
+      this.state.start &&
+      this.state.arcEnd &&
+      this.state.target
+    )
+      this.move(this.state.target, plane);
+    return true;
+  }
+  private buildSegments(target: Vec3, plane: WorkPlane): [Vec3, Vec3][] {
+    const { tool, start, arcEnd, arcSides, circleSides } = this.state;
+    if (!tool || !start) throw Error("Задайте начальную точку.");
+    if (tool === "arc") {
+      if (!arcEnd) throw Error("Сначала задайте второй конец дуги.");
+      return arcProfile(start, arcEnd, target, plane, arcSides).segments;
+    }
+    return sketchSegments(tool, start, target, plane, 1e-7, circleSides);
+  }
   cancel() {
     this.epoch++;
     this.sequence++;
@@ -163,6 +196,7 @@ export class ToolController {
     this.publish({
       phase: "Idle",
       start: null,
+      arcEnd: null,
       target: null,
       segments: [],
       preview: null,
@@ -189,14 +223,19 @@ export class ToolController {
       return;
     }
     try {
-      const segments = sketchSegments(
-        this.state.tool,
-        this.state.start,
-        target,
-        plane,
-        1e-7,
-        this.state.circleSides,
-      );
+      if (this.state.tool === "arc" && !this.state.arcEnd) {
+        arcChordFrame(this.state.start, target, plane);
+        this.publish({
+          phase: "Preview",
+          target: [...target],
+          segments: [[[...this.state.start], [...target]]],
+          error: "",
+          preview: null,
+          stats: null,
+        });
+        return;
+      }
+      const segments = this.buildSegments(target, plane);
       this.publish({
         phase: "Preview",
         target: [...target],
@@ -257,12 +296,21 @@ export class ToolController {
       });
       return;
     }
+    try {
+      assertVector(target);
+    } catch (e) {
+      this.publish({
+        error: e instanceof Error ? e.message : "Недопустимая точка.",
+      });
+      return;
+    }
     if (!this.state.start) {
       this.epoch++;
       this.origin = [...target];
       this.publish({
         phase: "Start",
         start: [...target],
+        arcEnd: null,
         target: null,
         segments: [],
         preview: null,
@@ -277,14 +325,20 @@ export class ToolController {
       tool = this.state.tool;
     let segments: [Vec3, Vec3][];
     try {
-      segments = sketchSegments(
-        tool,
-        this.state.start,
-        target,
-        plane,
-        1e-7,
-        this.state.circleSides,
-      );
+      if (tool === "arc" && !this.state.arcEnd) {
+        arcChordFrame(this.state.start, target, plane);
+        this.publish({
+          phase: "Start",
+          arcEnd: [...target],
+          target: null,
+          segments: [],
+          preview: null,
+          stats: null,
+          error: "",
+        });
+        return;
+      }
+      segments = this.buildSegments(target, plane);
     } catch (e) {
       this.publish({
         error: e instanceof Error ? e.message : "Ошибка построения",
@@ -313,6 +367,7 @@ export class ToolController {
       this.publish({
         phase: finish ? "Finish" : "Continue",
         start: finish ? null : [...target],
+        arcEnd: null,
         target: null,
         segments: [],
         error: "",

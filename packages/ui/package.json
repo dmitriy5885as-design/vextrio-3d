@@ -1,6 +1,6 @@
 {
   "exports": "./src/index.ts",
-  "version": "0.2.0-alpha.4",
+  "version": "0.2.0-alpha.5",
   "name": "@forma/ui",
   "private": true,
   "type": "module"

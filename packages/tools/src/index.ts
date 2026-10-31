@@ -7,11 +7,17 @@ export type ToolName =
   | "line"
   | "rectangle"
   | "circle"
+  | "arc"
   | "extrude"
   | "orbit"
   | "pan";
 export function isSketchTool(tool: ToolName): tool is SketchTool {
-  return tool === "line" || tool === "rectangle" || tool === "circle";
+  return (
+    tool === "line" ||
+    tool === "rectangle" ||
+    tool === "circle" ||
+    tool === "arc"
+  );
 }
 export const shortcuts: Record<string, ToolName> = {
   v: "select",
@@ -21,6 +27,7 @@ export const shortcuts: Record<string, ToolName> = {
   h: "pan",
   r: "rectangle",
   c: "circle",
+  a: "arc",
   l: "line",
   p: "extrude",
   " ": "select",
@@ -34,6 +41,7 @@ export const toolLabels = {
   line: "Линия",
   rectangle: "Прямоугольник",
   circle: "Окружность",
+  arc: "Дуга",
   extrude: "Вытянуть / вдавить",
   orbit: "Орбита",
   pan: "Панорама",

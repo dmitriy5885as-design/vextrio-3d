@@ -185,6 +185,13 @@ export function splitSegments(
           "Canonical intersection leaves its source segment",
         );
     }
+    // Intersection arithmetic may produce 0.9999999999999998 for the exact
+    // canonical endpoint. Preserve full-edge identity using welded vertex IDs,
+    // not a relaxed parameter epsilon (which could swallow a real split).
+    for (const cut of s.cuts) {
+      if (cut.vertex === s.a) cut.t = 0;
+      else if (cut.vertex === s.b) cut.t = 1;
+    }
     s.cuts.sort((a, b) => a.t - b.t || a.vertex.localeCompare(b.vertex));
     const cuts = s.cuts.filter(
       (c, i, a) => i === 0 || c.vertex !== a[i - 1].vertex,
