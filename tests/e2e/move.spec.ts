@@ -173,7 +173,7 @@ test("M mouse preview, axis lock and immediate Ctrl S commit the actual geometry
   ).toBeCloseTo(5, 5);
   expect(Object.keys(g.vertices)).toHaveLength(4);
 });
-test("invalid nonplanar M, Escape, blur and held pointer never change the document", async ({
+test("invalid numeric M, Escape, blur and held pointer never change the document", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -186,7 +186,7 @@ test("invalid nonplanar M, Escape, blur and held pointer never change the docume
     .getByLabel("Режим перемещения", { exact: true })
     .selectOption("coordinates");
   const input = page.getByLabel("Размер перемещения", { exact: true });
-  await input.fill("0;1m;0");
+  await input.fill("0;abc;0");
   await input.press("Enter");
   await expect(page.getByTestId("move-panel").getByRole("alert")).toBeVisible();
   expect((await save(page)).geometries).toEqual(before.geometries);
