@@ -31,7 +31,11 @@ import { assertFaceContacts } from "./volume";
 
 import { foldMovedFaces } from "./fold";
 import type { LineageEntry } from "./transactions";
-import { prepareWireMoveArrangement, rebuildBodies } from "./sketch";
+import {
+  canArrangeWireMove,
+  prepareWireMoveArrangement,
+  rebuildBodies,
+} from "./sketch";
 
 export interface MoveEntity {
   kind: "vertex" | "edge" | "face";
@@ -318,8 +322,8 @@ function finish(
   return { forward, inverse: invertDelta(forward), lineage };
 }
 
-/** Reuse Sketch arrangement for wire-only models. Existing surfaces retain
- * the conservative Move contact checks until surface surgery is implemented. */
+/** Reuse Sketch arrangement when only free wires move. Existing surfaces
+ * may be subdivided by contacts but their source geometry is stationary. */
 function finishWireMove(
   before: GeometryModel,
   after: GeometryModel,
@@ -327,7 +331,7 @@ function finishWireMove(
   context: ValidationContext,
   operationId: Id<"operation">,
 ) {
-  if (Object.keys(before.faces).length || !changed.size)
+  if (!canArrangeWireMove(before, after) || !changed.size)
     return finish(before, after, changed, context);
   const arranged = prepareWireMoveArrangement(
     before,
@@ -377,7 +381,7 @@ export function prepareVertexMove(
     after.vertices[m.vertexId].position = [...m.position];
   }
 
-  if (!Object.keys(model.faces).length)
+  if (canArrangeWireMove(model, after))
     return finishWireMove(model, after, changed, context, operationId);
   const lineage = foldMovedFaces(model, after, changed, context, operationId);
   return finish(model, after, changed, context, lineage);

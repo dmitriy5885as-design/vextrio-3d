@@ -1,6 +1,6 @@
 {
   "exports": "./src/index.ts",
-  "version": "0.2.0-alpha.11",
+  "version": "0.2.0-alpha.12",
   "name": "@forma/geometry",
   "private": true,
   "type": "module",
