@@ -440,8 +440,25 @@ export function prepareSketch(
   );
   rebuildBodies(model, before, split.allocate, vertexAliases);
   validateGeometry(model, context);
+  return finishArrangement(
+    before,
+    model,
+    split.lineage,
+    replacements,
+    vertexAliases,
+    operationId,
+  );
+}
+function finishArrangement(
+  before: GeometryModel,
+  model: GeometryModel,
+  rawLineage: LineageEntry[],
+  replacements: Map<string, Id<"face">[]>,
+  vertexAliases: Map<string, string>,
+  operationId: Id<"operation">,
+): PreparedGeometryChange {
   const forward = diffGeometry(before, model),
-    lineage: LineageEntry[] = split.lineage.filter((e) =>
+    lineage: LineageEntry[] = rawLineage.filter((e) =>
       forward[
         (
           {
@@ -589,4 +606,49 @@ export function prepareSketch(
     )
       entry.reason = "merge";
   return { forward, inverse: invertDelta(forward), lineage };
+}
+
+/** Canonicalise a moved wire graph against its original arrangement. The
+ * original cells prevent a deleted face from being refilled by an unrelated move. */
+export function prepareWireMoveArrangement(
+  before: GeometryModel,
+  moved: GeometryModel,
+  context: ValidationContext,
+  operationId: Id<"operation">,
+): PreparedGeometryChange {
+  validateGeometry(before, context);
+  validateGeometry(moved, context);
+  if (Object.keys(before.faces).length || Object.keys(moved.faces).length)
+    throw new GeometryError(
+      "UNSUPPORTED_OPERATION",
+      "Wire arrangement requires a surface-free geometry context",
+    );
+  const split = splitSegments(moved, [], context, operationId);
+  regenerateFaces(
+    before,
+    before,
+    split.model,
+    context,
+    split.allocate,
+    split.tolerance,
+    split.world,
+    split.local,
+    null,
+    null,
+  );
+  const vertexAliases = new Map(
+    split.lineage
+      .filter((l) => l.kind === "vertex" && l.descendants.length === 1)
+      .map((l) => [l.retiredId, l.descendants[0].id]),
+  );
+  rebuildBodies(split.model, before, split.allocate, vertexAliases);
+  validateGeometry(split.model, context);
+  return finishArrangement(
+    before,
+    split.model,
+    split.lineage,
+    new Map(),
+    vertexAliases,
+    operationId,
+  );
 }

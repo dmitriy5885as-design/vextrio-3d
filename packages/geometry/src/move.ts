@@ -23,7 +23,7 @@ import { metric, unit, contextPlane, inRegion } from "./sketch-common";
 
 import { validateGeometry, type ValidationContext } from "./validate";
 
-import { diffGeometry, invertDelta } from "./transactions";
+import { applyDelta, diffGeometry, invertDelta } from "./transactions";
 
 import { segmentIntersections } from "./intersections";
 
@@ -31,7 +31,7 @@ import { assertFaceContacts } from "./volume";
 
 import { foldMovedFaces } from "./fold";
 import type { LineageEntry } from "./transactions";
-import { rebuildBodies } from "./sketch";
+import { prepareWireMoveArrangement, rebuildBodies } from "./sketch";
 
 export interface MoveEntity {
   kind: "vertex" | "edge" | "face";
@@ -318,6 +318,29 @@ function finish(
   return { forward, inverse: invertDelta(forward), lineage };
 }
 
+/** Reuse Sketch arrangement for wire-only models. Existing surfaces retain
+ * the conservative Move contact checks until surface surgery is implemented. */
+function finishWireMove(
+  before: GeometryModel,
+  after: GeometryModel,
+  changed: Set<string>,
+  context: ValidationContext,
+  operationId: Id<"operation">,
+) {
+  if (Object.keys(before.faces).length || !changed.size)
+    return finish(before, after, changed, context);
+  const arranged = prepareWireMoveArrangement(
+    before,
+    after,
+    context,
+    operationId,
+  );
+  const joined = applyDelta(before, arranged.forward, context);
+  for (const v of Object.keys(joined.vertices))
+    if (!before.vertices[v]) changed.add(v);
+  return finish(before, joined, changed, context, arranged.lineage);
+}
+
 export function prepareVertexMove(
   model: GeometryModel,
   positions: { vertexId: Id<"vertex">; position: Vec3 }[],
@@ -354,6 +377,8 @@ export function prepareVertexMove(
     after.vertices[m.vertexId].position = [...m.position];
   }
 
+  if (!Object.keys(model.faces).length)
+    return finishWireMove(model, after, changed, context, operationId);
   const lineage = foldMovedFaces(model, after, changed, context, operationId);
   return finish(model, after, changed, context, lineage);
 }
@@ -469,5 +494,11 @@ export function prepareEntityTranslation(
 
   rebuildBodies(after, model, allocate, new Map());
 
-  return finish(model, after, new Set(vm.values()), context);
+  return finishWireMove(
+    model,
+    after,
+    new Set(vm.values()),
+    context,
+    operationId,
+  );
 }
