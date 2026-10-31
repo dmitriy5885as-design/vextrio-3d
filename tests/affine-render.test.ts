@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import * as THREE from "three";
 import {
   validateProject,
+  emptyProjectV2,
   occurrenceMatrix,
   type ProjectV2,
 } from "@forma/document";
@@ -233,4 +234,61 @@ it("boundary plane inference excludes hidden parents and other occurrence contex
   expect(visible.drawingFace(ray, 0.01, path)?.occurrencePath).toEqual(path);
   expect(visible.drawingFace(ray, 0.01, ["instance/two"])).toBeNull();
   visible.dispose();
+});
+
+it("thin offset faces remain selectable while exact edges and vertices keep their identity", async () => {
+  useEditor.getState().replace(emptyProjectV2());
+  await useEditor.getState().drawSegments(
+    [],
+    [
+      [
+        [0, 0, 0],
+        [4, 0, 0],
+      ],
+      [
+        [4, 0, 0],
+        [4, 3, 0],
+      ],
+      [
+        [4, 3, 0],
+        [0, 3, 0],
+      ],
+      [
+        [0, 3, 0],
+        [0, 0, 0],
+      ],
+    ],
+  );
+  let p = useEditor.getState().project as ProjectV2,
+    g = Object.values(p.geometries)[0],
+    f = Object.values(g.faces)[0];
+  await useEditor
+    .getState()
+    .editGeometry(
+      {
+        definitionId: g.ownerDefinitionId,
+        geometryId: g.id,
+        kind: "face",
+        entityId: f.id,
+        occurrencePath: [],
+      },
+      { kind: "offset-face", faceId: f.id, distance: 0.2 },
+    );
+  p = useEditor.getState().project as ProjectV2;
+  g = p.geometries[g.id];
+  const ring = Object.values(g.faces).find((f) => f.innerLoopIds.length === 1)!,
+    bridge = new TopologyBridge(p, useEditor.getState().revision),
+    ray = new THREE.Raycaster(
+      new THREE.Vector3(0.1, 1.5, 10),
+      new THREE.Vector3(0, 0, -1),
+    );
+  const face = bridge.pick(ray, 0.15);
+  expect(face && "ref" in face && face.ref.entityId).toBe(ring.id);
+  ray.set(new THREE.Vector3(0, 1.5, 10), new THREE.Vector3(0, 0, -1));
+  const edge = bridge.pick(ray, 0.15);
+  expect(edge && "ref" in edge && edge.ref.kind).toBe("edge");
+  ray.set(new THREE.Vector3(0, 0, 10), new THREE.Vector3(0, 0, -1));
+  const vertex = bridge.pick(ray, 0.15);
+  expect(vertex && "ref" in vertex && vertex.ref.kind).toBe("vertex");
+  bridge.dispose();
 });

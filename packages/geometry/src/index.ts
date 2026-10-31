@@ -12,3 +12,5 @@ export * from "./through";
 export * from "./affine";
 
 export * from "./arc";
+
+export * from "./offset";
