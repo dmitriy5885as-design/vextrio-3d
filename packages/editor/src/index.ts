@@ -8,10 +8,12 @@ import {
   type ToolName,
 } from "@forma/tools";
 import { usePushPull } from "./pushpull";
+import { useOffset } from "./offset";
 import { usePrecision, precisionFrame } from "./precision";
 export * from "./precision";
 export * from "./volume-preview";
 export * from "./pushpull";
+export * from "./offset";
 export { GeometryDocumentCommand } from "./geometry-command";
 import {
   clone,
@@ -84,15 +86,17 @@ function trackGeometryCommit<T>(
 // Persistence waits for already confirmed commands, never for mouse previews.
 // Push/Pull can schedule its commit in a React effect after the pointer event.
 export async function awaitGeometryCommits() {
-  if (usePushPull.getState().committing)
+  for (const store of [usePushPull, useOffset]) {
+    if (!store.getState().committing) continue;
     await new Promise<void>((resolve) => {
-      const unsubscribe = usePushPull.subscribe((s) => {
+      const unsubscribe = store.subscribe((s) => {
         if (!s.committing) {
           unsubscribe();
           resolve();
         }
       });
     });
+  }
   while (geometryCommits.size) await Promise.allSettled([...geometryCommits]);
 }
 export type ObjectPatch = Partial<
@@ -255,6 +259,7 @@ export const useEditor = create<EditorState>((set, get) => {
   };
   const pendingGeometry = new Set<GeometrySession>();
   const cancelGeometry = () => {
+    useOffset.getState().cancel();
     for (const session of pendingGeometry) session.cancelAll();
     pendingGeometry.clear();
   };
@@ -882,9 +887,14 @@ export const useEditor = create<EditorState>((set, get) => {
       }
     },
     setTool: (tool) => {
-      if (isSketchTool(tool) && get().project.schemaVersion !== 2) {
+      if (
+        (isSketchTool(tool) || tool === "offset") &&
+        get().project.schemaVersion !== 2
+      ) {
         reject(
-          Error("Для рисования преобразуйте проект в v2 через меню значка программы."),
+          Error(
+            "Для рисования преобразуйте проект в v2 через меню значка программы.",
+          ),
         );
         return;
       }
@@ -961,10 +971,15 @@ usePrecision.subscribe((s, previous) => {
     s.planeName !== previous.planeName ||
     s.planeOverride !== previous.planeOverride ||
     (!s.enabled && previous.enabled)
-  )
+  ) {
     sketchController.cancel();
+    useOffset.getState().cancel();
+  }
 });
 useEditor.subscribe((s, previous) => {
+  const offset = useOffset.getState().gesture;
+  if (offset && (s.tool !== "offset" || s.revision !== offset.revision))
+    useOffset.getState().cancel();
   const gesture = usePushPull.getState().gesture;
   if (gesture && (s.tool !== "extrude" || s.revision !== gesture.revision))
     usePushPull.getState().cancel();

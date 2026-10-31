@@ -24,7 +24,9 @@ import {
 } from "./transactions";
 import { prepareSketch } from "./sketch";
 import { prepareExtrusion } from "./volume";
+import { prepareFaceOffset } from "./offset";
 export type GeometryIntent =
+  | { kind: "offset-face"; faceId: string; distance: number }
   | { kind: "extrude-face"; faceId: string; distance: number; side: 1 | -1 }
   | {
       kind: "move-vertices";
@@ -120,6 +122,18 @@ export function createLocalGeometryBackend(
       };
       try {
         validateGeometry(model, { ...context, policy: request.policy });
+        if (intent.kind === "offset-face") {
+          const change = prepareFaceOffset(
+            model,
+            intent.faceId,
+            intent.distance,
+            { ...context, policy: request.policy },
+            reply.operationId,
+          );
+          return entityTables.every((t) => change.forward[t].length === 0)
+            ? { ...reply, status: "noop" }
+            : { ...reply, status: "proposed", change };
+        }
         if (intent.kind === "extrude-face") {
           const change = prepareExtrusion(
             model,

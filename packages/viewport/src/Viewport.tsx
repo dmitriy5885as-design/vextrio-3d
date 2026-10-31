@@ -10,6 +10,7 @@ import {
   dot,
   subtract,
   extrusionStop,
+  offsetReference,
   classifyBody,
 } from "@forma/geometry";
 import { useEffect, useRef } from "react";
@@ -25,6 +26,8 @@ import {
   sketchPlane,
   useVolumePreview,
   usePushPull,
+  useOffset,
+  isGeometryLocked,
 } from "@forma/editor";
 import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
@@ -87,7 +90,8 @@ export function Viewport() {
         state = useEditor.getState(),
         wanted =
           preview.document &&
-          state.tool === "extrude" &&
+          preview.owner === state.tool &&
+          (state.tool === "extrude" || state.tool === "offset") &&
           preview.revision === state.revision
             ? preview.document
             : null;
@@ -432,11 +436,15 @@ export function Viewport() {
     });
     let down = { x: 0, y: 0 },
       downTool = sketchController.state.tool,
+      downEditorTool = useEditor.getState().tool,
+      downOffsetGeneration = useOffset.getState().generation,
       downGeneration = sketchController.generation;
     const pointerDown = (e: PointerEvent) => {
       inferDrawingPlane(e.clientX, e.clientY);
       down = { x: e.clientX, y: e.clientY };
       downTool = sketchController.state.tool;
+      downEditorTool = useEditor.getState().tool;
+      downOffsetGeneration = useOffset.getState().generation;
       downGeneration = sketchController.generation;
     };
     const pointerUp = (e: PointerEvent) => {
@@ -445,6 +453,85 @@ export function Viewport() {
         useEditor.getState().tool === "pan"
       )
         return;
+      if (useEditor.getState().tool === "offset") {
+        if (
+          downEditorTool !== "offset" ||
+          downGeneration !== sketchController.generation ||
+          downOffsetGeneration !== useOffset.getState().generation
+        )
+          return;
+        if (
+          e.button !== 0 ||
+          dragging ||
+          Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
+        )
+          return;
+        const operation = useOffset.getState();
+        if (operation.gesture) {
+          operation.confirm();
+          return;
+        }
+        const state = useEditor.getState(),
+          p = state.project;
+        if (p.schemaVersion !== 2 || !topology) return;
+        const rect = renderer.domElement.getBoundingClientRect(),
+          threshold =
+            camera instanceof THREE.PerspectiveCamera
+              ? (camera.position.distanceTo(controls.target) *
+                  Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                  12) /
+                rect.height
+              : (((ortho.top - ortho.bottom) / camera.zoom) * 6) / rect.height,
+          ray = cursorRay(e.clientX, e.clientY),
+          ref = topology.drawingFace(
+            ray,
+            threshold,
+            usePrecision.getState().path,
+            true,
+          );
+        if (!ref) {
+          state.notify(
+            "Выберите грань в активном контексте. В группу войдите двойным щелчком.",
+          );
+          return;
+        }
+        try {
+          if (isGeometryLocked(p, ref))
+            throw Error("Геометрический контекст заблокирован.");
+          const plane = affinePlane(
+              p.geometries[ref.geometryId].faces[ref.entityId].plane,
+              occurrenceMatrix(p, ref.occurrencePath),
+            ),
+            point = ray.ray.intersectPlane(
+              new THREE.Plane().setFromNormalAndCoplanarPoint(
+                new THREE.Vector3(...plane.normal),
+                new THREE.Vector3(...plane.origin),
+              ),
+              new THREE.Vector3(),
+            );
+          if (!point) throw Error("Рабочая плоскость параллельна лучу камеры.");
+          const reference = offsetReference(
+            p.geometries[ref.geometryId],
+            ref.entityId,
+            point.toArray() as Vec3,
+            geometryContext(p, ref.geometryId, true, ref.occurrencePath),
+          );
+          state.selectEntity(ref);
+          operation.begin({
+            ref,
+            ...reference,
+            revision: state.revision,
+            distance: 0,
+          });
+        } catch (error) {
+          state.notify(
+            error instanceof Error
+              ? error.message
+              : "Не удалось начать Offset.",
+          );
+        }
+        return;
+      }
       if (useEditor.getState().tool === "extrude") {
         if (
           e.button !== 0 ||
@@ -672,15 +759,16 @@ export function Viewport() {
       preview.visible = !!(enabled && p.target);
       planeGuide.visible = enabled;
       precisionAxes.visible = enabled;
-      controls.mouseButtons.LEFT =
-        useEditor.getState().tool === "extrude"
-          ? (null as unknown as THREE.MOUSE)
-          : useEditor.getState().tool === "pan"
-            ? THREE.MOUSE.PAN
-            : enabled
-              ? (null as unknown as THREE.MOUSE)
-              : THREE.MOUSE.ROTATE;
-      transform.enabled = !enabled;
+      controls.mouseButtons.LEFT = ["extrude", "offset"].includes(
+        useEditor.getState().tool,
+      )
+        ? (null as unknown as THREE.MOUSE)
+        : useEditor.getState().tool === "pan"
+          ? THREE.MOUSE.PAN
+          : enabled
+            ? (null as unknown as THREE.MOUSE)
+            : THREE.MOUSE.ROTATE;
+      transform.enabled = !enabled && useEditor.getState().tool !== "offset";
       if (enabled) {
         try {
           const { matrix } = precisionFrame(document, p),
@@ -893,6 +981,27 @@ export function Viewport() {
         hoverFrame = requestAnimationFrame(() => {
           hoverFrame = 0;
           if (lastCursor) {
+            const offset = useOffset.getState().gesture;
+            if (useEditor.getState().tool === "offset" && offset) {
+              const ray = cursorRay(...lastCursor),
+                point = ray.ray.intersectPlane(
+                  new THREE.Plane().setFromNormalAndCoplanarPoint(
+                    new THREE.Vector3(...offset.plane.normal),
+                    new THREE.Vector3(...offset.plane.origin),
+                  ),
+                  new THREE.Vector3(),
+                );
+              if (point)
+                useOffset
+                  .getState()
+                  .move(
+                    dot(
+                      subtract(point.toArray() as Vec3, offset.anchor),
+                      offset.inward,
+                    ),
+                  );
+              return;
+            }
             const gesture = usePushPull.getState().gesture;
             if (useEditor.getState().tool === "extrude" && gesture) {
               if (gesture.revision !== useEditor.getState().revision) {
@@ -974,7 +1083,8 @@ export function Viewport() {
           return;
         const activeTool = useEditor.getState().tool;
         const path = usePrecision.getState().path;
-        if (activeTool === "extrude") useEditor.getState().setTool("select");
+        if (activeTool === "extrude" || activeTool === "offset")
+          useEditor.getState().setTool("select");
         else if (
           !sketchController.state.start &&
           activeTool === "select" &&
@@ -984,6 +1094,7 @@ export function Viewport() {
             .getState()
             .configure({ path: path.slice(0, -1), sharedEditConfirmed: false });
         usePushPull.getState().cancel();
+        useOffset.getState().cancel();
         sketchController.cancel();
         usePrecision.getState().clear();
         snapEngine?.reset();
@@ -998,10 +1109,14 @@ export function Viewport() {
       // (including a save/download) must not discard its queued geometry.
       if (
         usePushPull.getState().committing ||
+        useOffset.getState().committing ||
         sketchController.state.phase === "Commit"
       )
         return;
       usePushPull.getState().cancel();
+      useOffset.getState().cancel();
+      if (useEditor.getState().tool === "offset")
+        useEditor.getState().selectEntity(null);
       if (sketchController.state.tool) sketchController.cancel();
       usePrecision.getState().clear();
     };

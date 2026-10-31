@@ -126,6 +126,7 @@ export function ExtrudePanel() {
         useVolumePreview.setState({
           document: candidate as ProjectV2,
           revision: s.revision,
+          owner: "extrude",
         });
       } catch (e) {
         if (ticket === generation.current)

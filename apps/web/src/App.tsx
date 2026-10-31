@@ -3,6 +3,7 @@ import { EditContext } from "./EditContext";
 import { useRecovery } from "./useRecovery";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
+import { OffsetPanel } from "./OffsetPanel";
 import { ExtrudePanel } from "./ExtrudePanel";
 import {
   getLegacyObjects,
@@ -19,6 +20,7 @@ import {
   CircleHelp,
   Circle,
   Spline,
+  ScanLine,
   Cylinder,
   Eye,
   EyeOff,
@@ -284,7 +286,10 @@ export function App() {
         s.select(null);
         setMenu(null);
       }
-      if (key === "f") s.view("focus");
+      if (key === "f" && e.shiftKey) {
+        s.view("focus");
+        return;
+      }
       if (e.shiftKey && key === "z") {
         e.preventDefault();
         s.view("reset");
@@ -391,7 +396,7 @@ export function App() {
       {
         label: "Фокус на выделении",
         action: () => s.view("focus"),
-        shortcut: "F",
+        shortcut: "Shift F",
       },
       { label: "Сбросить камеру", action: () => s.view("reset") },
     ],
@@ -415,6 +420,11 @@ export function App() {
       },
       { label: "Окружность", action: () => s.setTool("circle"), shortcut: "C" },
       { label: "Дуга", action: () => s.setTool("arc"), shortcut: "A" },
+      {
+        label: "Отступ контура",
+        action: () => s.setTool("offset"),
+        shortcut: "F",
+      },
       { label: "Масштаб", action: () => s.setTool("scale"), shortcut: "S" },
       {
         label: "Вытянуть / вдавить",
@@ -607,6 +617,7 @@ export function App() {
                 { tool: "rectangle", icon: <Square size={20} />, key: "R" },
                 { tool: "circle", icon: <Circle size={20} />, key: "C" },
                 { tool: "arc", icon: <Spline size={20} />, key: "A" },
+                { tool: "offset", icon: <ScanLine size={20} />, key: "F" },
                 { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "M" },
                 { tool: "rotate", icon: <Rotate3D size={21} />, key: "Q" },
@@ -634,7 +645,7 @@ export function App() {
             ))}
             <hr />
             <Button
-              title="Фокус на объекте (F)"
+              title="Фокус на объекте (Shift+F)"
               onClick={() => s.view("focus")}
             >
               <Maximize size={19} />
@@ -763,11 +774,13 @@ export function App() {
           </aside>
         )}
         <section
-          className={`scene${isSketchTool(s.tool) ? " sketch-active" : ""}`}
+          className={`scene${isSketchTool(s.tool) || s.tool === "offset" ? " sketch-active" : ""}`}
         >
           <Viewport />
           {isSketchTool(s.tool) ? (
             <SketchPanel />
+          ) : s.tool === "offset" ? (
+            <OffsetPanel />
           ) : s.tool === "extrude" ? (
             <ExtrudePanel />
           ) : (
@@ -980,7 +993,7 @@ export function App() {
                       <kbd>Space</kbd> Выделение
                     </span>
                     <span>
-                      <kbd>F</kbd> Фокус на объекте
+                      <kbd>Shift F</kbd> Фокус на объекте
                     </span>
                     <span>
                       <kbd>Ctrl S</kbd> Сохранить
@@ -1117,11 +1130,13 @@ export function App() {
                       <span>Выделение</span>
                       <kbd>L / R / C / A</kbd>
                       <span>Линия / прямоугольник / окружность / дуга</span>
+                      <kbd>F</kbd>
+                      <span>Отступ замкнутого контура</span>
                       <kbd>P</kbd>
                       <span>Вытянуть / вдавить выбранную грань</span>
                       <kbd>M / Q / S</kbd>
                       <span>Перемещение / вращение / масштаб</span>
-                      <kbd>F</kbd>
+                      <kbd>Shift F</kbd>
                       <span>Фокус на выбранном объекте</span>
                       <kbd>Ctrl Z / Y</kbd>
                       <span>Отменить / повторить</span>

@@ -293,13 +293,17 @@ export class TopologyBridge {
   pick(
     ray: THREE.Raycaster,
     threshold: number,
+    includePreviewHiddenRoot = false,
   ): { ref: EntityRef } | { legacyId: string; path: string[] } | null {
     this.root.updateMatrixWorld(true);
-    ray.params.Line.threshold = threshold;
+    // Edges get a narrower hit band than vertices, leaving thin native
+    // strips selectable as faces (eg a 200 mm wall at overview scale).
+    ray.params.Line.threshold = threshold / 2;
     ray.params.Points.threshold = threshold;
     const visible = (o: THREE.Object3D) => {
       for (let n: THREE.Object3D | null = o; n; n = n.parent)
-        if (!n.visible) return false;
+        if (!n.visible && !(includePreviewHiddenRoot && n === this.root))
+          return false;
       return true;
     };
     const hits = ray.intersectObjects(this.pickables.filter(visible), false),
@@ -375,10 +379,11 @@ export class TopologyBridge {
     ray: THREE.Raycaster,
     threshold: number,
     path?: string[],
+    includePreviewHiddenRoot = false,
   ): EntityRef | null {
-    const direct = this.pickFace(ray, path);
+    const direct = this.pickFace(ray, path, includePreviewHiddenRoot);
     if (direct) return direct.ref;
-    const picked = this.pick(ray, threshold);
+    const picked = this.pick(ray, threshold, includePreviewHiddenRoot);
     if (
       !picked ||
       !("ref" in picked) ||
@@ -425,7 +430,7 @@ export class TopologyBridge {
         continue;
       let visible = true;
       for (let n: THREE.Object3D | null = object; n; n = n.parent)
-        if (!n.visible) {
+        if (!n.visible && !(includePreviewHiddenRoot && n === this.root)) {
           visible = false;
           break;
         }
