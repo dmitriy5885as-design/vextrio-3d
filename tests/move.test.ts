@@ -168,8 +168,17 @@ it("raises a real ridge shared by two roof faces into a 42 cubic metre gabled mo
   expect(bodyVolume(after, Object.keys(after.bodies)[0])).toBeCloseTo(42, 7);
   expect(Object.keys(after.edges)).toEqual(Object.keys(g.edges));
 });
-it("rejects a nonplanar corner atomically and preserves redo history", async () => {
+it("rejects an unsupported nonplanar pentagon atomically and preserves redo history", async () => {
   await useEditor.getState().drawSegments([], rect);
+  await useEditor.getState().drawSegments(
+    [],
+    [
+      [
+        [0, 0, 0],
+        [2, 0, 0],
+      ],
+    ],
+  );
   const { g, ref } = state();
   await useEditor.getState().editGeometry(ref, {
     kind: "translate-entities",

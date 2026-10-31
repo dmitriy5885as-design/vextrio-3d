@@ -1,5 +1,6 @@
 import {
   GeometryError,
+  id,
   createIdAllocator,
   entityTables,
   type GeometryModel,
@@ -28,6 +29,8 @@ import { segmentIntersections } from "./intersections";
 
 import { assertFaceContacts } from "./volume";
 
+import { foldMovedQuads } from "./fold";
+import type { LineageEntry } from "./transactions";
 import { rebuildBodies } from "./sketch";
 
 export interface MoveEntity {
@@ -87,6 +90,7 @@ function finish(
   after: GeometryModel,
   changed: Set<string>,
   context: ValidationContext,
+  lineage: LineageEntry[] = [],
 ) {
   const { world, tolerance } = metric(after, context),
     affected = new Set<string>();
@@ -121,7 +125,12 @@ function finish(
       ]);
 
     const normal = unit(sum),
-      u = unit(subtract(points[1], origin));
+      u = unit(
+        subtract(
+          subtract(points[1], origin),
+          multiply(normal, dot(subtract(points[1], origin), normal)),
+        ),
+      );
 
     if (dot(normal, f.plane.normal) <= 0)
       throw new GeometryError(
@@ -138,7 +147,10 @@ function finish(
   const edges = Object.values(after.edges),
     moved = new Set(
       edges
-        .filter((e) => changed.has(e.start) || changed.has(e.end))
+        .filter(
+          (e) =>
+            !before.edges[e.id] || changed.has(e.start) || changed.has(e.end),
+        )
         .map((e) => e.id),
     );
 
@@ -294,13 +306,14 @@ function finish(
   assertFaceContacts(after, affected, context, "Перемещение");
 
   const forward = diffGeometry(before, after);
-  return { forward, inverse: invertDelta(forward), lineage: [] };
+  return { forward, inverse: invertDelta(forward), lineage };
 }
 
 export function prepareVertexMove(
   model: GeometryModel,
   positions: { vertexId: Id<"vertex">; position: Vec3 }[],
   context: ValidationContext,
+  operationId: Id<"operation"> = id("direct-vertex-move"),
 ) {
   validateGeometry(model, context);
 
@@ -332,7 +345,8 @@ export function prepareVertexMove(
     after.vertices[m.vertexId].position = [...m.position];
   }
 
-  return finish(model, after, changed, context);
+  const lineage = foldMovedQuads(model, after, changed, context, operationId);
+  return finish(model, after, changed, context, lineage);
 }
 
 export function prepareEntityTranslation(
@@ -371,6 +385,7 @@ export function prepareEntityTranslation(
         position: position(vertexId),
       })),
       context,
+      operationId,
     );
 
   const after = structuredClone(model),
