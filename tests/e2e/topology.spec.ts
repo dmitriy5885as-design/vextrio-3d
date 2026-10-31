@@ -46,6 +46,16 @@ test("native S3 hole renders, picks face/edge/vertex IDs, and roundtrips from th
     Object.keys(g.faces)[0],
   );
   await expect(page.getByTestId("face-area")).toContainText("11 м²");
+  await page.getByRole("button", { name: "Структура", exact: true }).click();
+  await page
+    .locator(".structure .tree-object > button:first-child")
+    .first()
+    .click();
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute(
+    "data-entity-id",
+    Object.keys(g.faces)[0],
+  );
   await clickWorld(page, doc, [4, 1.5, 0]);
   await expect(panel).toHaveAttribute("data-kind", "edge");
   const edgeId = await panel.getAttribute("data-entity-id");
@@ -189,6 +199,9 @@ test("native parent visibility and shared-definition locks participate in real e
     "data-kind",
     "face",
   );
+  // The left dock now combines the structure tree and the properties panel as
+  // tabs, so the tree must be opened before using its node controls.
+  await page.getByRole("button", { name: "Структура", exact: true }).click();
   await page
     .getByTitle("Заблокировать узел Компонент 2", { exact: true })
     .click();

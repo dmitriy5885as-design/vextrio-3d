@@ -61,14 +61,15 @@ import {
 } from "@forma/file-io";
 
 import {
-  APP_VERSION,
   APP_RELEASE_LABEL,
+  APP_VERSION,
   primitiveNames,
   type Primitive,
 } from "@forma/shared";
 import { ru } from "@forma/ui";
 import { shortcuts, toolLabels, isSketchTool } from "@forma/tools";
 import { Properties } from "./Properties";
+import { devblogEntries } from "./changelog";
 
 function Button({
   children,
@@ -102,7 +103,15 @@ export function App() {
     [modal, setModal] = useState<"settings" | "help" | null>(null),
     [menu, setMenu] = useState<string | null>(null),
     [query, setQuery] = useState(""),
-    [structure, setStructure] = useState(true);
+    [structure, setStructure] = useState(true),
+    [dockTab, setDockTab] = useState<"structure" | "properties">("structure"),
+    [helpTab, setHelpTab] = useState<"hotkeys" | "about">("hotkeys");
+  // KOMPAS-style left dock: show properties automatically once something is
+  // selected and return to the structure tree when the selection is cleared.
+  useEffect(() => {
+    if (s.selected || s.topologySelection) setDockTab("properties");
+    else setDockTab("structure");
+  }, [s.selected, s.topologySelection]);
   const removeSelected = () => {
     if (s.topologySelections.length > 1) {
       s.notify("Для удаления выберите одну грань.");
@@ -415,7 +424,7 @@ export function App() {
     ],
     Окно: [
       {
-        label: structure ? "Скрыть структуру" : "Показать структуру",
+        label: structure ? "Скрыть боковую панель" : "Показать боковую панель",
         action: () => setStructure(!structure),
       },
       { label: "Настройки", action: () => setModal("settings") },
@@ -462,58 +471,88 @@ export function App() {
           }
         }}
       />
-      <header className="titlebar">
-        <div className="brand">
-          <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
+      <header className="topbar">
+        <div className="menu-anchor brand">
+          <button
+            aria-label="Файл"
+            title="Файл — открыть, сохранить, экспортировать"
+            className={menu === "Файл" ? "menu-active" : ""}
+            onClick={() => setMenu(menu === "Файл" ? null : "Файл")}
+          >
+            <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
+          </button>
           <strong>VEXTRIO 3D</strong>
-          <span className="version">{APP_RELEASE_LABEL}</span>
+          {menu === "Файл" && (
+            <>
+              <div className="menu-backdrop" onClick={() => setMenu(null)} />
+              <div className="dropdown">
+                {actions["Файл"].map((a) => (
+                  <button
+                    key={a.label}
+                    disabled={a.disabled}
+                    onClick={() => {
+                      a.action();
+                      setMenu(null);
+                    }}
+                  >
+                    {a.label}
+                    <kbd>{a.shortcut}</kbd>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
+        <nav className="menubar">
+          {ru.menus.map((m) => (
+            <div className="menu-anchor" key={m}>
+              <button
+                className={menu === m ? "menu-active" : ""}
+                onClick={() => setMenu(menu === m ? null : m)}
+              >
+                {m}
+              </button>
+              {menu === m && (
+                <>
+                  <div
+                    className="menu-backdrop"
+                    onClick={() => setMenu(null)}
+                  />
+                  <div className="dropdown">
+                    {actions[m].map((a) => (
+                      <button
+                        key={a.label}
+                        disabled={a.disabled}
+                        onClick={() => {
+                          a.action();
+                          setMenu(null);
+                        }}
+                      >
+                        {a.label}
+                        <kbd>{a.shortcut}</kbd>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </nav>
         <div className="project-title">
           <span className={dirty ? "unsaved-dot" : "saved-dot"} />
           {s.project.name}
           <span className="file-extension">.v3d</span>
           <ChevronDown size={12} />
         </div>
-        <div className="local-badge">
-          <span className="mint-dot" /> Локальный проект{" "}
-          <span className="version">v{APP_VERSION}</span>
+        <div className="topbar-right">
+          <div className="local-badge">
+            <span className="mint-dot" /> Локальный проект
+          </div>
+          <Button title="Настройки" onClick={() => setModal("settings")}>
+            <Settings2 size={16} />
+          </Button>
         </div>
       </header>
-      <nav className="menubar">
-        {ru.menus.map((m) => (
-          <div className="menu-anchor" key={m}>
-            <button
-              className={menu === m ? "menu-active" : ""}
-              onClick={() => setMenu(menu === m ? null : m)}
-            >
-              {m}
-            </button>
-            {menu === m && (
-              <>
-                <div className="menu-backdrop" onClick={() => setMenu(null)} />
-                <div className="dropdown">
-                  {actions[m].map((a) => (
-                    <button
-                      key={a.label}
-                      disabled={a.disabled}
-                      onClick={() => {
-                        a.action();
-                        setMenu(null);
-                      }}
-                    >
-                      {a.label}
-                      <kbd>{a.shortcut}</kbd>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-        <div className="menu-right">
-          Придай идее форму <ArrowUpRight size={12} />
-        </div>
-      </nav>
       <div className="toolbar">
         <div className="toolbar-section">
           <Button title="Новый проект" onClick={newProject}>
@@ -534,21 +573,6 @@ export function App() {
             <Redo2 size={17} />
           </Button>
         </div>
-        <div className="toolbar-section create-tools">
-          <span className="toolbar-caption">Создать</span>
-          {primitives.map((p) => (
-            <button
-              className="primitive-button"
-              key={p.type}
-              onClick={() => s.add(p.type)}
-              title={`Создать: ${primitiveNames[p.type]}`}
-              aria-label={`Создать: ${primitiveNames[p.type]}`}
-            >
-              {p.icon}
-              <span>{primitiveNames[p.type]}</span>
-            </button>
-          ))}
-        </div>
         <div className="toolbar-spacer" />
         <div className="toolbar-section">
           <Button
@@ -564,9 +588,6 @@ export function App() {
             onClick={() => useEditor.setState({ grid: !s.grid })}
           >
             <Grid3X3 size={17} />
-          </Button>
-          <Button title="Настройки" onClick={() => setModal("settings")}>
-            <Settings2 size={17} />
           </Button>
         </div>
       </div>
@@ -602,7 +623,7 @@ export function App() {
             {primitives.map((p) => (
               <Button
                 key={p.type}
-                title={`Создать ${primitiveNames[p.type].toLowerCase()}`}
+                title={`Создать: ${primitiveNames[p.type]}`}
                 onClick={() => s.add(p.type)}
               >
                 {p.icon}
@@ -634,80 +655,107 @@ export function App() {
         </aside>
         {structure && (
           <aside className="structure">
-            <div className="panel-heading">
-              Структура проекта{" "}
+            <div className="dock-tabs">
               <button
-                className="plain"
-                title="Скрыть структуру"
+                className={dockTab === "structure" ? "active" : ""}
+                aria-pressed={dockTab === "structure"}
+                onClick={() => setDockTab("structure")}
+              >
+                Структура
+              </button>
+              <button
+                className={dockTab === "properties" ? "active" : ""}
+                aria-pressed={dockTab === "properties"}
+                onClick={() => setDockTab("properties")}
+              >
+                Свойства
+              </button>
+              <button
+                className="plain dock-hide"
+                title="Скрыть боковую панель"
                 onClick={() => setStructure(false)}
               >
                 <PanelRight size={14} />
               </button>
             </div>
-            <label className="search">
-              <Search size={14} />
-              <input
-                aria-label="Поиск объектов"
-                placeholder="Найти объект…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <kbd>⌕</kbd>
-            </label>
-            <div className="scene-heading">
-              <ChevronDown size={12} />
-              <Layers size={14} />
-              <strong>Сцена</strong>
-              <span>{getLegacyObjects(s.project).length}</span>
-            </div>
-            <div className="object-list">
-              {getLegacyObjects(s.project)
-                .filter((o) =>
-                  o.name
-                    .toLocaleLowerCase()
-                    .includes(query.toLocaleLowerCase()),
-                )
-                .map((o) => (
-                  <div
-                    className={`tree-object ${s.selected === o.id ? "selected" : ""}`}
-                    key={o.id}
-                  >
-                    <button onClick={() => s.select(o.id)}>
-                      <Box size={14} />
-                      <span>{o.name}</span>
-                    </button>
-                    <button
-                      title={o.visible ? "Скрыть" : "Показать"}
-                      disabled={o.locked}
-                      onClick={() => s.patch(o.id, { visible: !o.visible })}
+            <div
+              className={`dock-pane${dockTab === "structure" ? "" : " is-hidden"}`}
+            >
+              <label className="search">
+                <Search size={14} />
+                <input
+                  aria-label="Поиск объектов"
+                  placeholder="Найти объект…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                <kbd>⌕</kbd>
+              </label>
+              <div className="scene-heading">
+                <ChevronDown size={12} />
+                <Layers size={14} />
+                <strong>Сцена</strong>
+                <span>{getLegacyObjects(s.project).length}</span>
+              </div>
+              <div className="object-list">
+                {getLegacyObjects(s.project)
+                  .filter((o) =>
+                    o.name
+                      .toLocaleLowerCase()
+                      .includes(query.toLocaleLowerCase()),
+                  )
+                  .map((o) => (
+                    <div
+                      className={`tree-object ${s.selected === o.id ? "selected" : ""}`}
+                      key={o.id}
                     >
-                      {o.visible ? <Eye size={13} /> : <EyeOff size={13} />}
-                    </button>
-                    <button
-                      title={o.locked ? "Разблокировать" : "Заблокировать"}
-                      onClick={() => s.setLocked(o.id, !o.locked)}
-                    >
-                      {o.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                    </button>
-                  </div>
-                ))}
-              <TopologyTree />
-              {getLegacyObjects(s.project).length === 0 &&
-                nativeContexts.length === 0 && (
-                  <div className="empty-tree">
-                    Ваша сцена пока пуста.
-                    <br />
-                    Добавьте первую форму.
-                  </div>
-                )}
+                      <button
+                        onClick={() => {
+                          s.select(o.id);
+                          setDockTab("properties");
+                        }}
+                      >
+                        <Box size={14} />
+                        <span>{o.name}</span>
+                      </button>
+                      <button
+                        title={o.visible ? "Скрыть" : "Показать"}
+                        disabled={o.locked}
+                        onClick={() => s.patch(o.id, { visible: !o.visible })}
+                      >
+                        {o.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                      </button>
+                      <button
+                        title={o.locked ? "Разблокировать" : "Заблокировать"}
+                        onClick={() => s.setLocked(o.id, !o.locked)}
+                      >
+                        {o.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                      </button>
+                    </div>
+                  ))}
+                <TopologyTree onSelect={() => setDockTab("properties")} />
+                {getLegacyObjects(s.project).length === 0 &&
+                  nativeContexts.length === 0 && (
+                    <div className="empty-tree">
+                      Ваша сцена пока пуста.
+                      <br />
+                      Добавьте первую форму.
+                    </div>
+                  )}
+              </div>
+              <div className="structure-footer">
+                <Boxes size={14} />{" "}
+                {getLegacyObjects(s.project).length + nativeContexts.length}{" "}
+                объектов{" "}
+                <button title="Добавить куб" onClick={() => s.add("cube")}>
+                  +
+                </button>
+              </div>
             </div>
-            <div className="structure-footer">
-              <Boxes size={14} />{" "}
-              {getLegacyObjects(s.project).length + nativeContexts.length}{" "}
-              объектов{" "}
-              <button title="Добавить куб" onClick={() => s.add("cube")}>
-                +
-              </button>
+            <div
+              className={`dock-pane${dockTab === "properties" ? "" : " is-hidden"}`}
+            >
+              <Properties />
             </div>
           </aside>
         )}
@@ -730,13 +778,9 @@ export function App() {
                 : "Ортография"}
               <ChevronDown size={12} />
             </button>
-            <span>Объёмный вид</span>
           </div>
           <NavigationCube />
           <EditContext />
-          <div className="scene-caption">
-            <span className="mint-dot" /> ПРОСТРАНСТВО ДЛЯ ВАШИХ ИДЕЙ
-          </div>
           <div className="viewport-bottom">
             <span>
               <MousePointer2 size={12} />{" "}
@@ -760,7 +804,6 @@ export function App() {
             <Maximize size={16} />
           </button>
         </section>
-        <Properties />
       </main>
       <footer className="statusbar">
         <span
@@ -814,7 +857,6 @@ export function App() {
             <option value="mm">Миллиметры</option>
           </select>
         </label>
-        <span className="foundation">VEXTRIO 3D {APP_VERSION}</span>
       </footer>
       {welcome && (
         <div className="modal-overlay welcome-overlay">
@@ -825,21 +867,38 @@ export function App() {
                 alt="Знак VEXTRIO 3D"
               />
               <div className="art-grid" />
-              <span>ОТ ЭСКИЗА К ВОЗМОЖНОСТЯМ</span>
+              <span>ОТ ЭСКИЗА К ГОТОВОЙ ДЕТАЛИ</span>
               <h1>
                 Придай идее
                 <br />
                 <em>форму.</em>
               </h1>
               <p>
-                Ваше пространство для моделирования,
+                Трёхмерное моделирование в браузере:
                 <br />
-                проектирования и творчества.
+                эскизы с точными размерами, объёмы
+                <br />и точная работа с гранями.
               </p>
+              <div className="art-stats">
+                <div>
+                  <strong>4 примитива</strong>
+                  <small>куб, сфера, цилиндр, плоскость</small>
+                </div>
+                <div>
+                  <strong>OBJ / STL</strong>
+                  <small>экспорт готовой геометрии</small>
+                </div>
+                <div>
+                  <strong>.v3d</strong>
+                  <small>геометрия, материалы и структура</small>
+                </div>
+              </div>
               <small>VEXTRIO 3D {APP_RELEASE_LABEL}</small>
             </div>
             <div className="welcome-content">
-              <span className="eyebrow">VEXTRIO 3D</span>
+              <span className="eyebrow">
+                VEXTRIO 3D · ЛОКАЛЬНЫЙ 3D-РЕДАКТОР
+              </span>
               <h2>Начнём с идеи</h2>
               {(recovery.snapshot || recovery.error) && (
                 <div className="recovery-card" data-testid="recovery-card">
@@ -876,9 +935,8 @@ export function App() {
                 </div>
               )}
               <p>
-                Всё необходимое, чтобы создать
-                <br />
-                первую трёхмерную модель.
+                Нарисуйте эскиз, задайте точный размер и получите объём — всё в
+                одном окне, без установки и регистрации.
               </p>
               <button className="start-card" onClick={newProject}>
                 <span className="start-icon">
@@ -886,7 +944,9 @@ export function App() {
                 </span>
                 <span>
                   <strong>Новый проект</strong>
-                  <small>Линии, грани и точные размеры.</small>
+                  <small>
+                    Эскиз → точный размер → объём. Линии, грани, топология.
+                  </small>
                 </span>
                 <ArrowUpRight size={18} />
               </button>
@@ -900,6 +960,40 @@ export function App() {
                 </span>
                 <ChevronRight size={18} />
               </button>
+              <div className="welcome-cols">
+                <div className="welcome-col">
+                  <h4>Быстрый старт</h4>
+                  <div className="welcome-shortcuts">
+                    <span>
+                      <kbd>R</kbd> Прямоугольник
+                    </span>
+                    <span>
+                      <kbd>C</kbd> Окружность
+                    </span>
+                    <span>
+                      <kbd>P</kbd> Выдавить грань
+                    </span>
+                    <span>
+                      <kbd>Space</kbd> Выделение
+                    </span>
+                    <span>
+                      <kbd>F</kbd> Фокус на объекте
+                    </span>
+                    <span>
+                      <kbd>Ctrl S</kbd> Сохранить
+                    </span>
+                  </div>
+                </div>
+                <div className="welcome-col">
+                  <h4>Возможности</h4>
+                  <ul className="welcome-list">
+                    <li>Эскизы с точными размерами и привязками</li>
+                    <li>Выдавливание, окна и сквозные проёмы</li>
+                    <li>Группы, экземпляры и топология граней</li>
+                    <li>Автокопия сессии и экспорт OBJ / STL</li>
+                  </ul>
+                </div>
+              </div>
               <div className="welcome-note">
                 <span className="mint-dot" /> Без регистрации. Файлы остаются у
                 вас.
@@ -992,42 +1086,93 @@ export function App() {
                 <h2>
                   VEXTRIO 3D <small>{APP_RELEASE_LABEL}</small>
                 </h2>
-                <p>
-                  Нарисуйте прямоугольник (R), выберите его грань (Space),
-                  задайте высоту (P). Сгруппируйте результат и собирайте модель
-                  из независимых частей.
-                </p>
-                <div className="help-grid">
-                  <kbd>Space / V</kbd>
-                  <span>Выделение</span>
-                  <kbd>L / R / C</kbd>
-                  <span>Линия / прямоугольник / окружность</span>
-                  <kbd>P</kbd>
-                  <span>Вытянуть / вдавить выбранную грань</span>
-                  <kbd>M / Q / S</kbd>
-                  <span>Перемещение / вращение / масштаб</span>
-                  <kbd>F</kbd>
-                  <span>Фокус на выбранном объекте</span>
-                  <kbd>Ctrl Z / Y</kbd>
-                  <span>Отменить / повторить</span>
-                  <kbd>Ctrl D</kbd>
-                  <span>Дублировать объект</span>
-                  <kbd>Delete</kbd>
-                  <span>Удалить объект</span>
-                  <kbd>Мышь</kbd>
-                  <span>
-                    Средняя кнопка — орбита, колесо — зум, Shift + средняя
-                    кнопка — панорама
-                  </span>
+                <div className="dock-tabs dialog-tabs">
+                  <button
+                    className={helpTab === "hotkeys" ? "active" : ""}
+                    aria-pressed={helpTab === "hotkeys"}
+                    onClick={() => setHelpTab("hotkeys")}
+                  >
+                    Горячие клавиши
+                  </button>
+                  <button
+                    className={helpTab === "about" ? "active" : ""}
+                    aria-pressed={helpTab === "about"}
+                    onClick={() => setHelpTab("about")}
+                  >
+                    О программе
+                  </button>
                 </div>
-                <p className="dialog-note">
-                  Выдавливание поддерживает плоские контуры и ограниченные
-                  углубления и сквозные окна между параллельными гранями.
-                  Поддерживаются сквозные дверные проёмы до края стены. Общие
-                  булевы операции пока не поддерживаются. Экспорт OBJ/STL — в
-                  меню «Файл» браузерной версии. Основные инструменты остаются
-                  бесплатными.
-                </p>
+                {helpTab === "hotkeys" ? (
+                  <>
+                    <p>
+                      Нарисуйте прямоугольник (R), выберите его грань (Space),
+                      задайте высоту (P). Сгруппируйте результат и собирайте
+                      модель из независимых частей.
+                    </p>
+                    <div className="help-grid">
+                      <kbd>Space / V</kbd>
+                      <span>Выделение</span>
+                      <kbd>L / R / C</kbd>
+                      <span>Линия / прямоугольник / окружность</span>
+                      <kbd>P</kbd>
+                      <span>Вытянуть / вдавить выбранную грань</span>
+                      <kbd>M / Q / S</kbd>
+                      <span>Перемещение / вращение / масштаб</span>
+                      <kbd>F</kbd>
+                      <span>Фокус на выбранном объекте</span>
+                      <kbd>Ctrl Z / Y</kbd>
+                      <span>Отменить / повторить</span>
+                      <kbd>Ctrl D</kbd>
+                      <span>Дублировать объект</span>
+                      <kbd>Delete</kbd>
+                      <span>Удалить объект</span>
+                      <kbd>Мышь</kbd>
+                      <span>
+                        Средняя кнопка — орбита, колесо — зум, Shift + средняя
+                        кнопка — панорама
+                      </span>
+                    </div>
+                    <p className="dialog-note">
+                      Выдавливание поддерживает плоские контуры и ограниченные
+                      углубления и сквозные окна между параллельными гранями.
+                      Поддерживаются сквозные дверные проёмы до края стены.
+                      Общие булевы операции пока не поддерживаются. Экспорт
+                      OBJ/STL — в меню за значком программы слева сверху.
+                      Основные инструменты остаются бесплатными.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Бесплатный браузерный и настольный редактор 3D-моделей:
+                      эскизы на гранях, выдавливание, окна, сквозные проёмы,
+                      группы и экземпляры, экспорт OBJ / STL. Без регистрации;
+                      файлы остаются у вас. Текущая версия{" "}
+                      <strong>
+                        {APP_VERSION} ({APP_RELEASE_LABEL})
+                      </strong>
+                      .
+                    </p>
+                    <h3>Недавние изменения</h3>
+                    <div className="devblog">
+                      {devblogEntries.map((entry) => (
+                        <article
+                          className="devblog-entry"
+                          key={`${entry.version} ${entry.title}`}
+                        >
+                          <h4>
+                            {entry.title} <small>{entry.version}</small>
+                          </h4>
+                          <ul>
+                            {entry.items.map((item, index) => (
+                              <li key={`${entry.version}-${index}`}>{item}</li>
+                            ))}
+                          </ul>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>

@@ -68,7 +68,13 @@ test("C accepts an exact radius, creates native edges/face, extrudes and roundtr
     "Переместите мышь и щёлкните для завершения",
   );
   const height = page.getByLabel("Высота выдавливания", { exact: true });
-  await height.fill("2m");
+  await height.fill("2");
+  // Pending pointer frames must not overwrite a focused numeric field.
+  await move(page, [0.2, 0.5, 0.1]);
+  await expect(height).toHaveValue("2");
+  await height.press("End");
+  await height.press("m");
+  await expect(height).toHaveValue("2m");
   await expect(page.getByTestId("volume-preview")).toContainText(
     "6.21165708 м³",
   );

@@ -11,7 +11,6 @@ export const brand = {
 };
 export const ru = {
   menus: [
-    "Файл",
     "Правка",
     "Вид",
     "Камера",

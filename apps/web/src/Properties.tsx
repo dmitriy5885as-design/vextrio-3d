@@ -85,15 +85,12 @@ export function Properties() {
       edge = ref.kind === "edge" ? m.edges[ref.entityId] : null,
       vertex = ref.kind === "vertex" ? m.vertices[ref.entityId] : null;
     return (
-      <aside
+      <div
         className="properties"
         data-testid="topology-selection"
         data-kind={ref.kind}
         data-entity-id={ref.entityId}
       >
-        <div className="panel-heading">
-          Свойства <span className="micro">ТОПОЛОГИЯ</span>
-        </div>
         <div className="property-group">
           <h3>{name}</h3>
           {s.topologySelections.length > 1 && (
@@ -313,7 +310,7 @@ export function Properties() {
             </button>
           )}
         </div>
-      </aside>
+      </div>
     );
   }
   function transform(
@@ -328,10 +325,7 @@ export function Properties() {
     s.patch(o.id, { transform: t });
   }
   return (
-    <aside className="properties">
-      <div className="panel-heading">
-        Свойства <span className="micro">ОБЪЕКТ</span>
-      </div>
+    <div className="properties">
       {o ? (
         <>
           <div className="object-summary">
@@ -491,6 +485,6 @@ export function Properties() {
       <div className="panel-bottom">
         <span className="mint-dot" /> Все изменения — в вашем проекте
       </div>
-    </aside>
+    </div>
   );
 }
