@@ -106,13 +106,11 @@ test("M previews and commits a real quad fold with lineage, picking, Undo and pr
   await page.screenshot({ path: "test-results/fold-sheet.png" });
   page.on("dialog", (d) => d.accept());
   await page.reload();
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "fold.v3d",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(after)),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "fold.v3d",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(after)),
+  });
   await expect(page.locator(".viewport-canvas")).toHaveAttribute(
     "data-topology-faces",
     "2",
@@ -146,7 +144,7 @@ test("raising a closed block corner folds its cap and preserves a 38 cubic metre
   writeFileSync("test-results/fold-solid.v3d", JSON.stringify(saved, null, 2));
   await page.screenshot({ path: "test-results/fold-solid.png" });
 });
-test("a nonplanar face with a hole is rejected without changing document or history", async ({
+test("collapsing a boundary of a holed face is rejected without changing document or history", async ({
   page,
 }) => {
   const doc = topologyProject();
@@ -157,13 +155,11 @@ test("a nonplanar face with a hole is rejected without changing document or hist
     zoom: 1,
   };
   await page.goto("/");
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "hole.v3d",
-      mimeType: "application/json",
-      buffer: Buffer.from(serializeProject(doc)),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "hole.v3d",
+    mimeType: "application/json",
+    buffer: Buffer.from(serializeProject(doc)),
+  });
   await expect(page.locator(".viewport-canvas")).toHaveAttribute(
     "data-topology-faces",
     "1",
@@ -177,11 +173,9 @@ test("a nonplanar face with a hole is rejected without changing document or hist
     .getByLabel("Режим перемещения", { exact: true })
     .selectOption("coordinates");
   const input = page.getByLabel("Размер перемещения", { exact: true });
-  await input.fill("0;0;1m");
+  await input.fill("0;-3m;0");
   await input.press("Enter");
-  await expect(page.getByTestId("move-panel").getByRole("alert")).toContainText(
-    "без отверстий",
-  );
+  await expect(page.getByTestId("move-panel").getByRole("alert")).toBeVisible();
   expect((await save(page)).geometries).toEqual(before.geometries);
   await expect(
     page.getByRole("button", { name: "Отменить", exact: true }),

@@ -168,7 +168,7 @@ it("raises a real ridge shared by two roof faces into a 42 cubic metre gabled mo
   expect(bodyVolume(after, Object.keys(after.bodies)[0])).toBeCloseTo(42, 7);
   expect(Object.keys(after.edges)).toEqual(Object.keys(g.edges));
 });
-it("rejects an unsupported nonplanar face with a hole atomically and preserves redo history", async () => {
+it("rejects a nonfinite move atomically and preserves redo history", async () => {
   useEditor.getState().replace(topologyProject());
   const { g, ref } = state();
   await useEditor.getState().editGeometry(ref, {
@@ -184,7 +184,7 @@ it("rejects an unsupported nonplanar face with a hole atomically and preserves r
     {
       kind: "translate-entities",
       entities: [{ kind: "vertex", id: Object.keys(g.vertices)[0] }],
-      delta: [0, 0, 1],
+      delta: [0, 0, Infinity],
       copy: false,
     },
   );

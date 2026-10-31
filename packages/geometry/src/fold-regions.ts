@@ -1,7 +1,7 @@
 import { GeometryError, type Vec2, type Vec3 } from "./model";
 import { orientation } from "./predicates";
-import { cross, subtract, dot, length } from "./math";
-import { unit } from "./sketch-common";
+import { cross, subtract, dot, length, projectPoint } from "./math";
+import { unit, signedArea } from "./sketch-common";
 const key = (a: number, b: number) => (a < b ? a + ":" + b : b + ":" + a);
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 /** Constrained ears retain every boundary vertex, including collinear ones.
@@ -98,6 +98,25 @@ export function foldRegions(
         "DEGENERATE",
         "Сгиб создаёт вырожденный участок.",
       );
+  return mergeFoldTriangles(triangles, points, ids, tolerance).map((region) => {
+    if (region.holes.length)
+      throw new GeometryError(
+        "INVALID_TOPOLOGY",
+        "Простой контур неожиданно получил отверстие.",
+      );
+    return region.outer;
+  });
+}
+export interface FoldRegion {
+  outer: number[];
+  holes: number[][];
+}
+export function mergeFoldTriangles(
+  triangles: number[][],
+  points: Vec3[],
+  ids: string[],
+  tolerance: number,
+): FoldRegion[] {
   let groups = triangles.map((t) => [t]);
   const boundary = (group: number[][]) => {
     const edges = new Map<string, [number, number][]>();
@@ -147,7 +166,14 @@ export function foldRegions(
           )
         )
           continue;
-        groups[i] = [...groups[i], ...groups[j]];
+        const joined = [...groups[i], ...groups[j]],
+          rim = boundary(joined);
+        if (
+          new Set(rim.map((e) => e[0])).size !== rim.length ||
+          new Set(rim.map((e) => e[1])).size !== rim.length
+        )
+          continue;
+        groups[i] = joined;
         groups.splice(j, 1);
         merged = true;
         break outer;
@@ -156,27 +182,60 @@ export function foldRegions(
   const regions = groups.map((group) => {
     const edges = boundary(group).sort((a, b) => compare(ids[a[0]], ids[b[0]])),
       next = new Map(edges.map((e) => [e[0], e[1]])),
-      ring = [edges[0][0]];
-    if (next.size !== edges.length)
+      pending = new Set(edges.map((e) => e[0])),
+      rings: number[][] = [];
+    if (
+      next.size !== edges.length ||
+      new Set(edges.map((e) => e[1])).size !== edges.length
+    )
       throw new GeometryError(
         "INVALID_TOPOLOGY",
         "Граница участка сгиба неоднозначна.",
       );
-    while (next.get(ring[ring.length - 1]) !== ring[0]) {
-      const v = next.get(ring[ring.length - 1]);
-      if (v === undefined || ring.includes(v) || ring.length >= edges.length)
+    while (pending.size) {
+      const start = pending.values().next().value!,
+        ring = [start];
+      pending.delete(start);
+      while (next.get(ring[ring.length - 1]) !== start) {
+        const v = next.get(ring[ring.length - 1]);
+        if (v === undefined || !pending.has(v) || ring.length >= edges.length)
+          throw new GeometryError(
+            "INVALID_TOPOLOGY",
+            "Незамкнутый участок сгиба.",
+          );
+        ring.push(v);
+        pending.delete(v);
+      }
+      if (ring.length < 3)
         throw new GeometryError(
-          "INVALID_TOPOLOGY",
-          "Незамкнутый участок сгиба.",
+          "DEGENERATE",
+          "Слишком короткая граница сгиба.",
         );
-      ring.push(v);
+      rings.push(ring);
     }
-    if (ring.length !== edges.length)
+    const t = group[0],
+      origin = points[t[0]],
+      u = unit(subtract(points[t[1]], origin)),
+      normal = unit(
+        cross(subtract(points[t[1]], origin), subtract(points[t[2]], origin)),
+      ),
+      plane = { origin, u, v: cross(normal, u), normal };
+    const areas = rings.map((r) =>
+      signedArea(r.map((i) => projectPoint(points[i], plane))),
+    );
+    if (areas.some((a) => Math.abs(a) <= tolerance * tolerance))
+      throw new GeometryError(
+        "DEGENERATE",
+        "Сгиб схлопывает границу отверстия.",
+      );
+    const outer = rings.filter((_, i) => areas[i] > 0),
+      holes = rings.filter((_, i) => areas[i] < 0);
+    if (outer.length !== 1)
       throw new GeometryError(
         "INVALID_TOPOLOGY",
-        "Несвязная граница участка сгиба.",
+        "Участок сгиба имеет несколько внешних контуров.",
       );
-    return ring;
+    return { outer: outer[0], holes };
   });
   if (regions.length < 2)
     throw new GeometryError(
