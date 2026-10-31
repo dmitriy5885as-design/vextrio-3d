@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect } from "@playwright/test";
 import { APP_VERSION, APP_RELEASE_LABEL } from "@forma/shared";
 test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", async ({
@@ -13,7 +14,7 @@ test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", 
   expect(logo.ok()).toBe(true);
   expect(await logo.text()).toContain('viewBox="0 0 128 128"');
   await page.screenshot({ path: "test-results/vextrio-welcome.png" });
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await expect(page.locator(".brand strong")).toHaveText("VEXTRIO 3D");
   await page.getByRole("button", { name: "Настройки", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Настройки" })).toBeVisible();
@@ -47,7 +48,7 @@ test("exact alpha version stays visible in the editor at 1024 pixels", async ({
 }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   const version = page.getByTestId("app-version");
   await expect(version).toBeVisible();
   await expect(version).toHaveText(APP_RELEASE_LABEL);

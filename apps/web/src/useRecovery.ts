@@ -39,7 +39,8 @@ export function useRecovery() {
         if (mounted) setError(e.message);
       });
     const stop = useEditor.subscribe((s, b) => {
-      if (s.revision === b.revision) return;
+      if (s.revision === b.revision && s.savedSignature === b.savedSignature)
+        return;
       if (isDirty()) w.schedule(s.project);
       else w.cancel();
     });

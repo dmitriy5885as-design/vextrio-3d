@@ -34,7 +34,11 @@ try {
     Array.from(document.images).every((i) => i.complete && i.naturalWidth > 0);
   await page.waitForFunction(loaded);
   assert.equal(await page.locator("img").count(), 2);
+  assert.equal(await page.locator("canvas").count(), 0);
   await page.locator(".start-card").first().click();
+  await page
+    .getByRole("button", { name: "Создать проект", exact: true })
+    .click();
   await page.getByTestId("viewport").waitFor();
   await page.waitForFunction(loaded);
   assert.deepEqual(failures, []);
