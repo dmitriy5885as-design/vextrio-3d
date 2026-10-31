@@ -1363,3 +1363,11 @@ hr {
   }
 }
 .edit-context {position:absolute; left:18px; bottom:88px; z-index:4; display:flex; gap:14px; align-items:center; max-width:calc(100% - 36px); padding:8px 12px; border:1px dashed #4dd5c0; border-radius:5px; background:var(--panel); font-size:11px;} .edit-context button{color:var(--text);background:none;border:0;cursor:pointer;font-size:11px;}
+
+.release-badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 10px;
+  padding-right: 10px;
+}

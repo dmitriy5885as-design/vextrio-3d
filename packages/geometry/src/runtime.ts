@@ -17,15 +17,24 @@ import {
 } from "./validate";
 import {
   applyDelta,
-  diffGeometry,
-  invertDelta,
   validatePrepared,
   type PreparedGeometryChange,
 } from "./transactions";
 import { prepareSketch } from "./sketch";
 import { prepareExtrusion } from "./volume";
+import {
+  prepareVertexMove,
+  prepareEntityTranslation,
+  type MoveEntity,
+} from "./move";
 import { prepareFaceOffset } from "./offset";
 export type GeometryIntent =
+  | {
+      kind: "translate-entities";
+      entities: MoveEntity[];
+      delta: Vec3;
+      copy: boolean;
+    }
   | { kind: "offset-face"; faceId: string; distance: number }
   | { kind: "extrude-face"; faceId: string; distance: number; side: 1 | -1 }
   | {
@@ -122,6 +131,28 @@ export function createLocalGeometryBackend(
       };
       try {
         validateGeometry(model, { ...context, policy: request.policy });
+        if (
+          intent.kind === "translate-entities" ||
+          intent.kind === "move-vertices"
+        ) {
+          const change =
+            intent.kind === "move-vertices"
+              ? prepareVertexMove(model, intent.positions, {
+                  ...context,
+                  policy: request.policy,
+                })
+              : prepareEntityTranslation(
+                  model,
+                  intent.entities,
+                  intent.delta,
+                  intent.copy,
+                  { ...context, policy: request.policy },
+                  reply.operationId,
+                );
+          return entityTables.every((t) => change.forward[t].length === 0)
+            ? { ...reply, status: "noop" }
+            : { ...reply, status: "proposed", change };
+        }
         if (intent.kind === "offset-face") {
           const change = prepareFaceOffset(
             model,
@@ -145,40 +176,15 @@ export function createLocalGeometryBackend(
           );
           return { ...reply, status: "proposed", change };
         }
-        if (intent.kind !== "move-vertices") {
-          const change = prepareSketch(
-            model,
-            intent,
-            { ...context, policy: request.policy },
-            reply.operationId,
-          );
-          return entityTables.every((t) => change.forward[t].length === 0)
-            ? { ...reply, status: "noop" }
-            : { ...reply, status: "proposed", change };
-        }
-        const after = structuredClone(model),
-          seen = new Set<string>();
-        for (const move of intent.positions) {
-          if (!after.vertices[move.vertexId] || seen.has(move.vertexId))
-            throw new GeometryError(
-              "INVALID_TOPOLOGY",
-              "Missing/duplicate move vertex",
-              [move.vertexId],
-            );
-          seen.add(move.vertexId);
-          after.vertices[move.vertexId].position = structuredClone(
-            move.position,
-          );
-        }
-        validateGeometry(after, { ...context, policy: request.policy });
-        const forward = diffGeometry(model, after);
-        if (entityTables.every((t) => forward[t].length === 0))
-          return { ...reply, status: "noop" };
-        return {
-          ...reply,
-          status: "proposed",
-          change: { forward, inverse: invertDelta(forward), lineage: [] },
-        };
+        const change = prepareSketch(
+          model,
+          intent,
+          { ...context, policy: request.policy },
+          reply.operationId,
+        );
+        return entityTables.every((t) => change.forward[t].length === 0)
+          ? { ...reply, status: "noop" }
+          : { ...reply, status: "proposed", change };
       } catch (error) {
         return { ...reply, status: "error", diagnostics: [diagnostic(error)] };
       }

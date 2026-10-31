@@ -1,5 +1,5 @@
-export const APP_VERSION = "0.2.0-alpha.6";
-export const APP_RELEASE_LABEL = "0.2 Alpha";
+export const APP_VERSION = "0.2.0-alpha.7";
+export const APP_RELEASE_LABEL = APP_VERSION.replace("-alpha.", " Alpha.");
 export type Vec3 = [number, number, number];
 export type Primitive = "cube" | "sphere" | "cylinder" | "plane";
 export type TransformMode = "translate" | "rotate" | "scale";

@@ -194,3 +194,24 @@ export function rayOnPlane(
     ? point
     : null;
 }
+
+/** Closest forward ray/axis pair; avoids projecting a camera-plane point onto
+ * the axis, which moves the result away from the cursor in perspective. */
+export function rayOnAxis(
+  origin: Vec3,
+  direction: Vec3,
+  anchor: Vec3,
+  axis: Vec3,
+): Vec3 | null {
+  const r = normalize(direction),
+    d = normalize(axis),
+    w = subtract(origin, anchor),
+    c = dot(r, d),
+    den = 1 - c * c;
+  if (den < 1e-10) return null;
+  const t = (dot(d, w) - c * dot(r, w)) / den,
+    rayT = c * t - dot(r, w);
+  if (rayT < 0) return null;
+  const p = add(anchor, multiply(d, t));
+  return p.every((n) => Number.isFinite(n) && Math.abs(n) <= 1e9) ? p : null;
+}

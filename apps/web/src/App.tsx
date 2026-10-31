@@ -3,6 +3,7 @@ import { EditContext } from "./EditContext";
 import { useRecovery } from "./useRecovery";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
+import { MovePanel } from "./MovePanel";
 import { OffsetPanel } from "./OffsetPanel";
 import { ExtrudePanel } from "./ExtrudePanel";
 import {
@@ -137,6 +138,9 @@ export function App() {
               s.project.definitions[o.definitionId].geometryId),
         )
       : [];
+  useEffect(() => {
+    document.title = `VEXTRIO 3D — ${APP_RELEASE_LABEL}`;
+  }, []);
   const input = useRef<HTMLInputElement>(null);
   const fileBusyRef = useRef(false);
   const [fileBusy, setFileBusy] = useState(false);
@@ -494,6 +498,13 @@ export function App() {
             <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
           </button>
           <strong>VEXTRIO 3D</strong>
+          <span
+            className="release-badge"
+            data-testid="app-version"
+            title={`Версия ${APP_VERSION}`}
+          >
+            {APP_RELEASE_LABEL}
+          </span>
           {menu === "Файл" && (
             <>
               <div className="menu-backdrop" onClick={() => setMenu(null)} />
@@ -774,11 +785,13 @@ export function App() {
           </aside>
         )}
         <section
-          className={`scene${isSketchTool(s.tool) || s.tool === "offset" ? " sketch-active" : ""}`}
+          className={`scene${isSketchTool(s.tool) || ["offset", "translate"].includes(s.tool) ? " sketch-active" : ""}`}
         >
           <Viewport />
           {isSketchTool(s.tool) ? (
             <SketchPanel />
+          ) : s.tool === "translate" ? (
+            <MovePanel />
           ) : s.tool === "offset" ? (
             <OffsetPanel />
           ) : s.tool === "extrude" ? (

@@ -1,10 +1,12 @@
 import { test, expect } from "@playwright/test";
-import { APP_VERSION } from "@forma/shared";
+import { APP_VERSION, APP_RELEASE_LABEL } from "@forma/shared";
 test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle("VEXTRIO 3D — Придай идее форму");
+  await expect(page).toHaveTitle(`VEXTRIO 3D — ${APP_RELEASE_LABEL}`);
+  await expect(page.getByTestId("app-version")).toBeVisible();
+  await expect(page.getByTestId("app-version")).toHaveText(APP_RELEASE_LABEL);
   await expect(page.getByAltText("Знак VEXTRIO 3D")).toBeVisible();
   await expect(page.locator("body")).not.toContainText("FORMA");
   const logo = await page.request.get("/vextrio.svg");
@@ -38,4 +40,17 @@ test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", 
   await page.keyboard.press("Control+y");
   await expect(page.locator(".tree-object")).toHaveCount(1);
   await page.screenshot({ path: "test-results/vextrio-editor.png" });
+});
+
+test("exact alpha version stays visible in the editor at 1024 pixels", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto("/");
+  await page.locator(".start-card").first().click();
+  const version = page.getByTestId("app-version");
+  await expect(version).toBeVisible();
+  await expect(version).toHaveText(APP_RELEASE_LABEL);
+  await expect(version).toBeInViewport();
+  await expect(page).toHaveTitle(`VEXTRIO 3D — ${APP_RELEASE_LABEL}`);
 });

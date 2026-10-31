@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { APP_VERSION } from "@forma/shared";
+import { APP_VERSION, APP_RELEASE_LABEL } from "@forma/shared";
 import { useEditor } from "@forma/editor";
 import {
   topologyProject,
@@ -14,9 +14,10 @@ it("ships a consistent alpha version without changing compatibility identifiers"
       readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8"),
     ),
     cargo = readFileSync("apps/desktop/src-tauri/Cargo.toml", "utf8");
-  expect(APP_VERSION).toBe("0.2.0-alpha.6");
+  expect(APP_VERSION).toBe("0.2.0-alpha.7");
   expect(root.version).toBe(APP_VERSION);
   expect(tauri.version).toBe(APP_VERSION);
+  expect(tauri.app.windows[0].title).toBe(`VEXTRIO 3D — ${APP_RELEASE_LABEL}`);
   expect(cargo).toContain(`version = "${APP_VERSION}"`);
   expect(tauri.identifier).toBe("studio.forma.editor");
 });

@@ -80,6 +80,7 @@ export function assertFaceContacts(
   m: GeometryModel,
   changed: ReadonlySet<string>,
   context: ValidationContext,
+  operation = "Выдавливание",
 ) {
   const { world } = metric(m, context),
     all = Object.values(m.vertices).map((v) => world(v.position));
@@ -177,7 +178,7 @@ export function assertFaceContacts(
             if (contains(point, to) && !allowed(point))
               throw new GeometryError(
                 "INVALID_TOPOLOGY",
-                "Выдавливание пересекает другую грань. Уменьшите расстояние или разделите геометрию на группы.",
+                `${operation} пересекает другую грань. Уменьшите расстояние или разделите геометрию на группы.`,
                 [from.f.id, to.f.id],
               );
           };

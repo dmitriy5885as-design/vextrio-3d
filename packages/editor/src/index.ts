@@ -8,12 +8,14 @@ import {
   type ToolName,
 } from "@forma/tools";
 import { usePushPull } from "./pushpull";
+import { useMove } from "./move";
 import { useOffset } from "./offset";
 import { usePrecision, precisionFrame } from "./precision";
 export * from "./precision";
 export * from "./volume-preview";
 export * from "./pushpull";
 export * from "./offset";
+export * from "./move";
 export { GeometryDocumentCommand } from "./geometry-command";
 import {
   clone,
@@ -86,7 +88,7 @@ function trackGeometryCommit<T>(
 // Persistence waits for already confirmed commands, never for mouse previews.
 // Push/Pull can schedule its commit in a React effect after the pointer event.
 export async function awaitGeometryCommits() {
-  for (const store of [usePushPull, useOffset]) {
+  for (const store of [usePushPull, useOffset, useMove]) {
     if (!store.getState().committing) continue;
     await new Promise<void>((resolve) => {
       const unsubscribe = store.subscribe((s) => {
@@ -259,6 +261,7 @@ export const useEditor = create<EditorState>((set, get) => {
   };
   const pendingGeometry = new Set<GeometrySession>();
   const cancelGeometry = () => {
+    useMove.getState().cancel();
     useOffset.getState().cancel();
     for (const session of pendingGeometry) session.cancelAll();
     pendingGeometry.clear();
@@ -973,10 +976,21 @@ usePrecision.subscribe((s, previous) => {
     (!s.enabled && previous.enabled)
   ) {
     sketchController.cancel();
+    useMove.getState().cancel();
     useOffset.getState().cancel();
   }
 });
 useEditor.subscribe((s, previous) => {
+  const move = useMove.getState().gesture;
+  if (
+    move &&
+    (s.tool !== "translate" ||
+      s.revision !== move.revision ||
+      JSON.stringify(s.topologySelections) !== JSON.stringify(move.refs))
+  )
+    useMove.getState().cancel();
+  if (previous.tool === "translate" && s.tool !== "translate" && move)
+    usePrecision.getState().configure({ enabled: false });
   const offset = useOffset.getState().gesture;
   if (offset && (s.tool !== "offset" || s.revision !== offset.revision))
     useOffset.getState().cancel();
@@ -1001,6 +1015,7 @@ useEditor.subscribe((s, previous) => {
       });
   }
   if (s.tool !== previous.tool) {
+    useMove.getState().cancel();
     const draw = isSketchTool(s.tool);
     if (draw) {
       const p = usePrecision.getState();

@@ -91,7 +91,7 @@ function faceContains(
     f.innerLoopIds.map(polygon),
   );
 }
-function rebuildBodies(
+export function rebuildBodies(
   model: GeometryModel,
   before: GeometryModel,
   allocate: Allocator,

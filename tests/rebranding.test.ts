@@ -9,7 +9,7 @@ it("presents the new brand consistently in browser and native metadata", () => {
   const config = JSON.parse(read("apps/desktop/src-tauri/tauri.conf.json"));
   expect(brand.name).toBe("VEXTRIO 3D");
   expect(config.productName).toBe(brand.name);
-  expect(config.app.windows[0].title).toBe(brand.name+" — 0.2 Alpha");
+  expect(config.app.windows[0].title).toBe(brand.name+" — "+config.version.replace("-alpha."," Alpha."));
   expect(config.identifier).toBe("studio.forma.editor");
   expect(config.mainBinaryName).toBe("forma-editor");
   expect(config.bundle.publisher).toBe(brand.name);
