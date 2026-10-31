@@ -1,6 +1,6 @@
 {
   "exports": "./src/index.ts",
-  "version": "0.2.0-alpha.8",
+  "version": "0.2.0-alpha.9",
   "name": "@forma/editor",
   "private": true,
   "type": "module",

@@ -6,13 +6,14 @@ import {
   type Id,
   type Vec3,
 } from "./model";
-import { add, subtract, cross, dot, length } from "./math";
+import { add, subtract, cross, dot, length, projectPoint } from "./math";
 import { metric, contextPlane, unit } from "./sketch-common";
+import { foldRegions } from "./fold-regions";
 import type { ValidationContext } from "./validate";
 import type { LineageEntry } from "./transactions";
-/** Fold simple quadrilaterals only. The diagonal and triangles become real
+/** Fold simple polygons without holes. Creases and planar regions become real
  * topology; renderer tessellation is never used to edit canonical data. */
-export function foldMovedQuads(
+export function foldMovedFaces(
   before: GeometryModel,
   after: GeometryModel,
   changed: ReadonlySet<string>,
@@ -25,7 +26,9 @@ export function foldMovedQuads(
       ...(context.reservedIds ?? []),
     ]),
     lineage: LineageEntry[] = [];
-  let count = 0;
+  let count = 0,
+    usedVertices = 0;
+  const predicateBudget = { remaining: 200000 };
   for (const source of Object.values(before.faces)) {
     const loop = before.loops[source.outerLoopId],
       coedges = loop.coedgeIds.map((c) => before.coedges[c]),
@@ -65,10 +68,16 @@ export function foldMovedQuads(
       )
     )
       continue;
-    if (vertices.length !== 4 || source.innerLoopIds.length)
+    if (vertices.length > 128)
+      throw new GeometryError(
+        "RESOURCE_LIMIT",
+        "Автоскладывание: не более 128 вершин контура.",
+        [source.id],
+      );
+    if (source.innerLoopIds.length)
       throw new GeometryError(
         "UNSUPPORTED_OPERATION",
-        "Автоскладывание пока поддерживает только четырёхугольники без отверстий. Разделите грань линиями.",
+        "Автоскладывание поддерживает контуры до 128 вершин без отверстий. Разделите грань линиями.",
         [source.id],
       );
     if (++count > 128)
@@ -76,71 +85,22 @@ export function foldMovedQuads(
         "RESOURCE_LIMIT",
         "Не более 128 складываемых граней за операцию.",
       );
-    const old = vertices.map((v) => world(before.vertices[v].position));
-    const candidates = [0, 1]
-      .map((start) => {
-        const seq = [0, 1, 2, 3].map((i) => (start + i) % 4),
-          triangles = [
-            [seq[0], seq[1], seq[2]],
-            [seq[0], seq[2], seq[3]],
-          ],
-          a = seq[0],
-          b = seq[2];
-        return {
-          triangles,
-          a,
-          b,
-          cost:
-            Number(changed.has(vertices[a])) + Number(changed.has(vertices[b])),
-          size: length(subtract(points[a], points[b])),
-          key: [vertices[a], vertices[b]].sort().join("|"),
-        };
-      })
-      .filter((c) =>
-        c.triangles.every(
-          (t) =>
-            dot(
-              cross(
-                subtract(old[t[1]], old[t[0]]),
-                subtract(old[t[2]], old[t[0]]),
-              ),
-              plane.normal,
-            ) >
-            tolerance * tolerance,
-        ),
-      )
-      .sort(
-        (a, b) =>
-          a.cost - b.cost ||
-          a.size - b.size ||
-          (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
-      );
-    const chosen = candidates[0];
-    if (!chosen)
+    usedVertices += vertices.length;
+    if (usedVertices > 512)
       throw new GeometryError(
-        "DEGENERATE",
-        "Нет устойчивой диагонали для складывания.",
-        [source.id],
+        "RESOURCE_LIMIT",
+        "Слишком много складываемых вершин за операцию: не более 512.",
       );
-    if (
-      Object.values(after.edges).some(
-        (e) =>
-          [e.start, e.end].sort().join("|") ===
-          [vertices[chosen.a], vertices[chosen.b]].sort().join("|"),
-      )
-    )
-      throw new GeometryError(
-        "UNSUPPORTED_OPERATION",
-        "Диагональ сгиба уже занята ребром. Сначала разделите грань.",
-        [source.id],
-      );
-    const diagonal = allocate("edge");
-    after.edges[diagonal] = {
-      id: diagonal,
-      start: vertices[chosen.a],
-      end: vertices[chosen.b],
-      curve: { kind: "line" },
-    };
+    const old = vertices.map((v) => world(before.vertices[v].position)),
+      regions = foldRegions(
+        old.map((p) => projectPoint(p, plane)),
+        points,
+        vertices,
+        changed,
+        tolerance,
+        predicateBudget,
+      ),
+      creases: Id<"edge">[] = [];
     const boundary = new Map(
         coedges.map((c) => {
           const e = before.edges[c.edgeId];
@@ -150,14 +110,36 @@ export function foldMovedQuads(
       newFaces: Id<"face">[] = [],
       newLoops: Id<"loop">[] = [],
       mapped = new Map<string, Id<"coedge">[]>();
-    for (const triangle of chosen.triangles) {
+    for (const region of regions) {
       const fid = allocate("face"),
         lid = allocate("loop"),
-        cids = triangle.map((i, k) => {
+        cids = region.map((i, k) => {
           const a = vertices[i],
-            b = vertices[triangle[(k + 1) % 3]],
-            eid = boundary.get([a, b].sort().join("|")) ?? diagonal,
-            e = after.edges[eid],
+            b = vertices[region[(k + 1) % region.length]],
+            edgeKey = [a, b].sort().join("|");
+          let eid = boundary.get(edgeKey);
+          if (!eid) {
+            if (
+              Object.values(after.edges).some(
+                (e) => [e.start, e.end].sort().join("|") === edgeKey,
+              )
+            )
+              throw new GeometryError(
+                "UNSUPPORTED_OPERATION",
+                "Диагональ сгиба уже занята ребром. Сначала разделите грань.",
+                [source.id],
+              );
+            eid = allocate("edge");
+            after.edges[eid] = {
+              id: eid,
+              start: a,
+              end: b,
+              curve: { kind: "line" },
+            };
+            boundary.set(edgeKey, eid);
+            creases.push(eid);
+          }
+          const e = after.edges[eid],
             cid = allocate("coedge");
           after.coedges[cid] = {
             id: cid,
@@ -194,7 +176,7 @@ export function foldMovedQuads(
         body.faceIds = body.faceIds.flatMap((f) =>
           f === source.id ? newFaces : [f],
         );
-        body.edgeIds.push(diagonal);
+        body.edgeIds.push(...creases);
       }
     const retire = (
       kind: LineageEntry["kind"],

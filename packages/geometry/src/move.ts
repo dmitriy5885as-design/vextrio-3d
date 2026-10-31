@@ -29,7 +29,7 @@ import { segmentIntersections } from "./intersections";
 
 import { assertFaceContacts } from "./volume";
 
-import { foldMovedQuads } from "./fold";
+import { foldMovedFaces } from "./fold";
 import type { LineageEntry } from "./transactions";
 import { rebuildBodies } from "./sketch";
 
@@ -139,7 +139,15 @@ function finish(
         [f.id],
       );
 
-    f.plane = { origin, u, v: cross(normal, u), normal };
+    // JSON stores both signed zero representations as 0. Canonicalise only
+    // the freshly computed frame, preserving all nonzero coordinates.
+    const zero = (v: Vec3) => v.map((n) => (n === 0 ? 0 : n)) as Vec3;
+    f.plane = {
+      origin: zero(origin),
+      u: zero(u),
+      v: zero(cross(normal, u)),
+      normal: zero(normal),
+    };
   }
 
   validateGeometry(after, context);
@@ -345,7 +353,7 @@ export function prepareVertexMove(
     after.vertices[m.vertexId].position = [...m.position];
   }
 
-  const lineage = foldMovedQuads(model, after, changed, context, operationId);
+  const lineage = foldMovedFaces(model, after, changed, context, operationId);
   return finish(model, after, changed, context, lineage);
 }
 
