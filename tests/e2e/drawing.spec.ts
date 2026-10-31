@@ -1,10 +1,11 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
 import { readFileSync } from "node:fs";
 type Point = [number, number, number];
 async function start(page: Page) {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await expect(page.getByTestId("viewport")).toBeVisible();
 }
 async function position(

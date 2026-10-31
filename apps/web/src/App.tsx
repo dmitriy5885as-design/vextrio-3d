@@ -1,3 +1,13 @@
+import { WelcomeHome } from "./home/WelcomeHome";
+import { NewProjectDialog } from "./home/NewProjectDialog";
+import { EditorSettings } from "./home/EditorSettings";
+import { useRecentProjects } from "./home/useRecentProjects";
+import {
+  createHomeProject,
+  homeProjectSettings,
+  type TemplateId,
+  type NewProjectOptions,
+} from "./home/templates";
 import { TopologyTree } from "./TopologyTree";
 import { EditContext } from "./EditContext";
 import { useRecovery } from "./useRecovery";
@@ -8,16 +18,24 @@ import { OffsetPanel } from "./OffsetPanel";
 import { ExtrudePanel } from "./ExtrudePanel";
 import {
   getLegacyObjects,
-  emptyProjectV2,
+  type Document,
   definitionOccurrences,
 } from "@forma/document";
-import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ArrowUpRight,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  lazy,
+  Suspense,
+  type ReactNode,
+} from "react";
+import {
+  House,
   Box,
   Boxes,
   ChevronDown,
-  ChevronRight,
+  ArrowUpRight,
   CircleHelp,
   Circle,
   Spline,
@@ -51,8 +69,18 @@ import {
   Globe,
   Pencil,
 } from "lucide-react";
-import { Viewport, NavigationCube } from "@forma/viewport";
-import { useEditor, isDirty, awaitGeometryCommits } from "@forma/editor";
+const Viewport = lazy(() =>
+  import("@forma/viewport").then((m) => ({ default: m.Viewport })),
+);
+const NavigationCube = lazy(() =>
+  import("@forma/viewport").then((m) => ({ default: m.NavigationCube })),
+);
+import {
+  useEditor,
+  usePrecision,
+  isDirty,
+  awaitGeometryCommits,
+} from "@forma/editor";
 import {
   browserFileAdapter,
   downloadGeometry,
@@ -103,6 +131,19 @@ function Button({
 export function App() {
   const s = useEditor();
   const recovery = useRecovery();
+  const recent = useRecentProjects();
+  const [newTemplate, setNewTemplate] = useState<TemplateId | null>(null);
+  const [hasDocument, setHasDocument] = useState(false);
+  const [homeError, setHomeError] = useState("");
+  const configureProject = (project: Document) =>
+    usePrecision.getState().configure({
+      enabled: false,
+      path: [],
+      system: "world",
+      planeOverride: null,
+      axis: null,
+      ...homeProjectSettings(project),
+    });
   const [welcome, setWelcome] = useState(true),
     [modal, setModal] = useState<"settings" | "help" | null>(null),
     [menu, setMenu] = useState<string | null>(null),
@@ -130,7 +171,7 @@ export function App() {
     else s.remove();
   };
   const nativeContexts =
-    s.project.schemaVersion === 2
+    !welcome && s.project.schemaVersion === 2
       ? definitionOccurrences(s.project).filter(
           (o) =>
             s.project.schemaVersion === 2 &&
@@ -154,23 +195,67 @@ export function App() {
     fileBusyRef.current = false;
     setFileBusy(false);
   };
-  const dirty = JSON.stringify(s.project) !== s.savedSignature;
+  const dirty = useMemo(
+    () => JSON.stringify(s.project) !== s.savedSignature,
+    [s.project, s.savedSignature],
+  );
   const safe = () =>
     !isDirty() ||
     window.confirm(
       "В проекте есть несохранённые изменения. Продолжить без сохранения?",
     );
-  const newProject = async () => {
-    if (fileBusyRef.current || !safe() || !beginFile()) return;
+  const newProject = () => {
+    if (fileBusyRef.current) return;
+    setMenu(null);
+    setNewTemplate("empty");
+  };
+  const createProject = async (options: NewProjectOptions) => {
+    const project = createHomeProject(options);
+    if (fileBusyRef.current) return false;
+    await awaitGeometryCommits();
+    if (!safe() || !beginFile()) return false;
     try {
       await resetNativeDestination();
-      const result = s.replace(emptyProjectV2());
+      const result = s.replace(project);
       if (result.status === "rejected") throw Error(result.error);
+      configureProject(project);
+      if (
+        project.name !== "Без названия" ||
+        options.template !== "empty" ||
+        options.units !== "m"
+      )
+        useEditor.setState({ savedSignature: "" });
+      setHasDocument(true);
+      setHomeError("");
       setWelcome(false);
-    } catch (error) {
-      alert(
-        error instanceof Error ? error.message : "Не удалось создать проект",
-      );
+      return true;
+    } finally {
+      endFile();
+    }
+  };
+  const returnHome = async () => {
+    if (!beginFile()) return;
+    try {
+      await awaitGeometryCommits();
+      useEditor.getState().setTool("select");
+      setMenu(null);
+      setHomeError("");
+      setWelcome(true);
+    } finally {
+      endFile();
+    }
+  };
+  const restoreProject = async () => {
+    if (fileBusyRef.current) return;
+    await awaitGeometryCommits();
+    if (!safe() || !beginFile()) return;
+    try {
+      if (await recovery.restore()) {
+        configureProject(useEditor.getState().project);
+        setHasDocument(true);
+        setHomeError("");
+        setWelcome(false);
+      }
     } finally {
       endFile();
     }
@@ -195,6 +280,7 @@ export function App() {
             p.name = project.name;
           });
         s.markSaved(JSON.stringify(project));
+        void recent.refresh();
       } else if (result.status === "download-started")
         s.notify("Скачивание начато. Запись на диск не подтверждена.");
     } catch (error) {
@@ -205,7 +291,7 @@ export function App() {
       endFile();
     }
   };
-  const open = async () => {
+  const open = async (recentId?: string) => {
     if (fileBusyRef.current) return;
     if (!isDesktop()) {
       input.current?.click();
@@ -214,7 +300,7 @@ export function App() {
     if (!safe() || !beginFile()) return;
     try {
       const startedProject = useEditor.getState().project,
-        candidate = await openNative();
+        candidate = await openNative(recentId);
       if (!candidate) return;
       if (useEditor.getState().project !== startedProject) {
         await rejectNativeOpen(candidate);
@@ -223,9 +309,16 @@ export function App() {
       const project = await acceptNativeOpen(candidate);
       const result = s.replace(project);
       if (result.status === "rejected") throw Error(result.error);
+      configureProject(project);
+      setHasDocument(true);
+      setHomeError("");
+      await recent.refresh();
       setWelcome(false);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Не удалось открыть файл");
+      const message =
+        error instanceof Error ? error.message : "Не удалось открыть файл";
+      if (welcome) setHomeError(message);
+      else alert(message);
     } finally {
       endFile();
     }
@@ -270,6 +363,7 @@ export function App() {
         (e.target as HTMLElement).matches("input,textarea,select") ||
         fileBusyRef.current ||
         modal ||
+        newTemplate ||
         welcome
       )
         return;
@@ -325,6 +419,7 @@ export function App() {
         action: () => s.upgradeProject(),
         disabled: s.project.schemaVersion === 2,
       },
+      { label: "Стартовый экран", action: () => void returnHome() },
       { label: "Новый проект", action: newProject, shortcut: "Ctrl N" },
       { label: "Открыть…", action: open, shortcut: "Ctrl O" },
       { label: "Сохранить", action: () => void save(), shortcut: "Ctrl S" },
@@ -450,7 +545,10 @@ export function App() {
     ],
   };
   return (
-    <div className={`app ${s.theme}`} aria-busy={fileBusy}>
+    <div
+      className={`app ${s.theme}${welcome ? " app-home" : ""}`}
+      aria-busy={fileBusy}
+    >
       {fileBusy && (
         <div className="file-busy-overlay" role="status">
           Работа с файлом…
@@ -475,74 +573,77 @@ export function App() {
               );
             const result = s.replace(project);
             if (result.status === "rejected") throw Error(result.error);
+            configureProject(project);
+            setHasDocument(true);
+            setHomeError("");
+            await recent.record(project.name, file);
             setWelcome(false);
           } catch (error) {
-            alert(
+            const message =
               error instanceof Error
                 ? error.message
-                : "Не удалось открыть файл",
-            );
+                : "Не удалось открыть файл";
+            if (welcome) setHomeError(message);
+            else alert(message);
           } finally {
             endFile();
           }
         }}
       />
-      <header className="topbar">
-        <div className="menu-anchor brand">
-          <button
-            aria-label="Файл"
-            title="Файл — открыть, сохранить, экспортировать"
-            className={menu === "Файл" ? "menu-active" : ""}
-            onClick={() => setMenu(menu === "Файл" ? null : "Файл")}
-          >
-            <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
-          </button>
-          <strong>VEXTRIO 3D</strong>
-          <span
-            className="release-badge"
-            data-testid="app-version"
-            title={`Версия ${APP_VERSION}`}
-          >
-            {APP_RELEASE_LABEL}
-          </span>
-          {menu === "Файл" && (
-            <>
-              <div className="menu-backdrop" onClick={() => setMenu(null)} />
-              <div className="dropdown">
-                {actions["Файл"].map((a) => (
-                  <button
-                    key={a.label}
-                    disabled={a.disabled}
-                    onClick={() => {
-                      a.action();
-                      setMenu(null);
-                    }}
-                  >
-                    {a.label}
-                    <kbd>{a.shortcut}</kbd>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <nav className="menubar">
-          {ru.menus.map((m) => (
-            <div className="menu-anchor" key={m}>
+      {welcome ? (
+        <WelcomeHome
+          onNew={(template) => {
+            if (!fileBusyRef.current) setNewTemplate(template);
+          }}
+          onOpen={(id) => void open(id)}
+          onResume={() => setWelcome(false)}
+          onAbout={() => {
+            setHelpTab("about");
+            setModal("help");
+          }}
+          onRestore={() => void restoreProject()}
+          busy={fileBusy}
+          hasDocument={hasDocument}
+          projectName={s.project.name}
+          dirty={dirty}
+          recovery={recovery}
+          recent={recent}
+          error={homeError}
+        />
+      ) : (
+        <Suspense
+          fallback={
+            <div className="file-busy-overlay" role="status">
+              Подготовка сцены…
+            </div>
+          }
+        >
+          <header className="topbar">
+            <div className="menu-anchor brand">
               <button
-                className={menu === m ? "menu-active" : ""}
-                onClick={() => setMenu(menu === m ? null : m)}
+                aria-label="Файл"
+                title="Файл — открыть, сохранить, экспортировать"
+                className={menu === "Файл" ? "menu-active" : ""}
+                onClick={() => setMenu(menu === "Файл" ? null : "Файл")}
               >
-                {m}
+                <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
               </button>
-              {menu === m && (
+              <strong>VEXTRIO 3D</strong>
+              <span
+                className="release-badge"
+                data-testid="app-version"
+                title={`Версия ${APP_VERSION}`}
+              >
+                {APP_RELEASE_LABEL}
+              </span>
+              {menu === "Файл" && (
                 <>
                   <div
                     className="menu-backdrop"
                     onClick={() => setMenu(null)}
                   />
                   <div className="dropdown">
-                    {actions[m].map((a) => (
+                    {actions["Файл"].map((a) => (
                       <button
                         key={a.label}
                         disabled={a.disabled}
@@ -559,486 +660,395 @@ export function App() {
                 </>
               )}
             </div>
-          ))}
-        </nav>
-        <div className="project-title">
-          <span className={dirty ? "unsaved-dot" : "saved-dot"} />
-          {s.project.name}
-          <span className="file-extension">.v3d</span>
-          <ChevronDown size={12} />
-        </div>
-        <div className="topbar-right">
-          <div className="local-badge">
-            <span className="mint-dot" /> Локальный проект
-          </div>
-          <Button title="Настройки" onClick={() => setModal("settings")}>
-            <Settings2 size={16} />
-          </Button>
-        </div>
-      </header>
-      <div className="toolbar">
-        <div className="toolbar-section">
-          <Button title="Новый проект" onClick={newProject}>
-            <FilePlus size={17} />
-          </Button>
-          <Button title="Открыть проект" onClick={open}>
-            <FolderOpen size={17} />
-          </Button>
-          <Button title="Сохранить проект" onClick={() => void save()}>
-            <Save size={17} />
-          </Button>
-        </div>
-        <div className="toolbar-section">
-          <Button title="Отменить" onClick={s.undo} disabled={!s.canUndo}>
-            <Undo2 size={17} />
-          </Button>
-          <Button title="Повторить" onClick={s.redo} disabled={!s.canRedo}>
-            <Redo2 size={17} />
-          </Button>
-        </div>
-        <div className="toolbar-spacer" />
-        <div className="toolbar-section">
-          <Button
-            title="Привязка к сетке 0,25 м"
-            active={s.snap}
-            onClick={() => useEditor.setState({ snap: !s.snap })}
-          >
-            <Magnet size={17} />
-          </Button>
-          <Button
-            title="Сетка и оси"
-            active={s.grid}
-            onClick={() => useEditor.setState({ grid: !s.grid })}
-          >
-            <Grid3X3 size={17} />
-          </Button>
-        </div>
-      </div>
-      <main className="workspace">
-        <aside className="tool-rail">
-          <div>
-            {(
-              [
-                {
-                  tool: "select",
-                  icon: <MousePointer2 size={20} />,
-                  key: "Space",
-                },
-                { tool: "line", icon: <Pencil size={20} />, key: "L" },
-                { tool: "rectangle", icon: <Square size={20} />, key: "R" },
-                { tool: "circle", icon: <Circle size={20} />, key: "C" },
-                { tool: "arc", icon: <Spline size={20} />, key: "A" },
-                { tool: "offset", icon: <ScanLine size={20} />, key: "F" },
-                { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
-                { tool: "translate", icon: <Move3D size={21} />, key: "M" },
-                { tool: "rotate", icon: <Rotate3D size={21} />, key: "Q" },
-                { tool: "scale", icon: <Scaling size={20} />, key: "S" },
-              ] as const
-            ).map((t) => (
-              <Button
-                key={t.tool}
-                title={`${toolLabels[t.tool]} (${t.key})`}
-                active={s.tool === t.tool}
-                onClick={() => s.setTool(t.tool)}
-              >
-                {t.icon}
-              </Button>
-            ))}
-            <hr />
-            {primitives.map((p) => (
-              <Button
-                key={p.type}
-                title={`Создать: ${primitiveNames[p.type]}`}
-                onClick={() => s.add(p.type)}
-              >
-                {p.icon}
-              </Button>
-            ))}
-            <hr />
-            <Button
-              title="Фокус на объекте (Shift+F)"
-              onClick={() => s.view("focus")}
-            >
-              <Maximize size={19} />
-            </Button>
-            <Button
-              title="Удалить выделенное"
-              disabled={!s.selected && s.topologySelection?.kind !== "face"}
-              onClick={removeSelected}
-            >
-              <Trash2 size={18} />
-            </Button>
-          </div>
-          <div>
-            <Button
-              title="Управление и справка"
-              onClick={() => setModal("help")}
-            >
-              <CircleHelp size={19} />
-            </Button>
-          </div>
-        </aside>
-        {structure && (
-          <aside className="structure">
-            <div className="dock-tabs">
-              <button
-                className={dockTab === "structure" ? "active" : ""}
-                aria-pressed={dockTab === "structure"}
-                onClick={() => setDockTab("structure")}
-              >
-                Структура
-              </button>
-              <button
-                className={dockTab === "properties" ? "active" : ""}
-                aria-pressed={dockTab === "properties"}
-                onClick={() => setDockTab("properties")}
-              >
-                Свойства
-              </button>
-              <button
-                className="plain dock-hide"
-                title="Скрыть боковую панель"
-                onClick={() => setStructure(false)}
-              >
-                <PanelRight size={14} />
-              </button>
-            </div>
-            <div
-              className={`dock-pane${dockTab === "structure" ? "" : " is-hidden"}`}
-            >
-              <label className="search">
-                <Search size={14} />
-                <input
-                  aria-label="Поиск объектов"
-                  placeholder="Найти объект…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <kbd>⌕</kbd>
-              </label>
-              <div className="scene-heading">
-                <ChevronDown size={12} />
-                <Layers size={14} />
-                <strong>Сцена</strong>
-                <span>{getLegacyObjects(s.project).length}</span>
-              </div>
-              <div className="object-list">
-                {getLegacyObjects(s.project)
-                  .filter((o) =>
-                    o.name
-                      .toLocaleLowerCase()
-                      .includes(query.toLocaleLowerCase()),
-                  )
-                  .map((o) => (
-                    <div
-                      className={`tree-object ${s.selected === o.id ? "selected" : ""}`}
-                      key={o.id}
-                    >
-                      <button
-                        onClick={() => {
-                          s.select(o.id);
-                          setDockTab("properties");
-                        }}
-                      >
-                        <Box size={14} />
-                        <span>{o.name}</span>
-                      </button>
-                      <button
-                        title={o.visible ? "Скрыть" : "Показать"}
-                        disabled={o.locked}
-                        onClick={() => s.patch(o.id, { visible: !o.visible })}
-                      >
-                        {o.visible ? <Eye size={13} /> : <EyeOff size={13} />}
-                      </button>
-                      <button
-                        title={o.locked ? "Разблокировать" : "Заблокировать"}
-                        onClick={() => s.setLocked(o.id, !o.locked)}
-                      >
-                        {o.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                      </button>
-                    </div>
-                  ))}
-                <TopologyTree onSelect={() => setDockTab("properties")} />
-                {getLegacyObjects(s.project).length === 0 &&
-                  nativeContexts.length === 0 && (
-                    <div className="empty-tree">
-                      Ваша сцена пока пуста.
-                      <br />
-                      Добавьте первую форму.
-                    </div>
+            <nav className="menubar">
+              {ru.menus.map((m) => (
+                <div className="menu-anchor" key={m}>
+                  <button
+                    className={menu === m ? "menu-active" : ""}
+                    onClick={() => setMenu(menu === m ? null : m)}
+                  >
+                    {m}
+                  </button>
+                  {menu === m && (
+                    <>
+                      <div
+                        className="menu-backdrop"
+                        onClick={() => setMenu(null)}
+                      />
+                      <div className="dropdown">
+                        {actions[m].map((a) => (
+                          <button
+                            key={a.label}
+                            disabled={a.disabled}
+                            onClick={() => {
+                              a.action();
+                              setMenu(null);
+                            }}
+                          >
+                            {a.label}
+                            <kbd>{a.shortcut}</kbd>
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
-              </div>
-              <div className="structure-footer">
-                <Boxes size={14} />{" "}
-                {getLegacyObjects(s.project).length + nativeContexts.length}{" "}
-                объектов{" "}
-                <button title="Добавить куб" onClick={() => s.add("cube")}>
-                  +
-                </button>
-              </div>
-            </div>
-            <div
-              className={`dock-pane${dockTab === "properties" ? "" : " is-hidden"}`}
-            >
-              <Properties />
-            </div>
-          </aside>
-        )}
-        <section
-          className={`scene${isSketchTool(s.tool) || ["offset", "translate"].includes(s.tool) ? " sketch-active" : ""}`}
-        >
-          <Viewport />
-          {isSketchTool(s.tool) ? (
-            <SketchPanel />
-          ) : s.tool === "translate" ? (
-            <MovePanel />
-          ) : s.tool === "offset" ? (
-            <OffsetPanel />
-          ) : s.tool === "extrude" ? (
-            <ExtrudePanel />
-          ) : (
-            <PrecisionPanel />
-          )}
-          <div className="viewport-header">
-            <button onClick={() => s.view("projection")}>
-              <View size={14} />
-              {s.project.camera.projection === "perspective"
-                ? "Перспектива"
-                : "Ортография"}
+                </div>
+              ))}
+            </nav>
+            <div className="project-title">
+              <span className={dirty ? "unsaved-dot" : "saved-dot"} />
+              {s.project.name}
+              <span className="file-extension">.v3d</span>
               <ChevronDown size={12} />
-            </button>
-          </div>
-          <NavigationCube />
-          <EditContext />
-          <div className="viewport-bottom">
-            <span>
-              <MousePointer2 size={12} />{" "}
-              {isSketchTool(s.tool) ? "ЛКМ · точка" : "Выбор · ЛКМ · Shift"}
-            </span>
-            <span>
-              <Rotate3D size={13} />{" "}
-              {isSketchTool(s.tool)
-                ? "ПКМ · орбита"
-                : "Орбита · перетаскивание"}
-            </span>
-            <span>
-              <Hand size={13} /> Орбита · СКМ · Shift: панорама
-            </span>
-          </div>
-          <button
-            className="reset-view"
-            title="Сбросить камеру"
-            onClick={() => s.view("reset")}
-          >
-            <Maximize size={16} />
-          </button>
-        </section>
-      </main>
-      <footer className="statusbar">
-        <span
-          className="recovery-status"
-          data-testid="recovery-status"
-          role="status"
-          title={
-            recovery.error ||
-            "Последняя локальная автокопия: " +
-              new Date(recovery.savedAt).toLocaleTimeString()
-          }
-        >
-          {recovery.error
-            ? "Автокопия: ошибка"
-            : recovery.savedAt
-              ? "Автокопия ✓"
-              : ""}
-        </span>
-        <span className="status-message">
-          <span className="mint-dot" />
-          {s.message}
-        </span>
-        <span>{toolLabels[s.tool]}</span>
-        {s.topologySelections.length > 1 && (
-          <span data-testid="selection-count">
-            Выбрано: {s.topologySelections.length}
-          </span>
-        )}
-        <span className="status-selection">
-          {s.topologySelection
-            ? `Выбрана топология: ${s.topologySelection.entityId}`
-            : s.selected
-              ? "Выделен 1 объект"
-              : "Нет выделения"}
-        </span>
-        <span className="status-spacer" />
-        <span>Привязка: {s.snap ? "0,25 м" : "выкл."}</span>
-        <label>
-          Единицы{" "}
-          <select
-            aria-label="Единицы измерения"
-            value={s.project.units}
-            onChange={(e) =>
-              s.mutate("Единицы измерения", (p) => {
-                p.units = e.target.value as "m" | "cm" | "mm";
-              })
-            }
-          >
-            <option value="m">Метры</option>
-            <option value="cm">Сантиметры</option>
-            <option value="mm">Миллиметры</option>
-          </select>
-        </label>
-      </footer>
-      {welcome && (
-        <div className="modal-overlay welcome-overlay">
-          <div className="welcome">
-            <div className="welcome-art">
-              <img
-                src={`${import.meta.env.BASE_URL}vextrio.svg`}
-                alt="Знак VEXTRIO 3D"
-              />
-              <div className="art-grid" />
-              <span>ОТ ЭСКИЗА К ГОТОВОЙ ДЕТАЛИ</span>
-              <h1>
-                Придай идее
-                <br />
-                <em>форму.</em>
-              </h1>
-              <p>
-                Трёхмерное моделирование в браузере:
-                <br />
-                эскизы с точными размерами, объёмы
-                <br />и точная работа с гранями.
-              </p>
-              <div className="art-stats">
-                <div>
-                  <strong>4 примитива</strong>
-                  <small>куб, сфера, цилиндр, плоскость</small>
-                </div>
-                <div>
-                  <strong>OBJ / STL</strong>
-                  <small>экспорт готовой геометрии</small>
-                </div>
-                <div>
-                  <strong>.v3d</strong>
-                  <small>геометрия, материалы и структура</small>
-                </div>
-              </div>
-              <small>VEXTRIO 3D {APP_RELEASE_LABEL}</small>
             </div>
-            <div className="welcome-content">
-              <span className="eyebrow">
-                VEXTRIO 3D · ЛОКАЛЬНЫЙ 3D-РЕДАКТОР
-              </span>
-              <h2>Начнём с идеи</h2>
-              {(recovery.snapshot || recovery.error) && (
-                <div className="recovery-card" data-testid="recovery-card">
-                  <strong>Локальная автокопия</strong>
-                  {recovery.snapshot && (
-                    <p>
-                      {recovery.snapshot.project.name} ·{" "}
-                      {new Date(recovery.snapshot.savedAt).toLocaleString()}
-                    </p>
-                  )}
-                  {recovery.error && <p role="alert">{recovery.error}</p>}
-                  <div>
-                    {recovery.snapshot && (
-                      <button
-                        disabled={recovery.busy}
-                        onClick={async () => {
-                          if (await recovery.restore()) setWelcome(false);
-                        }}
-                      >
-                        Восстановить проект
-                      </button>
-                    )}
-                    <button
-                      disabled={recovery.busy}
-                      onClick={() => void recovery.discard()}
-                    >
-                      Удалить автокопию
+            <div className="topbar-right">
+              <div className="local-badge">
+                <span className="mint-dot" /> Локальный проект
+              </div>
+              <Button title="Стартовый экран" onClick={() => void returnHome()}>
+                <House size={17} />
+              </Button>
+              <Button title="Настройки" onClick={() => setModal("settings")}>
+                <Settings2 size={16} />
+              </Button>
+            </div>
+          </header>
+          <div className="toolbar">
+            <div className="toolbar-section">
+              <Button title="Новый проект" onClick={newProject}>
+                <FilePlus size={17} />
+              </Button>
+              <Button title="Открыть проект" onClick={open}>
+                <FolderOpen size={17} />
+              </Button>
+              <Button title="Сохранить проект" onClick={() => void save()}>
+                <Save size={17} />
+              </Button>
+            </div>
+            <div className="toolbar-section">
+              <Button title="Отменить" onClick={s.undo} disabled={!s.canUndo}>
+                <Undo2 size={17} />
+              </Button>
+              <Button title="Повторить" onClick={s.redo} disabled={!s.canRedo}>
+                <Redo2 size={17} />
+              </Button>
+            </div>
+            <div className="toolbar-spacer" />
+            <div className="toolbar-section">
+              <Button
+                title="Привязка к сетке 0,25 м"
+                active={s.snap}
+                onClick={() => useEditor.setState({ snap: !s.snap })}
+              >
+                <Magnet size={17} />
+              </Button>
+              <Button
+                title="Сетка и оси"
+                active={s.grid}
+                onClick={() => useEditor.setState({ grid: !s.grid })}
+              >
+                <Grid3X3 size={17} />
+              </Button>
+            </div>
+          </div>
+          <main className="workspace">
+            <aside className="tool-rail">
+              <div>
+                {(
+                  [
+                    {
+                      tool: "select",
+                      icon: <MousePointer2 size={20} />,
+                      key: "Space",
+                    },
+                    { tool: "line", icon: <Pencil size={20} />, key: "L" },
+                    { tool: "rectangle", icon: <Square size={20} />, key: "R" },
+                    { tool: "circle", icon: <Circle size={20} />, key: "C" },
+                    { tool: "arc", icon: <Spline size={20} />, key: "A" },
+                    { tool: "offset", icon: <ScanLine size={20} />, key: "F" },
+                    {
+                      tool: "extrude",
+                      icon: <ArrowUpRight size={20} />,
+                      key: "P",
+                    },
+                    { tool: "translate", icon: <Move3D size={21} />, key: "M" },
+                    { tool: "rotate", icon: <Rotate3D size={21} />, key: "Q" },
+                    { tool: "scale", icon: <Scaling size={20} />, key: "S" },
+                  ] as const
+                ).map((t) => (
+                  <Button
+                    key={t.tool}
+                    title={`${toolLabels[t.tool]} (${t.key})`}
+                    active={s.tool === t.tool}
+                    onClick={() => s.setTool(t.tool)}
+                  >
+                    {t.icon}
+                  </Button>
+                ))}
+                <hr />
+                {primitives.map((p) => (
+                  <Button
+                    key={p.type}
+                    title={`Создать: ${primitiveNames[p.type]}`}
+                    onClick={() => s.add(p.type)}
+                  >
+                    {p.icon}
+                  </Button>
+                ))}
+                <hr />
+                <Button
+                  title="Фокус на объекте (Shift+F)"
+                  onClick={() => s.view("focus")}
+                >
+                  <Maximize size={19} />
+                </Button>
+                <Button
+                  title="Удалить выделенное"
+                  disabled={!s.selected && s.topologySelection?.kind !== "face"}
+                  onClick={removeSelected}
+                >
+                  <Trash2 size={18} />
+                </Button>
+              </div>
+              <div>
+                <Button
+                  title="Управление и справка"
+                  onClick={() => setModal("help")}
+                >
+                  <CircleHelp size={19} />
+                </Button>
+              </div>
+            </aside>
+            {structure && (
+              <aside className="structure">
+                <div className="dock-tabs">
+                  <button
+                    className={dockTab === "structure" ? "active" : ""}
+                    aria-pressed={dockTab === "structure"}
+                    onClick={() => setDockTab("structure")}
+                  >
+                    Структура
+                  </button>
+                  <button
+                    className={dockTab === "properties" ? "active" : ""}
+                    aria-pressed={dockTab === "properties"}
+                    onClick={() => setDockTab("properties")}
+                  >
+                    Свойства
+                  </button>
+                  <button
+                    className="plain dock-hide"
+                    title="Скрыть боковую панель"
+                    onClick={() => setStructure(false)}
+                  >
+                    <PanelRight size={14} />
+                  </button>
+                </div>
+                <div
+                  className={`dock-pane${dockTab === "structure" ? "" : " is-hidden"}`}
+                >
+                  <label className="search">
+                    <Search size={14} />
+                    <input
+                      aria-label="Поиск объектов"
+                      placeholder="Найти объект…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                    <kbd>⌕</kbd>
+                  </label>
+                  <div className="scene-heading">
+                    <ChevronDown size={12} />
+                    <Layers size={14} />
+                    <strong>Сцена</strong>
+                    <span>{getLegacyObjects(s.project).length}</span>
+                  </div>
+                  <div className="object-list">
+                    {getLegacyObjects(s.project)
+                      .filter((o) =>
+                        o.name
+                          .toLocaleLowerCase()
+                          .includes(query.toLocaleLowerCase()),
+                      )
+                      .map((o) => (
+                        <div
+                          className={`tree-object ${s.selected === o.id ? "selected" : ""}`}
+                          key={o.id}
+                        >
+                          <button
+                            onClick={() => {
+                              s.select(o.id);
+                              setDockTab("properties");
+                            }}
+                          >
+                            <Box size={14} />
+                            <span>{o.name}</span>
+                          </button>
+                          <button
+                            title={o.visible ? "Скрыть" : "Показать"}
+                            disabled={o.locked}
+                            onClick={() =>
+                              s.patch(o.id, { visible: !o.visible })
+                            }
+                          >
+                            {o.visible ? (
+                              <Eye size={13} />
+                            ) : (
+                              <EyeOff size={13} />
+                            )}
+                          </button>
+                          <button
+                            title={
+                              o.locked ? "Разблокировать" : "Заблокировать"
+                            }
+                            onClick={() => s.setLocked(o.id, !o.locked)}
+                          >
+                            {o.locked ? (
+                              <Lock size={12} />
+                            ) : (
+                              <Unlock size={12} />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                    <TopologyTree onSelect={() => setDockTab("properties")} />
+                    {getLegacyObjects(s.project).length === 0 &&
+                      nativeContexts.length === 0 && (
+                        <div className="empty-tree">
+                          Ваша сцена пока пуста.
+                          <br />
+                          Добавьте первую форму.
+                        </div>
+                      )}
+                  </div>
+                  <div className="structure-footer">
+                    <Boxes size={14} />{" "}
+                    {getLegacyObjects(s.project).length + nativeContexts.length}{" "}
+                    объектов{" "}
+                    <button title="Добавить куб" onClick={() => s.add("cube")}>
+                      +
                     </button>
                   </div>
-                  <small>
-                    Последний редактируемый проект в этом браузере. Файл на
-                    диске не перезаписывается.
-                  </small>
                 </div>
+                <div
+                  className={`dock-pane${dockTab === "properties" ? "" : " is-hidden"}`}
+                >
+                  <Properties />
+                </div>
+              </aside>
+            )}
+            <section
+              className={`scene${isSketchTool(s.tool) || ["offset", "translate"].includes(s.tool) ? " sketch-active" : ""}`}
+            >
+              <Viewport />
+              {isSketchTool(s.tool) ? (
+                <SketchPanel />
+              ) : s.tool === "translate" ? (
+                <MovePanel />
+              ) : s.tool === "offset" ? (
+                <OffsetPanel />
+              ) : s.tool === "extrude" ? (
+                <ExtrudePanel />
+              ) : (
+                <PrecisionPanel />
               )}
-              <p>
-                Нарисуйте эскиз, задайте точный размер и получите объём — всё в
-                одном окне, без установки и регистрации.
-              </p>
-              <button className="start-card" onClick={newProject}>
-                <span className="start-icon">
-                  <FilePlus />
-                </span>
-                <span>
-                  <strong>Новый проект</strong>
-                  <small>
-                    Эскиз → точный размер → объём. Линии, грани, топология.
-                  </small>
-                </span>
-                <ArrowUpRight size={18} />
-              </button>
-              <button className="start-card" onClick={open}>
-                <span className="start-icon muted">
-                  <FolderOpen />
-                </span>
-                <span>
-                  <strong>Открыть проект</strong>
-                  <small>Продолжить работу с файлом .v3d</small>
-                </span>
-                <ChevronRight size={18} />
-              </button>
-              <div className="welcome-cols">
-                <div className="welcome-col">
-                  <h4>Быстрый старт</h4>
-                  <div className="welcome-shortcuts">
-                    <span>
-                      <kbd>R</kbd> Прямоугольник
-                    </span>
-                    <span>
-                      <kbd>C</kbd> Окружность
-                    </span>
-                    <span>
-                      <kbd>P</kbd> Выдавить грань
-                    </span>
-                    <span>
-                      <kbd>Space</kbd> Выделение
-                    </span>
-                    <span>
-                      <kbd>Shift F</kbd> Фокус на объекте
-                    </span>
-                    <span>
-                      <kbd>Ctrl S</kbd> Сохранить
-                    </span>
-                  </div>
-                </div>
-                <div className="welcome-col">
-                  <h4>Возможности</h4>
-                  <ul className="welcome-list">
-                    <li>Эскизы с точными размерами и привязками</li>
-                    <li>Выдавливание, окна и сквозные проёмы</li>
-                    <li>Группы, экземпляры и топология граней</li>
-                    <li>Автокопия сессии и экспорт OBJ / STL</li>
-                  </ul>
-                </div>
+              <div className="viewport-header">
+                <button onClick={() => s.view("projection")}>
+                  <View size={14} />
+                  {s.project.camera.projection === "perspective"
+                    ? "Перспектива"
+                    : "Ортография"}
+                  <ChevronDown size={12} />
+                </button>
               </div>
-              <div className="welcome-note">
-                <span className="mint-dot" /> Без регистрации. Файлы остаются у
-                вас.
+              <NavigationCube />
+              <EditContext />
+              <div className="viewport-bottom">
+                <span>
+                  <MousePointer2 size={12} />{" "}
+                  {isSketchTool(s.tool) ? "ЛКМ · точка" : "Выбор · ЛКМ · Shift"}
+                </span>
+                <span>
+                  <Rotate3D size={13} />{" "}
+                  {isSketchTool(s.tool)
+                    ? "ПКМ · орбита"
+                    : "Орбита · перетаскивание"}
+                </span>
+                <span>
+                  <Hand size={13} /> Орбита · СКМ · Shift: панорама
+                </span>
               </div>
               <button
-                className="text-link"
-                onClick={() => {
-                  setWelcome(false);
-                  setModal("help");
-                }}
+                className="reset-view"
+                title="Сбросить камеру"
+                onClick={() => s.view("reset")}
               >
-                Познакомиться с управлением <ArrowUpRight size={13} />
+                <Maximize size={16} />
               </button>
-            </div>
-          </div>
-        </div>
+            </section>
+          </main>
+          <footer className="statusbar">
+            <span
+              className="recovery-status"
+              data-testid="recovery-status"
+              role="status"
+              title={
+                recovery.error ||
+                "Последняя локальная автокопия: " +
+                  new Date(recovery.savedAt).toLocaleTimeString()
+              }
+            >
+              {recovery.error
+                ? "Автокопия: ошибка"
+                : recovery.savedAt
+                  ? "Автокопия ✓"
+                  : ""}
+            </span>
+            <span className="status-message">
+              <span className="mint-dot" />
+              {s.message}
+            </span>
+            <span>{toolLabels[s.tool]}</span>
+            {s.topologySelections.length > 1 && (
+              <span data-testid="selection-count">
+                Выбрано: {s.topologySelections.length}
+              </span>
+            )}
+            <span className="status-selection">
+              {s.topologySelection
+                ? `Выбрана топология: ${s.topologySelection.entityId}`
+                : s.selected
+                  ? "Выделен 1 объект"
+                  : "Нет выделения"}
+            </span>
+            <span className="status-spacer" />
+            <span>Привязка: {s.snap ? "0,25 м" : "выкл."}</span>
+            <label>
+              Единицы{" "}
+              <select
+                aria-label="Единицы измерения"
+                value={s.project.units}
+                onChange={(e) =>
+                  s.mutate("Единицы измерения", (p) => {
+                    p.units = e.target.value as "m" | "cm" | "mm";
+                  })
+                }
+              >
+                <option value="m">Метры</option>
+                <option value="cm">Сантиметры</option>
+                <option value="mm">Миллиметры</option>
+              </select>
+            </label>
+          </footer>
+        </Suspense>
+      )}
+      {newTemplate && (
+        <NewProjectDialog
+          initial={newTemplate}
+          busy={fileBusy}
+          onCreate={createProject}
+          onClose={() => setNewTemplate(null)}
+        />
       )}
       {modal && (
         <div className="modal-overlay">
@@ -1054,60 +1064,7 @@ export function App() {
               <>
                 <span className="eyebrow">ВАШЕ РАБОЧЕЕ ПРОСТРАНСТВО</span>
                 <h2>Настройки</h2>
-                <label className="setting-row">
-                  Оформление{" "}
-                  <select
-                    aria-label="Тема"
-                    value={s.theme}
-                    onChange={(e) =>
-                      useEditor.setState({
-                        theme: e.target.value as "dark" | "light",
-                      })
-                    }
-                  >
-                    <option value="dark">Графитовая</option>
-                    <option value="light">Светлая</option>
-                  </select>
-                </label>
-                <label className="setting-row">
-                  Чувствительность навигации{" "}
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="2"
-                    step="0.1"
-                    value={s.sensitivity}
-                    onChange={(e) =>
-                      useEditor.setState({
-                        sensitivity: Number(e.target.value),
-                      })
-                    }
-                  />
-                  <span>{s.sensitivity.toFixed(1)}</span>
-                </label>
-                <label className="setting-row">
-                  Рабочая сетка{" "}
-                  <input
-                    type="checkbox"
-                    checked={s.grid}
-                    onChange={(e) =>
-                      useEditor.setState({ grid: e.target.checked })
-                    }
-                  />
-                </label>
-                <label className="setting-row">
-                  Привязка к сетке 0,25 м{" "}
-                  <input
-                    type="checkbox"
-                    checked={s.snap}
-                    onChange={(e) =>
-                      useEditor.setState({ snap: e.target.checked })
-                    }
-                  />
-                </label>
-                <p className="dialog-note">
-                  Настройки применяются к текущему сеансу редактора.
-                </p>
+                <EditorSettings />
               </>
             ) : (
               <>

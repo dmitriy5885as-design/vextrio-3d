@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -15,7 +16,7 @@ async function clickWorld(page: Page, p: [number, number, number]) {
 }
 async function rectangle(page: Page) {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.keyboard.press("r");
   await clickWorld(page, [0, 0, 0]);
   const size = page.getByLabel("Размер построения", { exact: true });
