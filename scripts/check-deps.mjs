@@ -116,13 +116,28 @@ export function checkDependencies(root) {
             options,
             ts.sys,
           ).resolvedModule;
-          const asset = path.resolve(path.dirname(file), specifier);
+          // Vite asset imports may carry an inline query such as "?raw".
+          const asset = path.resolve(
+            path.dirname(file),
+            specifier.replace(/\?.*$/, ""),
+          );
           const assetExists =
             isPath &&
-            /\.(css|svg|png|ico|wasm|json)$/.test(asset) &&
+            /\.(css|svg|png|ico|wasm|json|md)$/.test(asset) &&
             existsSync(asset);
           if (!resolved && !assetExists) {
             errors.push(`${file}: unresolved module ${specifier}`);
+            continue;
+          }
+          // Plain asset files (for example the root CHANGELOG.md loaded via
+          // "?raw") introduce no package dependency; they only must stay
+          // inside the repository.
+          if (assetExists && !resolved) {
+            const rel = path.relative(realpathSync(root), realpathSync(asset));
+            if (rel.startsWith("..") || path.isAbsolute(rel))
+              errors.push(
+                `${file}: module outside the repository: ${specifier}`,
+              );
             continue;
           }
           const resolvedPath = realpathSync(

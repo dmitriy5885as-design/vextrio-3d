@@ -119,3 +119,28 @@ it("detects manifest cycles even before a package is imported", () => {
   );
   expect(() => checkDependencies(root)).toThrow(/cycle/);
 });
+
+it("resolves repository Markdown raw imports and rejects missing raw assets", () => {
+  const root = fixture();
+  writeFileSync(path.join(root, "CHANGELOG.md"), "# Changes");
+  workspace(root, "a", {
+    "index.ts":
+      "import text from '../../../CHANGELOG.md?raw'; export default text;",
+  });
+  expect(checkDependencies(root).workspaceCount).toBe(1);
+  writeFileSync(
+    path.join(root, "packages/a/src/index.ts"),
+    "import text from './missing.md?raw'; export default text;",
+  );
+  expect(() => checkDependencies(root)).toThrow(/unresolved module/);
+});
+it("rejects raw assets outside the repository", () => {
+  const root = fixture(),
+    other = fixture();
+  const asset = path.join(other, "outside.md");
+  writeFileSync(asset, "outside");
+  workspace(root, "a", {
+    "index.ts": `import text from ${JSON.stringify(asset.replaceAll("\\", "/") + "?raw")}; export default text;`,
+  });
+  expect(() => checkDependencies(root)).toThrow(/outside the repository/);
+});

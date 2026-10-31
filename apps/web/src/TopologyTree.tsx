@@ -1,7 +1,7 @@
 import { definitionOccurrences } from "@forma/document";
 import { useEditor, isObjectLocked } from "@forma/editor";
 import { Boxes, Eye, EyeOff, Lock, Unlock } from "lucide-react";
-export function TopologyTree() {
+export function TopologyTree({ onSelect }: { onSelect?: () => void }) {
   const s = useEditor(),
     p = s.project;
   if (p.schemaVersion !== 2) return null;
@@ -28,15 +28,16 @@ export function TopologyTree() {
             >
               {g && entityId ? (
                 <button
-                  onClick={() =>
+                  onClick={() => {
                     s.selectEntity({
                       definitionId: d.id,
                       geometryId: g.id,
                       kind: face ? "face" : edge ? "edge" : "vertex",
                       entityId,
                       occurrencePath: o.path,
-                    })
-                  }
+                    });
+                    onSelect?.();
+                  }}
                 >
                   <Boxes size={14} />
                   <span>{name}</span>

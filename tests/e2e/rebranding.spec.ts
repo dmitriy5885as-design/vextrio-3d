@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { APP_VERSION } from "@forma/shared";
 test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", async ({
   page,
 }) => {
@@ -19,6 +20,15 @@ test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", 
   await page.getByRole("button", { name: "Справка", exact: true }).click();
   await page.getByRole("button", { name: "О VEXTRIO 3D и управление" }).click();
   await expect(page.getByRole("heading", { name: /VEXTRIO 3D/ })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("FORMA");
+  // The «О программе» tab renders the auto-generated devblog from
+  // CHANGELOG.md; it must carry the shipped version and never leak the
+  // pre-rebrand name into the visible UI.
+  await page.getByRole("button", { name: "О программе" }).click();
+  await expect(page.getByText(APP_VERSION).first()).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Недавние изменения" }),
+  ).toBeVisible();
   await expect(page.locator("body")).not.toContainText("FORMA");
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();

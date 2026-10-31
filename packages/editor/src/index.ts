@@ -467,7 +467,7 @@ export const useEditor = create<EditorState>((set, get) => {
           if (accept && !accept()) throw Error("Построение отменено.");
           if (before.schemaVersion !== 2)
             throw Error(
-              "Для рисования преобразуйте проект в v2 через меню Файл.",
+              "Для рисования преобразуйте проект в v2 через меню значка программы.",
             );
           const definitionId = definitionAtPath(before, path),
             occurrences = definitionOccurrences(before);
@@ -884,7 +884,7 @@ export const useEditor = create<EditorState>((set, get) => {
     setTool: (tool) => {
       if (isSketchTool(tool) && get().project.schemaVersion !== 2) {
         reject(
-          Error("Для рисования преобразуйте проект в v2 через меню Файл."),
+          Error("Для рисования преобразуйте проект в v2 через меню значка программы."),
         );
         return;
       }
