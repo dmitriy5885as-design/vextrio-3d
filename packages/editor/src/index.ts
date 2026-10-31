@@ -64,6 +64,35 @@ import {
 export { isObjectLocked, isGeometryLocked } from "./permissions";
 export type CommandResult =
   { status: "applied" | "noop" } | { status: "rejected"; error: string };
+const geometryCommits = new Set<Promise<unknown>>();
+function trackGeometryCommit<T>(
+  work: () => Promise<T>,
+  preview = false,
+): Promise<T> {
+  const result = work();
+  if (!preview) {
+    geometryCommits.add(result);
+    void result.then(
+      () => geometryCommits.delete(result),
+      () => geometryCommits.delete(result),
+    );
+  }
+  return result;
+}
+// Persistence waits for already confirmed commands, never for mouse previews.
+// Push/Pull can schedule its commit in a React effect after the pointer event.
+export async function awaitGeometryCommits() {
+  if (usePushPull.getState().committing)
+    await new Promise<void>((resolve) => {
+      const unsubscribe = usePushPull.subscribe((s) => {
+        if (!s.committing) {
+          unsubscribe();
+          resolve();
+        }
+      });
+    });
+  while (geometryCommits.size) await Promise.allSettled([...geometryCommits]);
+}
 export type ObjectPatch = Partial<
   Pick<
     SceneObject,
@@ -425,140 +454,141 @@ export const useEditor = create<EditorState>((set, get) => {
       if (JSON.stringify(get().topologyHover) !== JSON.stringify(ref))
         set({ topologyHover: ref ? clone(ref) : null });
     },
-    drawSegments: async (
-      path,
-      segments,
-      preview = false,
-      accept,
-      shared = false,
-    ) => {
-      const before = get().project,
-        revision = get().revision;
-      let session: GeometrySession | undefined;
-      try {
-        if (transactionInProgress)
-          throw Error("Другая команда ещё выполняется.");
-        if (accept && !accept()) throw Error("Построение отменено.");
-        if (before.schemaVersion !== 2)
-          throw Error(
-            "Для рисования преобразуйте проект в v2 через меню Файл.",
-          );
-        const definitionId = definitionAtPath(before, path),
-          occurrences = definitionOccurrences(before);
-        const occurrence = occurrences.find(
-          (o) => JSON.stringify(o.path) === JSON.stringify(path),
-        );
-        if (!occurrence?.visible || isGeometryLocked(before, { definitionId }))
-          throw Error("Контекст скрыт или заблокирован.");
-        if (
-          !preview &&
-          !shared &&
-          occurrences.filter((o) => o.definitionId === definitionId).length > 1
-        )
-          throw Error(
-            "Подтвердите изменение всех экземпляров общего компонента.",
-          );
-        const staged = clone(before),
-          seed: ConstructorParameters<typeof GeometryDocumentCommand>[3] = {};
-        let gid = staged.definitions[definitionId].geometryId;
-        if (!gid) {
-          gid = id("geometry/" + crypto.randomUUID());
-          seed.geometry = emptyGeometry(gid, id(definitionId));
-          staged.geometries[gid] = clone(seed.geometry);
-          staged.definitions[definitionId].geometryId = gid;
-        }
-        if (!Object.keys(staged.materials).length) {
-          const materialId = "material/" + crypto.randomUUID();
-          seed.material = {
-            id: materialId,
-            color: "#86b7c6",
-            roughness: 0.7,
-            metalness: 0,
-          };
-          staged.materials[materialId] = clone(seed.material);
-        }
-        const scope = {
-            definitionId,
-            geometryId: gid,
-            occurrencePath: [...path],
-          },
-          context = geometryContext(staged, gid, true, path),
-          matrix = inverseAffine(occurrenceMatrix(staged, path));
-        const local = segments.map(
-          ([a, b]) =>
-            [transformAffine(a, matrix), transformAffine(b, matrix)] as [
-              Vec3,
-              Vec3,
-            ],
-        );
-        session = new GeometrySession(
-          staged.geometries[gid],
-          context,
-          createLocalGeometryBackend(context),
-          id("draw/" + crypto.randomUUID()),
-        );
-        pendingGeometry.add(session);
-        const result = await session.prepare({
-          kind: "insert-segments",
-          segments: local,
-          plane: null,
-        });
-        if (accept && !accept()) throw Error("Построение отменено.");
-        if (get().revision !== revision)
-          throw Error("Результат построения устарел.");
-        if (result.status === "noop") return { status: "noop" };
-        if (result.status !== "preview")
-          throw Error(
-            result.status === "error"
-              ? result.diagnostics[0].message
-              : "Построение отменено.",
-          );
-        const command = new GeometryDocumentCommand(
-          segments.length === 4 ? "Прямоугольник построен" : "Линия построена",
-          scope,
-          result.change,
-          seed,
-        );
-        const candidate = command.execute(get().project);
-        validateProject(candidate);
-        if (candidate.schemaVersion !== 2) throw Error("Нужен v2.");
-        const g = candidate.geometries[gid],
-          world = occurrenceMatrix(candidate, path),
-          stats = {
-            vertices: Object.keys(g.vertices).length,
-            edges: Object.keys(g.edges).length,
-            faces: Object.keys(g.faces).length,
-            areas: Object.values(g.faces).map((f) =>
-              tessellationArea(tessellateFace(g, f), world),
-            ),
-          };
-        if (preview) return { status: "preview", stats };
-        const project = history.run(command, get().project);
-        publishingSketch = true;
+    drawSegments: (path, segments, preview = false, accept, shared = false) =>
+      trackGeometryCommit<SketchReply>(async () => {
+        const before = get().project,
+          revision = get().revision;
+        let session: GeometrySession | undefined;
         try {
-          set({
-            project: freezeData(project),
-            revision: revision + 1,
-            canUndo: history.canUndo,
-            canRedo: history.canRedo,
-            topologySelection: null,
-            topologySelections: [],
-            topologyHover: null,
-            message: command.label,
+          if (transactionInProgress)
+            throw Error("Другая команда ещё выполняется.");
+          if (accept && !accept()) throw Error("Построение отменено.");
+          if (before.schemaVersion !== 2)
+            throw Error(
+              "Для рисования преобразуйте проект в v2 через меню Файл.",
+            );
+          const definitionId = definitionAtPath(before, path),
+            occurrences = definitionOccurrences(before);
+          const occurrence = occurrences.find(
+            (o) => JSON.stringify(o.path) === JSON.stringify(path),
+          );
+          if (
+            !occurrence?.visible ||
+            isGeometryLocked(before, { definitionId })
+          )
+            throw Error("Контекст скрыт или заблокирован.");
+          if (
+            !preview &&
+            !shared &&
+            occurrences.filter((o) => o.definitionId === definitionId).length >
+              1
+          )
+            throw Error(
+              "Подтвердите изменение всех экземпляров общего компонента.",
+            );
+          const staged = clone(before),
+            seed: ConstructorParameters<typeof GeometryDocumentCommand>[3] = {};
+          let gid = staged.definitions[definitionId].geometryId;
+          if (!gid) {
+            gid = id("geometry/" + crypto.randomUUID());
+            seed.geometry = emptyGeometry(gid, id(definitionId));
+            staged.geometries[gid] = clone(seed.geometry);
+            staged.definitions[definitionId].geometryId = gid;
+          }
+          if (!Object.keys(staged.materials).length) {
+            const materialId = "material/" + crypto.randomUUID();
+            seed.material = {
+              id: materialId,
+              color: "#86b7c6",
+              roughness: 0.7,
+              metalness: 0,
+            };
+            staged.materials[materialId] = clone(seed.material);
+          }
+          const scope = {
+              definitionId,
+              geometryId: gid,
+              occurrencePath: [...path],
+            },
+            context = geometryContext(staged, gid, true, path),
+            matrix = inverseAffine(occurrenceMatrix(staged, path));
+          const local = segments.map(
+            ([a, b]) =>
+              [transformAffine(a, matrix), transformAffine(b, matrix)] as [
+                Vec3,
+                Vec3,
+              ],
+          );
+          session = new GeometrySession(
+            staged.geometries[gid],
+            context,
+            createLocalGeometryBackend(context),
+            id("draw/" + crypto.randomUUID()),
+          );
+          pendingGeometry.add(session);
+          const result = await session.prepare({
+            kind: "insert-segments",
+            segments: local,
+            plane: null,
           });
+          if (accept && !accept()) throw Error("Построение отменено.");
+          if (get().revision !== revision)
+            throw Error("Результат построения устарел.");
+          if (result.status === "noop") return { status: "noop" };
+          if (result.status !== "preview")
+            throw Error(
+              result.status === "error"
+                ? result.diagnostics[0].message
+                : "Построение отменено.",
+            );
+          const command = new GeometryDocumentCommand(
+            segments.length === 4
+              ? "Прямоугольник построен"
+              : "Линия построена",
+            scope,
+            result.change,
+            seed,
+          );
+          const candidate = command.execute(get().project);
+          validateProject(candidate);
+          if (candidate.schemaVersion !== 2) throw Error("Нужен v2.");
+          const g = candidate.geometries[gid],
+            world = occurrenceMatrix(candidate, path),
+            stats = {
+              vertices: Object.keys(g.vertices).length,
+              edges: Object.keys(g.edges).length,
+              faces: Object.keys(g.faces).length,
+              areas: Object.values(g.faces).map((f) =>
+                tessellationArea(tessellateFace(g, f), world),
+              ),
+            };
+          if (preview) return { status: "preview", stats };
+          const project = history.run(command, get().project);
+          publishingSketch = true;
+          try {
+            set({
+              project: freezeData(project),
+              revision: revision + 1,
+              canUndo: history.canUndo,
+              canRedo: history.canRedo,
+              topologySelection: null,
+              topologySelections: [],
+              topologyHover: null,
+              message: command.label,
+            });
+          } finally {
+            publishingSketch = false;
+          }
+          return { status: "applied", stats };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Ошибка построения";
+          if (!preview) set({ message });
+          return { status: "rejected", error: message };
         } finally {
-          publishingSketch = false;
+          if (session) pendingGeometry.delete(session);
         }
-        return { status: "applied", stats };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Ошибка построения";
-        if (!preview) set({ message });
-        return { status: "rejected", error: message };
-      } finally {
-        if (session) pendingGeometry.delete(session);
-      }
-    },
+      }, preview),
     selectEntity: (ref, additive = false) => {
       if (transactionInProgress) return;
       try {
@@ -611,69 +641,70 @@ export const useEditor = create<EditorState>((set, get) => {
         reject(error);
       }
     },
-    editGeometry: async (ref, intent, acceptContext) => {
-      if (transactionInProgress)
-        return reject(Error("Вложенная команда запрещена."));
-      const before = get().project,
-        revision = get().revision;
-      if (before.schemaVersion !== 2)
-        return reject(Error("Для топологии нужен документ v2."));
-      let session: GeometrySession | undefined;
-      try {
-        if (acceptContext && !acceptContext())
-          throw Error("Контекст редактирования изменился.");
-        validateEntityRef(before, ref);
-        if (isGeometryLocked(before, ref))
-          throw Error("Геометрический контекст заблокирован.");
-        const context = geometryContext(
-          before,
-          ref.geometryId,
-          true,
-          ref.occurrencePath,
-        );
-        session = new GeometrySession(
-          before.geometries[ref.geometryId],
-          context,
-          createLocalGeometryBackend(context),
-          ("edit/" +
-            crypto.randomUUID()) as import("@forma/geometry").Id<"session">,
-        );
-        pendingGeometry.add(session);
-        const result = await session.prepare(intent);
-        if (acceptContext && !acceptContext())
-          throw Error("Контекст редактирования изменился.");
-        if (get().revision !== revision || get().project.schemaVersion !== 2)
-          throw Error("Результат геометрии устарел.");
-        if (result.status === "noop") return { status: "noop" };
-        if (result.status !== "preview")
-          throw Error(
-            result.status === "error"
-              ? result.diagnostics[0].message
-              : "Операция отменена.",
+    editGeometry: (ref, intent, acceptContext) =>
+      trackGeometryCommit<CommandResult>(async () => {
+        if (transactionInProgress)
+          return reject(Error("Вложенная команда запрещена."));
+        const before = get().project,
+          revision = get().revision;
+        if (before.schemaVersion !== 2)
+          return reject(Error("Для топологии нужен документ v2."));
+        let session: GeometrySession | undefined;
+        try {
+          if (acceptContext && !acceptContext())
+            throw Error("Контекст редактирования изменился.");
+          validateEntityRef(before, ref);
+          if (isGeometryLocked(before, ref))
+            throw Error("Геометрический контекст заблокирован.");
+          const context = geometryContext(
+            before,
+            ref.geometryId,
+            true,
+            ref.occurrencePath,
           );
-        const project = history.run(
-          new GeometryDocumentCommand(
-            "Изменение геометрии",
-            ref,
-            result.change,
-          ),
-          get().project,
-        );
-        set({
-          project: freezeData(project),
-          revision: revision + 1,
-          canUndo: history.canUndo,
-          canRedo: history.canRedo,
-          topologySelection: null,
-          message: "Геометрия изменена",
-        });
-        return { status: "applied" };
-      } catch (error) {
-        return reject(error);
-      } finally {
-        if (session) pendingGeometry.delete(session);
-      }
-    },
+          session = new GeometrySession(
+            before.geometries[ref.geometryId],
+            context,
+            createLocalGeometryBackend(context),
+            ("edit/" +
+              crypto.randomUUID()) as import("@forma/geometry").Id<"session">,
+          );
+          pendingGeometry.add(session);
+          const result = await session.prepare(intent);
+          if (acceptContext && !acceptContext())
+            throw Error("Контекст редактирования изменился.");
+          if (get().revision !== revision || get().project.schemaVersion !== 2)
+            throw Error("Результат геометрии устарел.");
+          if (result.status === "noop") return { status: "noop" };
+          if (result.status !== "preview")
+            throw Error(
+              result.status === "error"
+                ? result.diagnostics[0].message
+                : "Операция отменена.",
+            );
+          const project = history.run(
+            new GeometryDocumentCommand(
+              "Изменение геометрии",
+              ref,
+              result.change,
+            ),
+            get().project,
+          );
+          set({
+            project: freezeData(project),
+            revision: revision + 1,
+            canUndo: history.canUndo,
+            canRedo: history.canRedo,
+            topologySelection: null,
+            message: "Геометрия изменена",
+          });
+          return { status: "applied" };
+        } catch (error) {
+          return reject(error);
+        } finally {
+          if (session) pendingGeometry.delete(session);
+        }
+      }),
     select: (selected) => {
       if (!transactionInProgress)
         set({

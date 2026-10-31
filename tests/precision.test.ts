@@ -233,6 +233,22 @@ it("finds endpoint, midpoint and arbitrary on-edge points", () => {
   expect(r.candidate?.kind).toBe("edge");
   expect(r.candidate?.point).toEqual([1.23, 0, 0]);
 });
+it("prefers a real edge over an axis-promoted grid node on a different plane", () => {
+  const e = new SnapEngine(
+      precisionProject([
+        [
+          [0, 0, 0.02],
+          [4, 0, 0.02],
+        ],
+      ]),
+    ),
+    q = query([1.23, 0, 0.02]);
+  q.gridStep = 0.25;
+  const result = e.query(q);
+  expect(result.candidates.some((c) => c.kind === "grid")).toBe(true);
+  expect(result.candidate?.kind).toBe("edge");
+  expect(result.candidate?.point).toEqual([1.23, 0, 0.02]);
+});
 it("finds isolated vertices and X junction intersections with canonical references", () => {
   const p = precisionProject([
       [

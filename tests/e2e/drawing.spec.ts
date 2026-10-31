@@ -243,6 +243,8 @@ test("drawing in a scaled group preserves neighbouring component geometry and re
     buffer: Buffer.from(JSON.stringify(before)),
   });
   await expect(page.getByTestId("viewport")).toBeVisible();
+  await expect(page.locator(".project-title")).toContainText(before.name);
+  await expect(page.locator(".app")).toHaveAttribute("aria-busy", "false");
   await page.keyboard.press("r");
   await page.getByText("Плоскость и контекст", { exact: true }).click();
   await page

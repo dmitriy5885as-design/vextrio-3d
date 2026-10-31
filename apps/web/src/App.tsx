@@ -47,7 +47,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Viewport, NavigationCube } from "@forma/viewport";
-import { useEditor, isDirty } from "@forma/editor";
+import { useEditor, isDirty, awaitGeometryCommits } from "@forma/editor";
 import {
   browserFileAdapter,
   downloadGeometry,
@@ -161,6 +161,7 @@ export function App() {
   const save = async (as = false) => {
     if (!beginFile()) return;
     try {
+      await awaitGeometryCommits();
       const startedProject = useEditor.getState().project;
       const project = structuredClone(startedProject);
       if (as) {
@@ -1021,10 +1022,11 @@ export function App() {
                 </div>
                 <p className="dialog-note">
                   Выдавливание поддерживает плоские контуры и ограниченные
-                  углубления и сквозные окна между параллельными гранями. Проёмы
-                  до края стены и общие булевы операции пока не поддерживаются.
-                  Экспорт OBJ/STL — в меню «Файл» браузерной версии. Основные
-                  инструменты остаются бесплатными.
+                  углубления и сквозные окна между параллельными гранями.
+                  Поддерживаются сквозные дверные проёмы до края стены. Общие
+                  булевы операции пока не поддерживаются. Экспорт OBJ/STL — в
+                  меню «Файл» браузерной версии. Основные инструменты остаются
+                  бесплатными.
                 </p>
               </>
             )}

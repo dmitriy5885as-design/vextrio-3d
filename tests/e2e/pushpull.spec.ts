@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 async function point(page: Page, p: [number, number, number]) {
   const b = (await page.getByTestId("viewport").boundingBox())!,
     c = new PerspectiveCamera(45, b.width / b.height, 0.05, 10000);
@@ -183,3 +183,96 @@ test("double click enters the group; drawing and cutting leave an independent ne
     .click();
   await expect(page.getByTestId("edit-context")).toHaveCount(0);
 });
+for (const grouped of [false, true])
+  test(`draw a doorway to the lower boundary, remove the threshold and roundtrip it (${grouped ? "group" : "scene"})`, async ({
+    page,
+  }) => {
+    await wall(page);
+    let neighbour: any;
+    if (grouped) {
+      await page.keyboard.press("Space");
+      await click(page, [2, 1, 0.2]);
+      await page
+        .getByRole("button", {
+          name: "Сгруппировать всю геометрию сцены",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("button", {
+          name: "Создать связанный экземпляр",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("button", { name: "Сделать независимым", exact: true })
+        .click();
+      const x = page.getByLabel("Положение группы X", { exact: true });
+      await x.fill("6");
+      await x.press("Enter");
+      const p = await save(page);
+      const node = Object.values(p.nodes).find(
+        (n: any) => n.transform.translation[0] === 6,
+      ) as any;
+      neighbour = {
+        gid: p.definitions[node.definitionId].geometryId,
+        geometry: p.geometries[p.definitions[node.definitionId].geometryId],
+      };
+      await page.keyboard.press("Space");
+      const v = await point(page, [2, 1, 0.2]);
+      await page.mouse.dblclick(v.x, v.y);
+      await expect(page.getByTestId("edit-context")).toBeVisible();
+    }
+    await page.keyboard.press("r");
+    await click(page, [1, 0, 0.2]);
+    await move(page, [2, 2, 0.2]);
+    const size = page.getByLabel("Размер построения", { exact: true });
+    await size.fill("1m;2m");
+    await size.press("Enter");
+    const before = await save(page);
+    await page.keyboard.press("p");
+    await click(page, [1.5, 1, 0.2]);
+    await move(page, [1.5, 1, -0.3]);
+    await expect(page.getByTestId("volume-preview")).toContainText(
+      "Объём: 2 м³",
+    );
+    // Moving and cancellation do not remove the threshold or add a history item.
+    await page.keyboard.press("Escape");
+    expect((await save(page)).geometries).toEqual(before.geometries);
+    await page.keyboard.press("p");
+    await click(page, [1.5, 1, 0.2]);
+    await move(page, [1.5, 1, -0.3]);
+    await expect(page.getByTestId("volume-preview")).toContainText(
+      "Объём: 2 м³",
+    );
+    await click(page, [1.5, 1, -0.3]);
+    const after = await save(page),
+      g = Object.values(after.geometries).find(
+        (g: any) => Object.keys(g.faces).length === 10,
+      ) as any;
+    expect(g).toBeDefined();
+    expect(Object.keys(g.vertices)).toHaveLength(16);
+    expect(Object.keys(g.edges)).toHaveLength(24);
+    expect(
+      Object.values(g.faces).every((f: any) => !f.innerLoopIds.length),
+    ).toBe(true);
+    if (grouped)
+      expect(after.geometries[neighbour.gid]).toEqual(neighbour.geometry);
+    else {
+      writeFileSync("test-results/doorway.v3d", JSON.stringify(after, null, 2));
+      await page.screenshot({ path: "test-results/doorway.png" });
+    }
+    await page.keyboard.press("Control+z");
+    expect((await save(page)).geometries).toEqual(before.geometries);
+    await page.keyboard.press("Control+y");
+    expect((await save(page)).geometries).toEqual(after.geometries);
+    page.on("dialog", (d) => d.accept());
+    await page.reload();
+    await page.locator("input[type=file]").setInputFiles({
+      name: "doorway.v3d",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(after)),
+    });
+    await expect(page.getByTestId("viewport")).toBeVisible();
+    expect((await save(page)).geometries).toEqual(after.geometries);
+  });
