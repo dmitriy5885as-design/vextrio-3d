@@ -200,3 +200,37 @@ it("does not pick hidden parent groups or reuse stale maps for another render re
   expect(bridge.pick(ray, 0.01)).toBe(null);
   bridge.dispose();
 });
+
+it("infers a drawing face beside a boundary vertex without filling a real hole", () => {
+  const p = topologyProject(),
+    bridge = new TopologyBridge(p, 1),
+    ray = new THREE.Raycaster(
+      new THREE.Vector3(-0.001, -0.001, 10),
+      new THREE.Vector3(0, 0, -1),
+    );
+  expect(bridge.pickFace(ray)).toBeNull();
+  const ref = bridge.drawingFace(ray, 0.01, []);
+  expect(ref?.kind).toBe("face");
+  expect(p.geometries[ref!.geometryId].faces[ref!.entityId]).toBeDefined();
+  ray.set(new THREE.Vector3(1.5, 1.5, 10), new THREE.Vector3(0, 0, -1));
+  expect(bridge.drawingFace(ray, 0.01, [])).toBeNull();
+  bridge.dispose();
+});
+it("boundary plane inference excludes hidden parents and other occurrence contexts", () => {
+  const p = componentProject(),
+    path = ["instance/group", "instance/one"],
+    point = transformAffine([0, 0, 0], occurrenceMatrix(p, path)),
+    ray = new THREE.Raycaster(
+      new THREE.Vector3(point[0] - 0.001, point[1] - 0.001, point[2] + 10),
+      new THREE.Vector3(0, 0, -1),
+    );
+  p.nodes["instance/group"].visible = false;
+  const hidden = new TopologyBridge(p, 1);
+  expect(hidden.drawingFace(ray, 0.01, path)).toBeNull();
+  hidden.dispose();
+  p.nodes["instance/group"].visible = true;
+  const visible = new TopologyBridge(p, 2);
+  expect(visible.drawingFace(ray, 0.01, path)?.occurrencePath).toEqual(path);
+  expect(visible.drawingFace(ray, 0.01, ["instance/two"])).toBeNull();
+  visible.dispose();
+});

@@ -1,14 +1,16 @@
 import * as THREE from "three";
-import { tessellateFace, type Vec3 } from "@forma/geometry";
+import { tessellateFace, affinePlane, type Vec3 } from "@forma/geometry";
 import {
   type ProjectV2,
   type EntityRef,
   type LegacyNode,
+  occurrenceMatrix,
 } from "@forma/document";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
 export class TopologyBridge {
   readonly root = new THREE.Group();
   readonly pickables: THREE.Object3D[] = [];
+  private incidentFaces = new Map<string, Map<string, Set<string>>>();
   readonly placements = new Map<string, THREE.Group>();
   findPlacement(path: string[]) {
     return this.placements.get(JSON.stringify(path));
@@ -366,6 +368,80 @@ export class TopologyBridge {
         }
       : null;
   }
+  /** Resolve a drawing plane at an exact boundary vertex/edge, where a
+   * triangle raycast can miss by roundoff. This never fills a picking hole.
+   */
+  drawingFace(
+    ray: THREE.Raycaster,
+    threshold: number,
+    path?: string[],
+  ): EntityRef | null {
+    const direct = this.pickFace(ray, path);
+    if (direct) return direct.ref;
+    const picked = this.pick(ray, threshold);
+    if (
+      !picked ||
+      !("ref" in picked) ||
+      !["edge", "vertex"].includes(picked.ref.kind)
+    )
+      return null;
+    const ref = picked.ref,
+      pathKey = JSON.stringify(ref.occurrencePath);
+    if (path && JSON.stringify(path) !== pathKey) return null;
+    const g = this.document.geometries[ref.geometryId];
+    let incidence = this.incidentFaces.get(g.id);
+    if (!incidence) {
+      incidence = new Map();
+      for (const face of Object.values(g.faces))
+        for (const loopId of [face.outerLoopId, ...face.innerLoopIds])
+          for (const coedgeId of g.loops[loopId].coedgeIds) {
+            const edge = g.edges[g.coedges[coedgeId].edgeId];
+            for (const key of [
+              "edge/" + edge.id,
+              "vertex/" + edge.start,
+              "vertex/" + edge.end,
+            ]) {
+              const faces = incidence.get(key) ?? new Set<string>();
+              faces.add(face.id);
+              incidence.set(key, faces);
+            }
+          }
+      this.incidentFaces.set(g.id, incidence);
+    }
+    const faces = incidence.get(ref.kind + "/" + ref.entityId);
+    if (!faces) return null;
+    let best: EntityRef | null = null,
+      facing = -1;
+    for (const object of this.pickables) {
+      const candidate = object.userData.entityRef as EntityRef | undefined;
+      if (
+        !candidate ||
+        candidate.geometryId !== g.id ||
+        candidate.kind !== "face" ||
+        !faces.has(candidate.entityId) ||
+        JSON.stringify(candidate.occurrencePath) !== pathKey ||
+        object.userData.renderRevision !== this.revision
+      )
+        continue;
+      let visible = true;
+      for (let n: THREE.Object3D | null = object; n; n = n.parent)
+        if (!n.visible) {
+          visible = false;
+          break;
+        }
+      if (!visible) continue;
+      const normal = affinePlane(
+          g.faces[candidate.entityId].plane,
+          occurrenceMatrix(this.document, candidate.occurrencePath),
+        ).normal,
+        score = Math.abs(ray.ray.direction.dot(new THREE.Vector3(...normal)));
+      if (score > facing) {
+        facing = score;
+        best = structuredClone(candidate);
+      }
+    }
+    return best;
+  }
   editingContext(path: string[]) {
     for (const o of this.pickables) {
       const p =
@@ -387,6 +463,7 @@ export class TopologyBridge {
   dispose() {
     for (const r of this.resources) r.dispose();
     this.resources.clear();
+    this.incidentFaces.clear();
     this.root.clear();
     this.pickables.length = 0;
     this.legacy.clear();

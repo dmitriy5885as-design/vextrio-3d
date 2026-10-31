@@ -10,3 +10,5 @@ export * from "./tessellate";
 export * from "./volume";
 export * from "./through";
 export * from "./affine";
+
+export * from "./arc";

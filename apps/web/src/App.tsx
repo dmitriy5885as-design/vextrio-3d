@@ -18,6 +18,7 @@ import {
   ChevronRight,
   CircleHelp,
   Circle,
+  Spline,
   Cylinder,
   Eye,
   EyeOff,
@@ -413,6 +414,7 @@ export function App() {
         shortcut: "R",
       },
       { label: "Окружность", action: () => s.setTool("circle"), shortcut: "C" },
+      { label: "Дуга", action: () => s.setTool("arc"), shortcut: "A" },
       { label: "Масштаб", action: () => s.setTool("scale"), shortcut: "S" },
       {
         label: "Вытянуть / вдавить",
@@ -604,6 +606,7 @@ export function App() {
                 { tool: "line", icon: <Pencil size={20} />, key: "L" },
                 { tool: "rectangle", icon: <Square size={20} />, key: "R" },
                 { tool: "circle", icon: <Circle size={20} />, key: "C" },
+                { tool: "arc", icon: <Spline size={20} />, key: "A" },
                 { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "M" },
                 { tool: "rotate", icon: <Rotate3D size={21} />, key: "Q" },
@@ -1112,8 +1115,8 @@ export function App() {
                     <div className="help-grid">
                       <kbd>Space / V</kbd>
                       <span>Выделение</span>
-                      <kbd>L / R / C</kbd>
-                      <span>Линия / прямоугольник / окружность</span>
+                      <kbd>L / R / C / A</kbd>
+                      <span>Линия / прямоугольник / окружность / дуга</span>
                       <kbd>P</kbd>
                       <span>Вытянуть / вдавить выбранную грань</span>
                       <kbd>M / Q / S</kbd>

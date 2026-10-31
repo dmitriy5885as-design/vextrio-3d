@@ -11,11 +11,21 @@ import { definitionOccurrences, definitionAtPath } from "@forma/document";
 import {
   formatDimension,
   resolvePrecision,
+  parseDimension,
   type PrecisionInput,
+  type PrecisionResult,
   type PlaneName,
   type CoordinateSystem,
 } from "@forma/snapping";
-import { subtract, length, multiply, dot } from "@forma/geometry";
+import {
+  add,
+  subtract,
+  length,
+  multiply,
+  dot,
+  arcChordFrame,
+  arcProfile,
+} from "@forma/geometry";
 import "./sketch.css";
 export function SketchPanel() {
   const editor = useEditor(),
@@ -63,18 +73,25 @@ export function SketchPanel() {
     ),
     definitionId = definitionAtPath(p, precision.path),
     count = occurrences.filter((o) => o.definitionId === definitionId).length;
+  const arcBulge = state.tool === "arc" && !!state.arcEnd;
   const mode: PrecisionInput["mode"] = coordinates
     ? "coordinates"
-    : state.tool === "line" || state.tool === "circle"
+    : state.tool === "line" || state.tool === "circle" || state.tool === "arc"
       ? "length"
       : "rectangle";
   const submit = async () => {
     try {
       const frame = precisionFrame(p, precision),
         plane = sketchPlane();
-      if (state.tool === "circle" && /^\d+s$/i.test(text.trim())) {
+      if (
+        (state.tool === "circle" || state.tool === "arc") &&
+        /^\d+s$/i.test(text.trim())
+      ) {
         const count = Number(text.trim().slice(0, -1));
-        const accepted = sketchController.setCircleSides(count, plane);
+        const accepted =
+          state.tool === "arc"
+            ? sketchController.setArcSides(count, plane)
+            : sketchController.setCircleSides(count, plane);
         if (accepted) {
           setText("");
           usePrecision.setState({ editing: false, exact: false, error: "" });
@@ -93,25 +110,53 @@ export function SketchPanel() {
               state.start ?? precision.anchor,
             )
           : ([0, 0, 0] as [number, number, number]);
-      if (state.tool === "circle") {
+      if (state.tool === "circle" || state.tool === "arc") {
         direction = subtract(
           direction,
           multiply(plane.normal, dot(direction, plane.normal)),
         );
         if (length(direction) <= 1e-7) direction = plane.u;
       }
-      const result = resolvePrecision({
-        text,
-        mode,
-        relative: false,
-        unit: p.units,
-        anchor: state.start ?? precision.anchor,
-        direction,
-        matrix: frame.matrix,
-        plane,
-        system: precision.system,
-        axis: precision.axis,
-      });
+      let result: PrecisionResult;
+      if (arcBulge && !coordinates && state.start && state.arcEnd) {
+        if (precision.axis)
+          throw Error("Для точной выпуклости снимите фиксацию оси.");
+        const chord = arcChordFrame(state.start, state.arcEnd, plane),
+          hover = precision.target ?? state.target,
+          side =
+            hover &&
+            dot(subtract(hover, chord.midpoint), chord.perpendicular) < -1e-7
+              ? -1
+              : 1,
+          value = parseDimension(text, p.units, true),
+          bulge = /^[+-]/.test(text.trim()) ? value : value * side;
+        result = {
+          point: add(chord.midpoint, multiply(chord.perpendicular, bulge)),
+        };
+      } else
+        result = resolvePrecision({
+          text,
+          mode,
+          relative: false,
+          unit: p.units,
+          anchor: state.start ?? precision.anchor,
+          direction,
+          matrix: frame.matrix,
+          plane,
+          system: precision.system,
+          axis: precision.axis,
+        });
+      if (state.tool === "arc" && state.start) {
+        if (state.arcEnd)
+          arcProfile(
+            state.start,
+            state.arcEnd,
+            result.point,
+            plane,
+            state.arcSides,
+          );
+        else arcChordFrame(state.start, result.point, plane);
+      }
       if (
         state.tool === "circle" &&
         state.start &&
@@ -150,12 +195,35 @@ export function SketchPanel() {
     }
   };
   const error = precision.error || state.error;
+  let arcMetrics: ReturnType<typeof arcProfile> | null = null;
+  if (arcBulge && state.start && state.arcEnd && precision.target) {
+    try {
+      arcMetrics = arcProfile(
+        state.start,
+        state.arcEnd,
+        precision.target,
+        sketchPlane(),
+        state.arcSides,
+      );
+    } catch {
+      /* invalid preview is reported below */
+    }
+  }
   return (
     <div
       className="sketch-panel"
       data-testid="sketch-panel"
       data-tool={state.tool}
       data-phase={state.phase}
+      data-stage={
+        state.tool === "arc"
+          ? !state.start
+            ? "start"
+            : state.arcEnd
+              ? "bulge"
+              : "endpoint"
+          : undefined
+      }
     >
       <div className="sketch-title">
         <strong>
@@ -163,7 +231,9 @@ export function SketchPanel() {
             ? "Линия · L"
             : state.tool === "circle"
               ? "Окружность · C"
-              : "Прямоугольник · R"}
+              : state.tool === "arc"
+                ? "Дуга · A"
+                : "Прямоугольник · R"}
         </strong>
         <button
           title="Завершить рисование"
@@ -180,7 +250,11 @@ export function SketchPanel() {
               ? "Укажите конец отрезка"
               : state.tool === "circle"
                 ? "Укажите радиус или введите размер"
-                : "Укажите противоположный угол"
+                : state.tool === "arc"
+                  ? state.arcEnd
+                    ? "Задайте выпуклость дуги мышью или числом"
+                    : "Укажите второй конец дуги или длину хорды"
+                  : "Укажите противоположный угол"
             : state.tool === "circle"
               ? "Щёлкните центр окружности"
               : "Щёлкните начальную точку"}
@@ -198,7 +272,11 @@ export function SketchPanel() {
               : mode === "length"
                 ? state.tool === "circle"
                   ? "Радиус"
-                  : "Длина"
+                  : state.tool === "arc"
+                    ? arcBulge
+                      ? "Выпуклость"
+                      : "Хорда"
+                    : "Длина"
                 : "Ширина; высота"}
           </span>
           <input
@@ -211,7 +289,11 @@ export function SketchPanel() {
                 : mode === "length"
                   ? state.tool === "circle"
                     ? "1000 мм · 48s — сегменты"
-                    : "4000 мм"
+                    : state.tool === "arc"
+                      ? arcBulge
+                        ? "1000 мм · 24s — сегменты"
+                        : "2000 мм"
+                      : "4000 мм"
                   : "4000 мм;3000 мм"
             }
             aria-invalid={!!error}
@@ -239,15 +321,19 @@ export function SketchPanel() {
           Enter · подтвердить
         </button>
       </form>
-      {state.tool === "circle" && (
+      {(state.tool === "circle" || state.tool === "arc") && (
         <label>
           Сегментов{" "}
           <select
-            aria-label="Сегменты окружности"
-            value={state.circleSides}
+            aria-label={
+              state.tool === "arc" ? "Сегменты дуги" : "Сегменты окружности"
+            }
+            value={state.tool === "arc" ? state.arcSides : state.circleSides}
             disabled={state.phase === "Commit"}
             onChange={(e) =>
-              sketchController.setCircleSides(
+              (state.tool === "arc"
+                ? sketchController.setArcSides.bind(sketchController)
+                : sketchController.setCircleSides.bind(sketchController))(
                 Number(e.target.value),
                 sketchPlane(),
               )
@@ -255,6 +341,7 @@ export function SketchPanel() {
           >
             {[
               ...new Set([
+                ...(state.tool === "arc" ? [2] : []),
                 3,
                 4,
                 6,
@@ -267,7 +354,7 @@ export function SketchPanel() {
                 64,
                 96,
                 128,
-                state.circleSides,
+                state.tool === "arc" ? state.arcSides : state.circleSides,
               ]),
             ]
               .sort((a, b) => a - b)
@@ -299,6 +386,13 @@ export function SketchPanel() {
             ? ` · ${state.tool === "circle" ? "R " : ""}${formatDimension(length(subtract(precision.target, state.start)), p.units)}`
             : ""}
         </output>
+      )}
+      {state.tool === "arc" && (
+        <small data-testid="arc-measurements">
+          {arcMetrics
+            ? `Выпуклость ${formatDimension(Math.abs(arcMetrics.bulge), p.units)} · R ${formatDimension(arcMetrics.radius, p.units)}`
+            : "Два конца → выпуклость · 12s — число сегментов"}
+        </small>
       )}
       <small>
         {precision.hover?.label ?? `Плоскость ${precision.planeName}`} · Esc —

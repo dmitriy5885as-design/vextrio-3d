@@ -807,3 +807,15 @@ it("merging fully coincident bodies retires both body IDs into one new descendan
     ),
   ).toBe(true);
 });
+
+it("exact welded endpoints preserve slanted edge IDs despite fractional intersection roundoff", async () => {
+  const s = session(),
+    a: Vec3 = [1 - Math.cos(Math.PI / 12), Math.sin(Math.PI / 12), 0],
+    b: Vec3 = [1 - Math.cos(Math.PI / 6), Math.sin(Math.PI / 6), 0];
+  await s.execute(segment(a, b));
+  const before = structuredClone(s.snapshot),
+    revision = s.revision;
+  expect(await s.execute(segment(b, a))).toEqual({ status: "noop" });
+  expect(s.snapshot).toEqual(before);
+  expect(s.revision).toBe(revision);
+});
