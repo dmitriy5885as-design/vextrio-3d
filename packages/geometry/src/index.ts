@@ -14,3 +14,5 @@ export * from "./affine";
 export * from "./arc";
 
 export * from "./offset";
+
+export * from "./move";

@@ -12,6 +12,7 @@ import {
   extrusionStop,
   offsetReference,
   classifyBody,
+  transformAffine,
 } from "@forma/geometry";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
@@ -27,6 +28,7 @@ import {
   useVolumePreview,
   usePushPull,
   useOffset,
+  useMove,
   isGeometryLocked,
 } from "@forma/editor";
 import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
@@ -91,7 +93,7 @@ export function Viewport() {
         wanted =
           preview.document &&
           preview.owner === state.tool &&
-          (state.tool === "extrude" || state.tool === "offset") &&
+          ["extrude", "offset", "translate"].includes(state.tool) &&
           preview.revision === state.revision
             ? preview.document
             : null;
@@ -437,6 +439,7 @@ export function Viewport() {
     let down = { x: 0, y: 0 },
       downTool = sketchController.state.tool,
       downEditorTool = useEditor.getState().tool,
+      downMoveGeneration = useMove.getState().generation,
       downOffsetGeneration = useOffset.getState().generation,
       downGeneration = sketchController.generation;
     const pointerDown = (e: PointerEvent) => {
@@ -444,6 +447,7 @@ export function Viewport() {
       down = { x: e.clientX, y: e.clientY };
       downTool = sketchController.state.tool;
       downEditorTool = useEditor.getState().tool;
+      downMoveGeneration = useMove.getState().generation;
       downOffsetGeneration = useOffset.getState().generation;
       downGeneration = sketchController.generation;
     };
@@ -453,6 +457,130 @@ export function Viewport() {
         useEditor.getState().tool === "pan"
       )
         return;
+      if (useEditor.getState().tool === "translate") {
+        const state = useEditor.getState(),
+          p = state.project,
+          operation = useMove.getState();
+        if (
+          downEditorTool !== "translate" ||
+          downMoveGeneration !== operation.generation ||
+          e.button !== 0 ||
+          e.detail > 1 ||
+          dragging ||
+          Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4
+        )
+          return;
+        if (operation.committing) return;
+        if (operation.gesture) {
+          updatePrecision(e.clientX, e.clientY);
+          operation.confirm();
+          return;
+        }
+        if (p.schemaVersion === 2 && topology) {
+          const rect = renderer.domElement.getBoundingClientRect(),
+            ray = cursorRay(e.clientX, e.clientY),
+            threshold =
+              camera instanceof THREE.PerspectiveCamera
+                ? (camera.position.distanceTo(controls.target) *
+                    Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                    12) /
+                  rect.height
+                : (((ortho.top - ortho.bottom) / camera.zoom) * 6) /
+                  rect.height;
+          const hit = topology.pick(ray, threshold, true);
+          if (hit && "ref" in hit) {
+            const ref = hit.ref,
+              path = usePrecision.getState().path;
+            if (
+              JSON.stringify(path) !== JSON.stringify(ref.occurrencePath) ||
+              isGeometryLocked(p, ref)
+            ) {
+              state.notify("Войдите в незаблокированный контекст геометрии.");
+              return;
+            }
+            const refs = state.topologySelections.length
+              ? state.topologySelections
+              : [ref];
+            if (
+              refs.some(
+                (r) =>
+                  r.geometryId !== ref.geometryId ||
+                  JSON.stringify(r.occurrencePath) !== JSON.stringify(path),
+              )
+            ) {
+              state.notify("Выберите геометрию одного активного контекста.");
+              return;
+            }
+            const model = p.geometries[ref.geometryId],
+              matrix = occurrenceMatrix(p, path),
+              anchor = new THREE.Vector3();
+            if (ref.kind === "vertex")
+              anchor.fromArray(
+                transformAffine(model.vertices[ref.entityId].position, matrix),
+              );
+            else if (ref.kind === "edge") {
+              const edge = model.edges[ref.entityId];
+              ray.ray.distanceSqToSegment(
+                new THREE.Vector3(
+                  ...transformAffine(
+                    model.vertices[edge.start].position,
+                    matrix,
+                  ),
+                ),
+                new THREE.Vector3(
+                  ...transformAffine(model.vertices[edge.end].position, matrix),
+                ),
+                undefined,
+                anchor,
+              );
+            } else {
+              const plane = affinePlane(
+                model.faces[ref.entityId].plane,
+                matrix,
+              );
+              if (
+                !ray.ray.intersectPlane(
+                  new THREE.Plane().setFromNormalAndCoplanarPoint(
+                    new THREE.Vector3(...plane.normal),
+                    new THREE.Vector3(...plane.origin),
+                  ),
+                  anchor,
+                )
+              )
+                return;
+            }
+            if (!state.topologySelections.length) state.selectEntity(ref);
+            const normal = camera
+                .getWorldDirection(new THREE.Vector3())
+                .negate(),
+              u = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion),
+              v = new THREE.Vector3().crossVectors(normal, u).normalize(),
+              point = anchor.toArray() as Vec3;
+            usePrecision
+              .getState()
+              .configure({
+                enabled: true,
+                axis: null,
+                planeOverride: {
+                  origin: point,
+                  u: u.toArray() as Vec3,
+                  v: v.toArray() as Vec3,
+                  normal: normal.toArray() as Vec3,
+                },
+              });
+            usePrecision.getState().setAnchor(point);
+            useMove
+              .getState()
+              .begin({
+                refs: structuredClone(refs),
+                anchor: point,
+                target: point,
+                revision: state.revision,
+              });
+            return;
+          }
+        }
+      }
       if (useEditor.getState().tool === "offset") {
         if (
           downEditorTool !== "offset" ||
@@ -759,7 +887,7 @@ export function Viewport() {
       preview.visible = !!(enabled && p.target);
       planeGuide.visible = enabled;
       precisionAxes.visible = enabled;
-      controls.mouseButtons.LEFT = ["extrude", "offset"].includes(
+      controls.mouseButtons.LEFT = ["extrude", "offset", "translate"].includes(
         useEditor.getState().tool,
       )
         ? (null as unknown as THREE.MOUSE)
@@ -1083,7 +1211,11 @@ export function Viewport() {
           return;
         const activeTool = useEditor.getState().tool;
         const path = usePrecision.getState().path;
-        if (activeTool === "extrude" || activeTool === "offset")
+        if (
+          activeTool === "extrude" ||
+          activeTool === "offset" ||
+          (activeTool === "translate" && useMove.getState().gesture)
+        )
           useEditor.getState().setTool("select");
         else if (
           !sketchController.state.start &&
@@ -1094,6 +1226,8 @@ export function Viewport() {
             .getState()
             .configure({ path: path.slice(0, -1), sharedEditConfirmed: false });
         usePushPull.getState().cancel();
+        useMove.getState().cancel();
+        if(activeTool === "translate")usePrecision.getState().configure({ enabled: false });
         useOffset.getState().cancel();
         sketchController.cancel();
         usePrecision.getState().clear();
@@ -1110,10 +1244,15 @@ export function Viewport() {
       if (
         usePushPull.getState().committing ||
         useOffset.getState().committing ||
+        useMove.getState().committing ||
         sketchController.state.phase === "Commit"
       )
         return;
       usePushPull.getState().cancel();
+      if (useMove.getState().gesture) {
+        useMove.getState().cancel();
+        usePrecision.getState().configure({ enabled: false });
+      }
       useOffset.getState().cancel();
       if (useEditor.getState().tool === "offset")
         useEditor.getState().selectEntity(null);
@@ -1131,6 +1270,14 @@ export function Viewport() {
     };
     controls.addEventListener("change", refreshPrecision);
     const unsubscribePrecision = usePrecision.subscribe((state, previous) => {
+      if (
+        useMove.getState().gesture &&
+        state.target &&
+        state.target !== previous.target &&
+        !state.editing
+      )
+        useMove.getState().move(state.target);
+
       topology?.editingContext(state.path);
       volumeBridge?.editingContext(state.path);
       if (

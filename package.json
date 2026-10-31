@@ -1,6 +1,6 @@
 {
   "name": "forma-3d",
-  "version": "0.2.0-alpha.6",
+  "version": "0.2.0-alpha.7",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.25.0",

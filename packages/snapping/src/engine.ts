@@ -19,7 +19,7 @@ import {
   assertVector,
   validatePlane,
 } from "@forma/geometry";
-import { normalize, rayOnPlane, type WorkPlane } from "./precision";
+import { normalize, rayOnPlane, rayOnAxis, type WorkPlane } from "./precision";
 export type SnapKind =
   | "vertex"
   | "endpoint"
@@ -342,7 +342,10 @@ export class SnapEngine {
       release = q.releaseRadius ?? 16;
     if (!(radius > 0 && release >= radius && Number.isFinite(release)))
       throw Error("Неверный радиус привязки.");
-    const raw = rayOnPlane(q.ray.origin, q.ray.direction, q.plane);
+    const raw =
+      q.axis !== undefined && q.axis !== null
+        ? rayOnAxis(q.ray.origin, q.ray.direction, q.anchor, q.axes[q.axis])
+        : rayOnPlane(q.ray.origin, q.ray.direction, q.plane);
     this.stats = {
       visited: 0,
       inspected: 0,

@@ -3,6 +3,7 @@ import { EditContext } from "./EditContext";
 import { useRecovery } from "./useRecovery";
 import { PrecisionPanel } from "./PrecisionPanel";
 import { SketchPanel } from "./SketchPanel";
+import { MovePanel } from "./MovePanel";
 import { OffsetPanel } from "./OffsetPanel";
 import { ExtrudePanel } from "./ExtrudePanel";
 import {
@@ -774,11 +775,13 @@ export function App() {
           </aside>
         )}
         <section
-          className={`scene${isSketchTool(s.tool) || s.tool === "offset" ? " sketch-active" : ""}`}
+          className={`scene${isSketchTool(s.tool) || ["offset", "translate"].includes(s.tool) ? " sketch-active" : ""}`}
         >
           <Viewport />
           {isSketchTool(s.tool) ? (
             <SketchPanel />
+          ) : s.tool === "translate" ? (
+            <MovePanel />
           ) : s.tool === "offset" ? (
             <OffsetPanel />
           ) : s.tool === "extrude" ? (

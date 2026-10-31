@@ -121,6 +121,8 @@ test("a real face deletion shares Undo/Redo with primitive commands and recovers
     "data-topology-faces",
     "1",
   );
+  // M now edits canonical geometry; return to selection after undoing the primitive.
+  await page.keyboard.press("Space");
   await clickWorld(page, doc, [3, 1.5, 0]);
   await expect(page.getByTestId("face-area")).toContainText("11 м²");
   page.on("dialog", (dialog) =>
