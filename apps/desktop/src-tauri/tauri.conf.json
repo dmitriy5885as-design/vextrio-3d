@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "VEXTRIO 3D — 0.2 Alpha",
+        "title": "VEXTRIO 3D — 0.2.0 Alpha.7",
         "width": 1440,
         "height": 900,
         "minWidth": 1000,

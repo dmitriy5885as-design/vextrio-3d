@@ -1,4 +1,6 @@
-# VEXTRIO 3D · 0.2 Alpha
+# VEXTRIO 3D · 0.2.0 Alpha.7
+
+**Текущие исходники: 0.2.0-alpha.7.** [Полная ветка разработки](https://github.com/dmitriy5885as-design/vextrio-3d/tree/codex/topology-move): [дуга — PR №14](https://github.com/dmitriy5885as-design/vextrio-3d/pull/14), [отступ — PR №15](https://github.com/dmitriy5885as-design/vextrio-3d/pull/15), [перемещение — PR №16](https://github.com/dmitriy5885as-design/vextrio-3d/pull/16). Сайт обновляется после принятия изменений в `main` и успешной публикации Pages; точная версия запущенной сборки видна в шапке редактора и заголовке окна.
 
 ## Открыть в браузере
 
@@ -97,7 +99,7 @@ pnpm desktop
 pnpm desktop:build
 ```
 
-Сборка установщика NSIS появляется в `apps/desktop/src-tauri/target/release/bundle/nsis`. Готовый установщик `VEXTRIO 3D_0.2.0-alpha.1_x64-setup.exe` доступен в artifact **vextrio-windows-installer** последнего успешного [Verify editor and Windows installer](https://github.com/dmitriy5885as-design/vextrio-3d/actions/workflows/verify.yml). Проверяйте версию и commit сборки. Установка, обновление, native диалоги и offline smoke ещё требуют ручной Windows-приёмки; компиляция не заменяет её.
+Сборка установщика NSIS появляется в `apps/desktop/src-tauri/target/release/bundle/nsis`. Установщик `VEXTRIO 3D_<версия>_x64-setup.exe` доступен в artifact **vextrio-windows-installer** последнего успешного [Verify editor and Windows installer](https://github.com/dmitriy5885as-design/vextrio-3d/actions/workflows/verify.yml). Проверяйте версию и commit сборки. Установка, обновление, native диалоги и offline smoke ещё требуют ручной Windows-приёмки; компиляция не заменяет её.
 
 В браузере сохранение скачивает новый файл; успешная передача браузеру не подтверждает запись на диск. В Desktop предусмотрен отдельный адаптер с диалогом и атомарной заменой через временный файл. Нативный путь меняется только после проверки и принятия файла; ошибка или отмена сохраняют прежний путь. Браузерный download-started не снимает предупреждение о несохранённых изменениях. Закрытие Desktop защищено обработчиком несохранённых изменений (требует проверки в собранном приложении).
 

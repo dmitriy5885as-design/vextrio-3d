@@ -138,6 +138,9 @@ export function App() {
               s.project.definitions[o.definitionId].geometryId),
         )
       : [];
+  useEffect(() => {
+    document.title = `VEXTRIO 3D — ${APP_RELEASE_LABEL}`;
+  }, []);
   const input = useRef<HTMLInputElement>(null);
   const fileBusyRef = useRef(false);
   const [fileBusy, setFileBusy] = useState(false);
@@ -495,6 +498,13 @@ export function App() {
             <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
           </button>
           <strong>VEXTRIO 3D</strong>
+          <span
+            className="release-badge"
+            data-testid="app-version"
+            title={`Версия ${APP_VERSION}`}
+          >
+            {APP_RELEASE_LABEL}
+          </span>
           {menu === "Файл" && (
             <>
               <div className="menu-backdrop" onClick={() => setMenu(null)} />
