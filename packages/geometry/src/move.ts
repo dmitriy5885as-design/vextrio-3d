@@ -104,7 +104,8 @@ function finish(
       }),
     );
 
-    if (!rings.flat().some((v) => changed.has(v))) continue;
+    if (before.faces[f.id] && !rings.flat().some((v) => changed.has(v)))
+      continue;
 
     affected.add(f.id);
 
