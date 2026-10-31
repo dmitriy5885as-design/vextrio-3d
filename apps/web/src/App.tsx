@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  Circle,
   Cylinder,
   Eye,
   EyeOff,
@@ -66,7 +67,7 @@ import {
   type Primitive,
 } from "@forma/shared";
 import { ru } from "@forma/ui";
-import { shortcuts, toolLabels } from "@forma/tools";
+import { shortcuts, toolLabels, isSketchTool } from "@forma/tools";
 import { Properties } from "./Properties";
 
 function Button({
@@ -270,7 +271,6 @@ export function App() {
       if (key === "delete" || key === "backspace") removeSelected();
       if (key === " ") e.preventDefault();
       if (key === "escape") {
-        if (s.tool === "extrude") s.setTool("select");
         s.select(null);
         setMenu(null);
       }
@@ -403,6 +403,7 @@ export function App() {
         action: () => s.setTool("rectangle"),
         shortcut: "R",
       },
+      { label: "Окружность", action: () => s.setTool("circle"), shortcut: "C" },
       { label: "Масштаб", action: () => s.setTool("scale"), shortcut: "S" },
       {
         label: "Вытянуть / вдавить",
@@ -581,6 +582,7 @@ export function App() {
                 },
                 { tool: "line", icon: <Pencil size={20} />, key: "L" },
                 { tool: "rectangle", icon: <Square size={20} />, key: "R" },
+                { tool: "circle", icon: <Circle size={20} />, key: "C" },
                 { tool: "extrude", icon: <ArrowUpRight size={20} />, key: "P" },
                 { tool: "translate", icon: <Move3D size={21} />, key: "M" },
                 { tool: "rotate", icon: <Rotate3D size={21} />, key: "Q" },
@@ -710,10 +712,10 @@ export function App() {
           </aside>
         )}
         <section
-          className={`scene${s.tool === "line" || s.tool === "rectangle" ? " sketch-active" : ""}`}
+          className={`scene${isSketchTool(s.tool) ? " sketch-active" : ""}`}
         >
           <Viewport />
-          {s.tool === "line" || s.tool === "rectangle" ? (
+          {isSketchTool(s.tool) ? (
             <SketchPanel />
           ) : s.tool === "extrude" ? (
             <ExtrudePanel />
@@ -738,13 +740,11 @@ export function App() {
           <div className="viewport-bottom">
             <span>
               <MousePointer2 size={12} />{" "}
-              {s.tool === "line" || s.tool === "rectangle"
-                ? "ЛКМ · точка"
-                : "Выбор · ЛКМ · Shift"}
+              {isSketchTool(s.tool) ? "ЛКМ · точка" : "Выбор · ЛКМ · Shift"}
             </span>
             <span>
               <Rotate3D size={13} />{" "}
-              {s.tool === "line" || s.tool === "rectangle"
+              {isSketchTool(s.tool)
                 ? "ПКМ · орбита"
                 : "Орбита · перетаскивание"}
             </span>
@@ -1000,8 +1000,8 @@ export function App() {
                 <div className="help-grid">
                   <kbd>Space / V</kbd>
                   <span>Выделение</span>
-                  <kbd>L / R</kbd>
-                  <span>Линия / прямоугольник</span>
+                  <kbd>L / R / C</kbd>
+                  <span>Линия / прямоугольник / окружность</span>
                   <kbd>P</kbd>
                   <span>Вытянуть / вдавить выбранную грань</span>
                   <kbd>M / Q / S</kbd>

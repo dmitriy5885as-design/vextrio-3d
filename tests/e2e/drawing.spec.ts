@@ -296,14 +296,20 @@ test("invalid dimensions, lost focus and pointer cancellation leave an empty doc
   await input.press("Escape");
   await expect(page.getByTestId("sketch-panel")).toHaveAttribute(
     "data-phase",
-    "Idle",
+    /^(Idle|Hover)$/,
+  );
+  await expect(page.getByTestId("sketch-panel")).toContainText(
+    "Щёлкните начальную точку",
   );
   await click(page, [0, 0, 0]);
   await move(page, [4, 0, 3]);
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
   await expect(page.getByTestId("sketch-panel")).toHaveAttribute(
     "data-phase",
-    "Idle",
+    /^(Idle|Hover)$/,
+  );
+  await expect(page.getByTestId("sketch-panel")).toContainText(
+    "Щёлкните начальную точку",
   );
   await click(page, [0, 0, 0]);
   await move(page, [4, 0, 3]);
@@ -312,7 +318,10 @@ test("invalid dimensions, lost focus and pointer cancellation leave an empty doc
     .dispatchEvent("pointercancel", { pointerId: 1 });
   await expect(page.getByTestId("sketch-panel")).toHaveAttribute(
     "data-phase",
-    "Idle",
+    /^(Idle|Hover)$/,
+  );
+  await expect(page.getByTestId("sketch-panel")).toContainText(
+    "Щёлкните начальную точку",
   );
   expect((await download(page)).geometries).toEqual({});
 });

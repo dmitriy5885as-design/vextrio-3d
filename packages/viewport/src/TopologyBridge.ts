@@ -337,11 +337,16 @@ export class TopologyBridge {
     }
     return null;
   }
-  pickFace(ray: THREE.Raycaster, path?: string[]) {
+  pickFace(
+    ray: THREE.Raycaster,
+    path?: string[],
+    includePreviewHiddenRoot = false,
+  ) {
     this.root.updateMatrixWorld(true);
     const visible = (o: THREE.Object3D) => {
       for (let n: THREE.Object3D | null = o; n; n = n.parent)
-        if (!n.visible) return false;
+        if (!n.visible && !(includePreviewHiddenRoot && n === this.root))
+          return false;
       return true;
     };
     const objects = this.pickables.filter(

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import {
   ToolController,
+  isSketchTool,
+  type SketchTool,
   type ToolState,
   type SketchReply,
   type ToolName,
@@ -880,10 +882,7 @@ export const useEditor = create<EditorState>((set, get) => {
       }
     },
     setTool: (tool) => {
-      if (
-        (tool === "line" || tool === "rectangle") &&
-        get().project.schemaVersion !== 2
-      ) {
+      if (isSketchTool(tool) && get().project.schemaVersion !== 2) {
         reject(
           Error("Для рисования преобразуйте проект в v2 через меню Файл."),
         );
@@ -987,7 +986,7 @@ useEditor.subscribe((s, previous) => {
       });
   }
   if (s.tool !== previous.tool) {
-    const draw = s.tool === "line" || s.tool === "rectangle";
+    const draw = isSketchTool(s.tool);
     if (draw) {
       const p = usePrecision.getState();
       const path = p.path;
@@ -996,9 +995,9 @@ useEditor.subscribe((s, previous) => {
         ...(JSON.stringify(path) !== JSON.stringify(p.path) ? { path } : {}),
       });
       useEditor.setState({ snap: true });
-    } else if (previous.tool === "line" || previous.tool === "rectangle")
+    } else if (isSketchTool(previous.tool))
       usePrecision.getState().configure({ enabled: false });
-    sketchController.activate(draw ? (s.tool as "line" | "rectangle") : null);
+    sketchController.activate(draw ? (s.tool as SketchTool) : null);
   }
 });
 export function sketchPlane() {
