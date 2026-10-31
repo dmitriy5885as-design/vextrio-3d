@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   useEditor,
   useVolumePreview,
@@ -46,8 +46,16 @@ export function ExtrudePanel() {
       async () => {},
     ),
     handledCommit = useRef(pointer.commitId);
-  useEffect(() => {
-    if (pointer.gesture) setText(String(pointer.gesture.distance) + "m");
+  // Flush gesture distance before the browser can focus/select the field.
+  // A passive effect could replace the selected text after focus and splice
+  // the user's first characters into a late "0m" value (for example "0m2m").
+  useLayoutEffect(() => {
+    if (
+      pointer.gesture &&
+      !usePushPull.getState().editing &&
+      document.activeElement !== field.current
+    )
+      setText(String(pointer.gesture.distance) + "m");
   }, [pointer.gesture?.distance, pointer.gesture?.ref.entityId]);
   // Capture the visible sheet side when the face/context changes, not while
   // orbiting the preview, so the confirmed result cannot flip with the camera.
