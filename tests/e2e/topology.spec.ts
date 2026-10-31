@@ -13,7 +13,16 @@ async function open(p: Page, doc: ProjectV2) {
     mimeType: "application/json",
     buffer: Buffer.from(serializeProject(doc)),
   });
-  await expect(p.getByTestId("viewport")).toBeVisible();
+  await expect(p.locator(".viewport-canvas")).toHaveAttribute(
+    "data-topology-faces",
+    String(
+      Object.values(doc.geometries).reduce(
+        (n, g) => n + Object.keys(g.faces).length,
+        0,
+      ),
+    ),
+  );
+  await expect(p.locator(".app")).toHaveAttribute("aria-busy", "false");
 }
 async function clickWorld(
   p: Page,
@@ -144,11 +153,14 @@ test("a real face deletion shares Undo/Redo with primitive commands and recovers
       )[0].vertices,
     )[0]
   ].position = [0, 0, Infinity];
+  const rejectedFile = page.waitForEvent("dialog", (d) => d.type() === "alert");
   await page.locator("input[type=file]").setInputFiles({
     name: "broken.v3d",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(bad)),
   });
+  await rejectedFile;
+  await expect(page.locator(".app")).toHaveAttribute("aria-busy", "false");
   await expect(page.locator(".viewport-canvas")).toHaveAttribute(
     "data-topology-faces",
     "1",

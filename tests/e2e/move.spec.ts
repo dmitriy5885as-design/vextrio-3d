@@ -238,7 +238,11 @@ test("M preserves scaled-group thickness and leaves the neighbour unchanged", as
     mimeType: "application/json",
     buffer: Buffer.from(serializeProject(doc)),
   });
-  await expect(page.getByTestId("viewport")).toBeVisible();
+  await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+    "data-topology-edges",
+    "8",
+  );
+  await expect(page.locator(".app")).toHaveAttribute("aria-busy", "false");
   await page.keyboard.press("r");
   await page.getByTestId("sketch-panel").locator("summary").click();
   await page
@@ -290,7 +294,11 @@ test("M requires shared-component acknowledgement and preserves shared-definitio
     mimeType: "application/json",
     buffer: Buffer.from(serializeProject(doc)),
   });
-  await expect(page.getByTestId("viewport")).toBeVisible();
+  await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+    "data-topology-edges",
+    "8",
+  );
+  await expect(page.locator(".app")).toHaveAttribute("aria-busy", "false");
   await page.keyboard.press("r");
   await page.getByTestId("sketch-panel").locator("summary").click();
   await page
