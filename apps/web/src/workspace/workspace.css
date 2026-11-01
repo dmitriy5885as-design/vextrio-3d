@@ -316,6 +316,7 @@ summary:focus-visible {
 }
 
 .workspace-modal {
+  margin: auto;
   padding: 0;
   border: 0;
   border-radius: 14px;

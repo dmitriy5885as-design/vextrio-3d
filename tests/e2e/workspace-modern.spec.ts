@@ -78,6 +78,12 @@ test("dock and navigator have persistent reveal handles, controls are consolidat
   await page
     .getByRole("button", { name: "Управление и справка", exact: true })
     .click();
+  const helpBox = (await page
+    .getByRole("dialog", { name: "Справка", exact: true })
+    .boundingBox())!;
+  expect(helpBox.x).toBeGreaterThan(100);
+  expect(Math.abs(helpBox.x + helpBox.width / 2 - 1366 / 2)).toBeLessThan(2);
+  expect(Math.abs(helpBox.y + helpBox.height / 2 - 768 / 2)).toBeLessThan(2);
   await page.getByRole("searchbox").fill("дуга");
   await expect(page.locator(".help-content")).toContainText(
     "Замкните её хордой",
