@@ -52,3 +52,29 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Checkout verification source
+        uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Select Chrome or install Chromium
+        shell: bash
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            echo "PLAYWRIGHT_CHANNEL=chrome" >> "$GITHUB_ENV"
+          else
+            pnpm exec playwright install --with-deps chromium
+          fi
+      - name: Verify actual public version and CAD import
+        run: node scripts/check-live-pages.mjs
+        env:
+          LIVE_PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-pages-evidence
+          path: test-results/

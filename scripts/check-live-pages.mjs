@@ -1,0 +1,33 @@
+import { chromium } from "@playwright/test";
+import assert from "node:assert/strict";
+import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+const version=JSON.parse(readFileSync("package.json","utf8")).version;
+const label=version.replace("-alpha."," Alpha.");
+const url=new URL(process.env.LIVE_PAGES_URL||"https://dmitriy5885as-design.github.io/vextrio-3d/");
+url.searchParams.set("release",process.env.GITHUB_SHA||version);
+const browser=await chromium.launch({channel:process.env.PLAYWRIGHT_CHANNEL,args:["--use-angle=swiftshader","--enable-webgl"]});
+try {
+ const page=await browser.newPage({viewport:{width:1366,height:768}}),errors=[],failed=[],resources=[];
+ page.on("pageerror",error=>errors.push(error.message));
+ page.on("response",response=>{if(response.url().startsWith(url.origin)){if(response.status()>=400)failed.push(response.status()+" "+response.url());if(response.url().includes("/cad/"))resources.push(response.url());}});
+ const response=await page.goto(url.href);
+ assert.equal(response.status(),200);
+ await page.getByTestId("app-version").waitFor();
+ assert.equal(await page.getByTestId("app-version").innerText(),label);
+ assert.equal(await page.title(),"VEXTRIO 3D — "+label);
+ await page.getByRole("button",{name:"Новый проект",exact:true}).click();
+ await page.getByRole("button",{name:"Создать проект",exact:true}).click();
+ await page.getByTestId("viewport").waitFor();
+ await page.locator("input[type=file]").setInputFiles("tests/fixtures/import-tetra.step");
+ await page.getByRole("button",{name:"Импортировать",exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector(".viewport-canvas")?.getAttribute("data-topology-faces")==="4",undefined,{timeout:60000});
+ assert.match(await page.getByTestId("model-stats").innerText(),/Грани: 4 · Рёбра: 6 · Полигоны: 4/);
+ assert.ok(resources.some(resource=>resource.endsWith("occt-import-js.wasm")),"Actual public CAD WASM must load");
+ const license=await page.request.get(new URL("cad/license.occt.txt",url).href);
+ assert.ok(license.ok(),"CAD license must be published beside the module");
+ assert.deepEqual(failed,[]);assert.deepEqual(errors,[]);
+ mkdirSync("test-results",{recursive:true});
+ await page.screenshot({path:"test-results/live-pages-alpha14.png"});
+ writeFileSync("test-results/live-pages-evidence.json",JSON.stringify({url:url.href,version,source:process.env.GITHUB_SHA,checkedAt:new Date().toISOString(),faces:4,edges:6,resources,errors,failed},null,2));
+ console.log("Live Pages verified: "+version+", real viewport, STEP topology, local CAD WASM and license; "+url.href);
+}finally{await browser.close();}
