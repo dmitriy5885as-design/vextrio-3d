@@ -244,6 +244,19 @@ test.describe.serial("basic house built entirely through UI", () => {
     expect(volumes[1]).toBeCloseTo(8.4, 7);
     const gid = Object.keys(walls.geometries)[0];
     expect(house.geometries[gid]).toEqual(walls.geometries[gid]);
+    // Capture the completed construction before navigating away. Persistence
+    // checks below remain independent of Chrome's capture-after-reload path.
+    mkdirSync("docs/0.2/images", { recursive: true });
+    await page.bringToFront();
+    await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+      "data-topology-faces",
+      "24",
+    );
+    await page.screenshot({
+      path: "docs/0.2/images/alpha15-house.png",
+      animations: "disabled",
+      caret: "hide",
+    });
   });
   test("saves, closes and reopens the entire house with identical geometry and groups", async () => {
     page.once("dialog", (d) => d.accept());
@@ -262,16 +275,13 @@ test.describe.serial("basic house built entirely through UI", () => {
       "docs/0.2/examples/alpha15-house.v3d",
       JSON.stringify(opened, null, 2),
     );
-    await page.bringToFront();
-    await expect(page.locator(".viewport-canvas")).toHaveAttribute(
-      "data-topology-faces",
-      "24",
+    // Roundtrip acceptance exercises the real picking/render bridge too.
+    await select(page, [3.6, 1.5, 3]);
+    await expect(page.getByTestId("topology-selection")).toHaveAttribute(
+      "data-kind",
+      "face",
     );
-    await page.screenshot({
-      path: "docs/0.2/images/alpha15-house.png",
-      animations: "disabled",
-      caret: "hide",
-    });
+    await expect(page.getByTestId("face-area")).toContainText("9.4 м²");
     for (const g of Object.values(opened.geometries) as GeometryModel[])
       expect(
         Object.values(g.faces).every((f) => tessellateFace(g, f).area > 0),
