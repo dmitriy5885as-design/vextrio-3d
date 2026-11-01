@@ -7,6 +7,8 @@ import {
 import { clone } from "@forma/shared";
 export * from "./export";
 export * from "./recovery";
+export * from "./recent";
+import type { RecentProject } from "./recent";
 import type { Document as Project } from "@forma/document";
 export type SaveResult =
   | { status: "saved" }
@@ -59,7 +61,9 @@ export interface NativeOpenCandidate {
   readonly project: Project;
 }
 export interface NativeTransport {
-  openCandidate(): Promise<{ candidateToken: string; text: string } | null>;
+  openCandidate(
+    recentId?: string,
+  ): Promise<{ candidateToken: string; text: string } | null>;
   acceptCandidate(candidateToken: string): Promise<void>;
   rejectCandidate(candidateToken: string): Promise<void>;
   save(text: string, name: string, saveAs: boolean): Promise<boolean>;
@@ -71,8 +75,8 @@ export function createNativeFileAdapter(transport: NativeTransport) {
     { token: string; project: Project }
   >();
   return {
-    async open(): Promise<NativeOpenCandidate | null> {
-      const response = await transport.openCandidate();
+    async open(recentId?: string): Promise<NativeOpenCandidate | null> {
+      const response = await transport.openCandidate(recentId);
       if (response === null) return null;
       try {
         const project = parseProject(response.text);
@@ -130,7 +134,10 @@ async function invoke<T>(
   return (await import("@tauri-apps/api/core")).invoke<T>(command, args);
 }
 const native = createNativeFileAdapter({
-  openCandidate: () => invoke("open_project"),
+  openCandidate: (recentId) =>
+    recentId
+      ? invoke("open_recent_project", { recentId })
+      : invoke("open_project"),
   acceptCandidate: (candidateToken) =>
     invoke("accept_open", { candidateToken }),
   rejectCandidate: (candidateToken) =>
@@ -138,7 +145,12 @@ const native = createNativeFileAdapter({
   save: (text, name, saveAs) => invoke("save_project", { text, name, saveAs }),
   resetDestination: () => invoke("reset_destination"),
 });
-export const openNative = () => native.open();
+export const openNative = (recentId?: string) => native.open(recentId);
+export const listNativeRecent = () =>
+  invoke<RecentProject[]>("list_recent_projects");
+export const clearNativeRecent = () => invoke<void>("clear_recent_projects");
+export const removeNativeRecent = (recentId: string) =>
+  invoke<void>("remove_recent_project", { recentId });
 export const acceptNativeOpen = (candidate: NativeOpenCandidate) =>
   native.accept(candidate);
 export const rejectNativeOpen = (candidate: NativeOpenCandidate) =>

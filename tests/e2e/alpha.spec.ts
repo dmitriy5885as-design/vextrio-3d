@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { PerspectiveCamera, Vector3 } from "three";
@@ -24,7 +25,7 @@ test("keyboard navigation does not confirm a pending line or leave the drawing t
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.keyboard.press("l");
   const box = (await page.getByTestId("viewport").boundingBox())!,
     camera = new PerspectiveCamera(45, box.width / box.height, 0.05, 10000);
@@ -181,7 +182,7 @@ test("corrupt recovery is rejected and can be discarded without preventing a new
     .getByRole("button", { name: "Удалить автокопию", exact: true })
     .click();
   await expect(page.getByTestId("recovery-card")).toHaveCount(0);
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await expect(page.locator(".viewport-canvas")).toHaveAttribute(
     "data-topology-faces",
     "0",

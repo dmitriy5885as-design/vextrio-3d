@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { serializeProject, occurrenceMatrix } from "@forma/document";
 import { componentProject } from "../fixtures/v2-project";
@@ -38,7 +39,7 @@ async function save(page: Page) {
 }
 async function rectangle(page: Page) {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.keyboard.press("r");
   await click(page, [0, 0, 0]);
   const input = page.getByLabel("Размер построения", { exact: true });

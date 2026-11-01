@@ -1,3 +1,4 @@
+import { createHomeProject } from "./home-helpers";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { test, expect } from "@playwright/test";
@@ -5,7 +6,7 @@ import { PerspectiveCamera, OrthographicCamera, Vector3 } from "three";
 
 test("gizmo drag commits one reversible change", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   const rect = (await page.getByTestId("viewport").boundingBox())!;
   const camera = new PerspectiveCamera(
@@ -42,10 +43,7 @@ test("create, move, save and reopen cube", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Новый проект", exact: false })
-    .filter({ has: page.locator(".start-icon") })
-    .click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   const x = page.getByRole("spinbutton", { name: "Положение X", exact: true });
   await x.fill("4.25");
@@ -63,6 +61,15 @@ test("create, move, save and reopen cube", async ({ page }) => {
   );
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Новый проект", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Создать проект", exact: true })
+    .click();
+  if (
+    await page
+      .getByRole("dialog", { name: "Новый проект", exact: true })
+      .isVisible()
+  )
+    await page.keyboard.press("Escape");
   await expect(page.getByText("Ваша сцена пока пуста.")).toBeVisible();
   await page.locator("input[type=file]").setInputFiles(path!);
   await page.getByRole("button", { name: "Куб 1", exact: true }).click();
@@ -77,7 +84,7 @@ test("mouse selection, history, camera and themes at target resolutions", async 
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   await page
     .getByRole("button", { name: "Выделение (Space)", exact: true })
@@ -135,12 +142,21 @@ test("invalid file leaves project intact and cancelled new preserves edits", asy
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page
     .getByRole("button", { name: "Создать: Сфера", exact: true })
     .click();
   page.once("dialog", (d) => d.dismiss());
   await page.getByRole("button", { name: "Новый проект", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Создать проект", exact: true })
+    .click();
+  if (
+    await page
+      .getByRole("dialog", { name: "Новый проект", exact: true })
+      .isVisible()
+  )
+    await page.keyboard.press("Escape");
   await expect(page.locator(".tree-object")).toHaveCount(1);
   let messages: string[] = [];
   page.on("dialog", async (d) => {
@@ -160,7 +176,7 @@ test("invalid numeric scale and locking keep the last valid object editable afte
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   const scale = page.getByRole("spinbutton", {
     name: "Масштаб X",
@@ -185,7 +201,7 @@ test("browser download retains unsaved warning and cancelled new keeps the proje
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   const wait = page.waitForEvent("download");
   await page
@@ -201,6 +217,15 @@ test("browser download retains unsaved warning and cancelled new keeps the proje
     await dialog.dismiss();
   });
   await page.getByRole("button", { name: "Новый проект", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Создать проект", exact: true })
+    .click();
+  if (
+    await page
+      .getByRole("dialog", { name: "Новый проект", exact: true })
+      .isVisible()
+  )
+    await page.keyboard.press("Escape");
   await expect.poll(() => warned).toBe(true);
   await expect(page.locator(".tree-object")).toHaveCount(1);
 });
@@ -213,7 +238,7 @@ test("golden v1 opens with absolute legacy child placement and roundtrips unchan
       createHash("sha256").update(readFileSync(source)).digest("hex"),
     before = hash();
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.locator("input[type=file]").setInputFiles(source);
   await expect(page.locator(".tree-object")).toHaveCount(4);
   await page
@@ -256,7 +281,7 @@ test("cancelling Save As does not rename or clear the project", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   let promptSeen = false;
   page.once("dialog", async (dialog) => {

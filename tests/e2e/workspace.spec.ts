@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
 
@@ -6,7 +7,7 @@ test("compact dock preserves object edits, locking, panel visibility and file-me
 }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   const properties = page.getByRole("button", {
     name: "Свойства",

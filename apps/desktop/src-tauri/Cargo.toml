@@ -1,6 +1,6 @@
 [package]
 name = "forma-editor"
-version = "0.2.0-alpha.12"
+version = "0.2.0-alpha.13"
 edition = "2021"
 
 [build-dependencies]
@@ -11,3 +11,5 @@ tauri = { version = "2", features = [] }
 rfd = "0.15"
 tempfile = "3"
 serde = { version = "1", features = ["derive"] }
+
+serde_json = "1"

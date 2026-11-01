@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -46,7 +47,7 @@ async function finish(page: Page, text: string, coordinates = false) {
 
 async function polygon(page: Page, points: [number, number, number][]) {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.keyboard.press("l");
   for (const p of [...points, points[0]]) await click(page, p);
   await expect(page.locator(".viewport-canvas")).toHaveAttribute(

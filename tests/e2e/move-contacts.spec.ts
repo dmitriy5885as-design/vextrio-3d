@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -78,7 +79,7 @@ test("M joins a drawn endpoint to a real edge and keeps the T junction through h
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await line(page, [
     [0, 0, 0],
     [4, 0, 0],
@@ -105,7 +106,7 @@ test("M closes a drawn wire into a selectable twelve square metre face", async (
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await line(page, [
     [0, 0, 0],
     [4, 0, 0],
