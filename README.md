@@ -1,10 +1,14 @@
 # VEXTRIO 3D · 0.2.0 Alpha.14
 
-**Текущая ветка разработки: 0.2.0-alpha.14 — рабочее пространство и импорт моделей.** [Исходники](https://github.com/dmitriy5885as-design/vextrio-3d/tree/codex/editor-workspace) · [Аудит, отчёт и скриншоты](docs/0.2/WORKSPACE_ALPHA14.md). Основа — VEXTRIO Home / PR №22 и предыдущие этапы №17–21. Основной сайт остаётся на Alpha.7 до отдельного принятия этих PR. Версия теперь находится в левом нижнем углу редактора; автоматического merge нет.
+**[Открыть VEXTRIO 3D Alpha.14 в браузере](https://dmitriy5885as-design.github.io/vextrio-3d/?v=0.2.0-alpha.14)** — без установки и регистрации.
+
+Основная версия приложения — **0.2.0-alpha.14**. [Исходники в main](https://github.com/dmitriy5885as-design/vextrio-3d/tree/main) · [PR №23 с отчётом и результатами CI](https://github.com/dmitriy5885as-design/vextrio-3d/pull/23) · [Аудит, функции и скриншоты](docs/0.2/WORKSPACE_ALPHA14.md) · [Windows x64 — установщик Alpha.14](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/41273708098/artifacts/13071050209).
+
+Проверенная основа Alpha.14 прошла **501 unit/integration, 97 Playwright E2E, Web/Windows CI и 10 native Rust-тестов**: [финальный CI разработки](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/41273708098). Подготовка локального CAD WASM включена в публикацию GitHub Pages; внешние CDN не требуются. Версия видна внизу слева и в заголовке окна.
 
 ## Открыть в браузере
 
-**[Запустить работающий прототип VEXTRIO 3D](https://dmitriy5885as-design.github.io/vextrio-3d/)** — без установки и регистрации.
+**[Запустить работающий прототип VEXTRIO 3D](https://dmitriy5885as-design.github.io/vextrio-3d/?v=0.2.0-alpha.14)** — без установки и регистрации.
 
 «Придай идее форму» · Shape your ideas.
 

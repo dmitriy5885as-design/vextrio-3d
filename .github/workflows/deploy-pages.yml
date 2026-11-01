@@ -31,6 +31,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Type check
         run: pnpm exec tsc --noEmit
+      - name: Prepare local CAD importer and licenses
+        run: node scripts/prepare-cad.mjs
       - name: Build for GitHub Pages
         run: pnpm exec vite build --base=/vextrio-3d/
       - name: Configure Pages
