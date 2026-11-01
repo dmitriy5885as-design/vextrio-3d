@@ -1,3 +1,4 @@
+import { insertPolygonPart, primitivePolygons } from "./polygon-import";
 import { create } from "zustand";
 import {
   ToolController,
@@ -156,11 +157,16 @@ interface EditorState {
   cameraRequest: { view: string; nonce: number; direction?: Vec3 } | null;
   navigateCamera: (direction: Vec3) => void;
   mutate: (label: string, fn: (candidate: ProjectV1) => void) => CommandResult;
+  importPolygons: (
+    parts: (import("@forma/geometry").PolygonData & { name: string })[],
+  ) => CommandResult;
+  convertPrimitive: () => CommandResult;
   add: (type: Primitive) => CommandResult;
   select: (id: string | null) => void;
   patch: (id: string, patch: ObjectPatch) => CommandResult;
   setLocked: (id: string, locked: boolean) => CommandResult;
   remove: () => CommandResult;
+  deleteSelection: () => Promise<CommandResult>;
   duplicate: () => CommandResult;
   undo: () => CommandResult;
   redo: () => CommandResult;
@@ -230,15 +236,17 @@ export const useEditor = create<EditorState>((set, get) => {
   const structure = (
     label: string,
     fn: (p: import("@forma/document").ProjectV2) => void,
+    allowMigration = false,
   ): CommandResult => {
     if (transactionInProgress)
       return reject(Error("Другая команда выполняется."));
     transactionInProgress = true;
     try {
       const before = get().project;
-      if (before.schemaVersion !== 2)
+      if (before.schemaVersion !== 2 && !allowMigration)
         throw Error("Для групп нужен документ v2.");
-      const candidate = clone(before);
+      const candidate =
+        before.schemaVersion === 2 ? clone(before) : migrateProject(before);
       fn(candidate);
       validateProject(candidate);
       const project = history.run(
@@ -427,6 +435,92 @@ export const useEditor = create<EditorState>((set, get) => {
       } catch (error) {
         return reject(error);
       }
+    },
+    importPolygons: (parts) => {
+      let key = "";
+      const result = structure(
+        "Импортирована модель",
+        (p) => {
+          if (
+            !parts.length ||
+            parts.length > 128 ||
+            parts.reduce((n, part) => n + part.polygons.length, 0) > 3000
+          )
+            throw Error("Превышен лимит импортируемой геометрии.");
+          for (const part of parts) key = insertPolygonPart(p, part, part.name);
+        },
+        true,
+      );
+      if (result.status === "applied") {
+        get().select(key);
+        set({ tool: "select" });
+        get().view("reset");
+      }
+      return result;
+    },
+    convertPrimitive: () => {
+      const key = get().selected;
+      const result = structure(
+        "Примитив преобразован в редактируемую топологию",
+        (p) => {
+          const node = key ? p.nodes[key] : undefined;
+          if (!node || node.kind !== "legacy-primitive")
+            throw Error("Выберите старый примитив.");
+          if (isObjectLocked(p, node.id)) throw Error("Объект заблокирован.");
+          if (
+            node.legacyParentId ||
+            Object.values(p.nodes).some(
+              (n) =>
+                n.kind === "legacy-primitive" && n.legacyParentId === node.id,
+            )
+          )
+            throw Error(
+              "Перед преобразованием отсоедините старые родительские связи примитива.",
+            );
+          const old = clone(node);
+          const nid = insertPolygonPart(
+            p,
+            primitivePolygons(old.primitive.kind, old.primitive.size),
+            old.name,
+            old.parentDefinitionId,
+            old.id,
+            old.materialId,
+          );
+          const next = p.nodes[nid];
+          if (next.kind === "legacy-primitive")
+            throw Error("Ошибка преобразования.");
+          const [x, y, z] = old.transform.rotation.map(
+              (n) => (n * Math.PI) / 360,
+            ),
+            a = Math.cos(x),
+            b = Math.cos(y),
+            c = Math.cos(z),
+            d = Math.sin(x),
+            e = Math.sin(y),
+            f = Math.sin(z);
+          next.transform = {
+            translation: old.transform.position,
+            scale: old.transform.scale,
+            rotation: [
+              d * b * c + a * e * f,
+              a * e * c - d * b * f,
+              a * b * f + d * e * c,
+              a * b * c - d * e * f,
+            ],
+          };
+          next.visible = old.visible;
+          const data = (p.extensions["vextrio:converted-primitives"] ??
+            {}) as Record<string, unknown>;
+          data[old.id] = old;
+          p.extensions["vextrio:converted-primitives"] = data;
+        },
+        true,
+      );
+      if (result.status === "applied") {
+        get().select(key);
+        set({ tool: "select" });
+      }
+      return result;
     },
     add: (type) => {
       try {
@@ -706,6 +800,8 @@ export const useEditor = create<EditorState>((set, get) => {
             canUndo: history.canUndo,
             canRedo: history.canRedo,
             topologySelection: null,
+            topologySelections: [],
+            topologyHover: null,
             message: "Геометрия изменена",
           });
           return { status: "applied" };
@@ -759,6 +855,52 @@ export const useEditor = create<EditorState>((set, get) => {
       });
       if (result.status === "applied") set({ selected: null });
       return result;
+    },
+    deleteSelection: async () => {
+      const state = get(),
+        refs = state.topologySelections.length
+          ? state.topologySelections
+          : state.topologySelection
+            ? [state.topologySelection]
+            : [];
+      if (refs.length) {
+        const ref = refs[0];
+        if (
+          refs.some(
+            (r) =>
+              r.geometryId !== ref.geometryId ||
+              JSON.stringify(r.occurrencePath) !==
+                JSON.stringify(ref.occurrencePath),
+          )
+        )
+          return reject(Error("Удаляйте геометрию одного контекста за раз."));
+        if (
+          state.project.schemaVersion === 2 &&
+          definitionOccurrences(state.project).filter(
+            (o) => o.definitionId === ref.definitionId,
+          ).length > 1
+        )
+          return reject(
+            Error(
+              "Это общий компонент. Сделайте экземпляр уникальным перед удалением его геометрии.",
+            ),
+          );
+        return get().editGeometry(ref, {
+          kind: "delete-entities",
+          entityIds: refs.map((r) => r.entityId),
+        });
+      }
+      const key = state.selected;
+      if (
+        key &&
+        state.project.schemaVersion === 2 &&
+        state.project.nodes[key]?.kind !== "legacy-primitive"
+      ) {
+        const result = get().removeInstance(key);
+        if (result.status === "applied") get().select(null);
+        return result;
+      }
+      return get().remove();
     },
     duplicate: () => {
       const before = get().project,

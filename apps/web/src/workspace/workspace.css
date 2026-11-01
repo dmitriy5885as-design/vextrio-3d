@@ -1,0 +1,376 @@
+.dock-reveal {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #536a884f;
+  background: var(--panel, #172335);
+  border-radius: 9px;
+  color: var(--text, #e4efff);
+  box-shadow: 0 3px 12px #0003;
+}
+.navigation-cube {
+  width: 174px !important;
+  border-radius: 17px !important;
+  background: linear-gradient(145deg, #23364bea, #101c2aee) !important;
+  border: 1px solid #6b9bca40 !important;
+  box-shadow: 0 10px 30px #0004 !important;
+  padding: 9px !important;
+  backdrop-filter: blur(10px);
+}
+.navigation-heading {
+  letter-spacing: 0.13em;
+  font-size: 9px;
+}
+.navigation-cube svg {
+  width: 100%;
+  height: auto;
+}
+.cube-face polygon {
+  fill: #29415a;
+  stroke: #7da7cd;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+  transition: fill 0.14s;
+}
+.cube-face text {
+  fill: #d9ecff;
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
+.cube-face:hover polygon,
+.cube-face:focus polygon {
+  fill: #3478f6;
+}
+.cube-face.cube-active polygon {
+  fill: #176b97;
+}
+.cube-shadow {
+  opacity: 0.35;
+}
+.cube-edge {
+  stroke: transparent !important;
+  stroke-width: 6 !important;
+}
+.cube-edge:hover,
+.cube-edge:focus {
+  stroke: #4dd5c0 !important;
+}
+.cube-corner {
+  fill: transparent !important;
+  stroke: transparent !important;
+}
+.cube-corner:hover,
+.cube-corner:focus {
+  fill: #4dd5c0 !important;
+}
+.navigation-tools {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+.navigation-tools button {
+  flex: 1;
+  font-size: 20px;
+  height: 29px;
+  border-radius: 7px;
+  background: #5685ab14;
+  border: 1px solid #78a6cf24;
+  color: #c2e5ff;
+}
+.navigation-actions button {
+  border-radius: 6px !important;
+}
+.navigation-reveal {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  z-index: 6;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #172638;
+  color: #7cdbff;
+  border: 1px solid #477296;
+  font-size: 24px;
+}
+.project-switcher {
+  min-width: 0;
+  max-width: 340px;
+}
+.project-switcher .project-title {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+.project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-dropdown {
+  right: 0;
+  left: auto;
+  min-width: 280px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.project-dropdown strong,
+.project-dropdown p {
+  display: block;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.project-dropdown button {
+  text-align: left;
+  white-space: normal;
+}
+.statusbar .release-badge {
+  flex-shrink: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.workspace-tooltip {
+  position: fixed;
+  z-index: 10000;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  padding: 12px 14px;
+  border: 1px solid #527da95c;
+  border-radius: 10px;
+  background: #101c2bf5;
+  color: #e4efff;
+  box-shadow: 0 8px 28px #0005;
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.workspace-tooltip strong {
+  display: block;
+  color: #8bd9ff;
+  font-size: 13px;
+}
+.workspace-tooltip span {
+  display: block;
+  margin-top: 5px;
+  max-height: 120px;
+  overflow: hidden;
+}
+.help-content {
+  min-width: 0;
+}
+.help-navigation {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.help-navigation button {
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+}
+.help-navigation button[aria-selected="true"] {
+  background: #3478f625;
+  border-color: #3478f6;
+}
+.help-content input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+.help-content label {
+  display: block;
+  margin-top: 16px;
+}
+.help-content details {
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+.help-content summary {
+  cursor: pointer;
+  display: list-item;
+  font-size: 13px;
+}
+.help-content summary kbd {
+  float: right;
+  font-size: 10px;
+}
+.help-content p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.help-content .help-grid {
+  display: block;
+}
+.help-content .help-grid > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 9px;
+  border-bottom: 1px solid var(--border);
+}
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #4dd5c0;
+  outline-offset: 3px;
+}
+@media (max-width: 1150px) {
+  .statusbar .status-selection {
+    display: none;
+  }
+  .project-switcher {
+    max-width: 180px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cube-face polygon {
+    transition: none;
+  }
+}
+
+.topology-entities {
+  padding: 3px 8px 10px 18px;
+  font-size: 11px;
+}
+.topology-entities details {
+  margin: 5px 0;
+}
+.topology-entities summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.topology-entities button {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 6px;
+  border-radius: 5px;
+}
+.topology-entities button:hover,
+.topology-entities button.active {
+  background: #3478f625;
+}
+.topology-entities button small {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 9px;
+}
+.topology-entities > small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 7px;
+}
+.convert-primitive {
+  padding: 9px;
+  border: 1px solid #3478f6;
+  background: #3478f622;
+  color: var(--text);
+  border-radius: 8px;
+  margin: 10px 0;
+  width: 100%;
+}
+.import-dialog p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.import-dialog select {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px;
+}
+.statusbar [data-testid="model-stats"] {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.dialog:has(.help-content) {
+  width: min(760px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.workspace-modal {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--panel, #161c28);
+  color: var(--text, #e4efff);
+  max-width: 94vw;
+  max-height: 88vh;
+  overflow: auto;
+}
+.workspace-modal::backdrop {
+  background: #080e1ac9;
+  backdrop-filter: blur(6px);
+}
+
+.navigation-cube .navigation-icon,
+.navigation-reveal .navigation-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  cursor: inherit;
+}
+.navigation-tools button {
+  display: grid;
+  place-items: center;
+}
+.navigation-heading button {
+  padding: 2px !important;
+}
+.cube-face[data-side="top"] polygon {
+  fill: #355876;
+}
+.cube-face[data-side="front"] polygon {
+  fill: #294057;
+}
+.cube-face[data-side="right"] polygon {
+  fill: #1b3046;
+}
+.cube-face polygon {
+  stroke: #91b7d4;
+  stroke-width: 1.2;
+}
+.cube-face text {
+  font-size: 7.5px;
+  fill: #d9eeff;
+  letter-spacing: 0.03em;
+}
+.cube-face:hover polygon,
+.cube-face:focus polygon {
+  fill: #2386c9;
+}
+.cube-face.cube-active polygon {
+  fill: #1b7196;
+}
+.navigation-reveal {
+  display: grid;
+  place-items: center;
+}

@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -47,7 +48,7 @@ async function save(page: Page) {
 }
 async function start(page: Page) {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
 }
 
 test("mouse arc closes into an editable face, extrudes and roundtrips exact topology", async ({

@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { PerspectiveCamera, Vector3 } from "three";
@@ -24,7 +25,7 @@ test("keyboard navigation does not confirm a pending line or leave the drawing t
   page,
 }) => {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.keyboard.press("l");
   const box = (await page.getByTestId("viewport").boundingBox())!,
     camera = new PerspectiveCamera(45, box.width / box.height, 0.05, 10000);
@@ -92,7 +93,7 @@ test("orientation cube follows the real camera, preserves pan and framing, suppo
   );
   await page.getByRole("button", { name: "Тип проекции", exact: true }).click();
   await page.getByRole("button", { name: "Изометрия ↗", exact: true }).click();
-  const sphere = page.getByTestId("navigation-cube").locator("svg"),
+  const sphere = page.getByTestId("navigation-cube").locator("svg[aria-label]"),
     cb = (await sphere.boundingBox())!;
   const initial = await save(page);
   await page.mouse.move(cb.x + 70, cb.y + 65);
@@ -181,7 +182,7 @@ test("corrupt recovery is rejected and can be discarded without preventing a new
     .getByRole("button", { name: "Удалить автокопию", exact: true })
     .click();
   await expect(page.getByTestId("recovery-card")).toHaveCount(0);
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await expect(page.locator(".viewport-canvas")).toHaveAttribute(
     "data-topology-faces",
     "0",

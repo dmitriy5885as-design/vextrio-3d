@@ -1,12 +1,12 @@
 {
   "name": "forma-3d",
-  "version": "0.2.0-alpha.7",
+  "version": "0.2.0-alpha.14",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.25.0",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "dev": "node scripts/prepare-cad.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/prepare-cad.mjs && tsc --noEmit && vite build",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check:deps": "node scripts/check-deps.mjs",
@@ -27,6 +27,7 @@
     "@forma/viewport": "workspace:*",
     "@tauri-apps/api": "^2.12.4",
     "lucide-react": "^0.468.0",
+    "occt-import-js": "0.0.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.171.0",

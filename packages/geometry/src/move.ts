@@ -1,5 +1,6 @@
 import {
   GeometryError,
+  id,
   createIdAllocator,
   entityTables,
   type GeometryModel,
@@ -22,13 +23,19 @@ import { metric, unit, contextPlane, inRegion } from "./sketch-common";
 
 import { validateGeometry, type ValidationContext } from "./validate";
 
-import { diffGeometry, invertDelta } from "./transactions";
+import { applyDelta, diffGeometry, invertDelta } from "./transactions";
 
 import { segmentIntersections } from "./intersections";
 
 import { assertFaceContacts } from "./volume";
 
-import { rebuildBodies } from "./sketch";
+import { foldMovedFaces } from "./fold";
+import type { LineageEntry } from "./transactions";
+import {
+  canArrangeWireMove,
+  prepareWireMoveArrangement,
+  rebuildBodies,
+} from "./sketch";
 
 export interface MoveEntity {
   kind: "vertex" | "edge" | "face";
@@ -87,6 +94,7 @@ function finish(
   after: GeometryModel,
   changed: Set<string>,
   context: ValidationContext,
+  lineage: LineageEntry[] = [],
 ) {
   const { world, tolerance } = metric(after, context),
     affected = new Set<string>();
@@ -100,7 +108,8 @@ function finish(
       }),
     );
 
-    if (!rings.flat().some((v) => changed.has(v))) continue;
+    if (before.faces[f.id] && !rings.flat().some((v) => changed.has(v)))
+      continue;
 
     affected.add(f.id);
 
@@ -121,7 +130,12 @@ function finish(
       ]);
 
     const normal = unit(sum),
-      u = unit(subtract(points[1], origin));
+      u = unit(
+        subtract(
+          subtract(points[1], origin),
+          multiply(normal, dot(subtract(points[1], origin), normal)),
+        ),
+      );
 
     if (dot(normal, f.plane.normal) <= 0)
       throw new GeometryError(
@@ -130,7 +144,15 @@ function finish(
         [f.id],
       );
 
-    f.plane = { origin, u, v: cross(normal, u), normal };
+    // JSON stores both signed zero representations as 0. Canonicalise only
+    // the freshly computed frame, preserving all nonzero coordinates.
+    const zero = (v: Vec3) => v.map((n) => (n === 0 ? 0 : n)) as Vec3;
+    f.plane = {
+      origin: zero(origin),
+      u: zero(u),
+      v: zero(cross(normal, u)),
+      normal: zero(normal),
+    };
   }
 
   validateGeometry(after, context);
@@ -138,7 +160,10 @@ function finish(
   const edges = Object.values(after.edges),
     moved = new Set(
       edges
-        .filter((e) => changed.has(e.start) || changed.has(e.end))
+        .filter(
+          (e) =>
+            !before.edges[e.id] || changed.has(e.start) || changed.has(e.end),
+        )
         .map((e) => e.id),
     );
 
@@ -294,13 +319,37 @@ function finish(
   assertFaceContacts(after, affected, context, "Перемещение");
 
   const forward = diffGeometry(before, after);
-  return { forward, inverse: invertDelta(forward), lineage: [] };
+  return { forward, inverse: invertDelta(forward), lineage };
+}
+
+/** Reuse Sketch arrangement when only free wires move. Existing surfaces
+ * may be subdivided by contacts but their source geometry is stationary. */
+function finishWireMove(
+  before: GeometryModel,
+  after: GeometryModel,
+  changed: Set<string>,
+  context: ValidationContext,
+  operationId: Id<"operation">,
+) {
+  if (!canArrangeWireMove(before, after) || !changed.size)
+    return finish(before, after, changed, context);
+  const arranged = prepareWireMoveArrangement(
+    before,
+    after,
+    context,
+    operationId,
+  );
+  const joined = applyDelta(before, arranged.forward, context);
+  for (const v of Object.keys(joined.vertices))
+    if (!before.vertices[v]) changed.add(v);
+  return finish(before, joined, changed, context, arranged.lineage);
 }
 
 export function prepareVertexMove(
   model: GeometryModel,
   positions: { vertexId: Id<"vertex">; position: Vec3 }[],
   context: ValidationContext,
+  operationId: Id<"operation"> = id("direct-vertex-move"),
 ) {
   validateGeometry(model, context);
 
@@ -332,7 +381,10 @@ export function prepareVertexMove(
     after.vertices[m.vertexId].position = [...m.position];
   }
 
-  return finish(model, after, changed, context);
+  if (canArrangeWireMove(model, after))
+    return finishWireMove(model, after, changed, context, operationId);
+  const lineage = foldMovedFaces(model, after, changed, context, operationId);
+  return finish(model, after, changed, context, lineage);
 }
 
 export function prepareEntityTranslation(
@@ -371,6 +423,7 @@ export function prepareEntityTranslation(
         position: position(vertexId),
       })),
       context,
+      operationId,
     );
 
   const after = structuredClone(model),
@@ -445,5 +498,11 @@ export function prepareEntityTranslation(
 
   rebuildBodies(after, model, allocate, new Map());
 
-  return finish(model, after, new Set(vm.values()), context);
+  return finishWireMove(
+    model,
+    after,
+    new Set(vm.values()),
+    context,
+    operationId,
+  );
 }

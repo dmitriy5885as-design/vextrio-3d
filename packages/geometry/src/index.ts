@@ -16,3 +16,5 @@ export * from "./arc";
 export * from "./offset";
 
 export * from "./move";
+
+export * from "./from-polygons";

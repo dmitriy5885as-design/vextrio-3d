@@ -137,10 +137,15 @@ export function createLocalGeometryBackend(
         ) {
           const change =
             intent.kind === "move-vertices"
-              ? prepareVertexMove(model, intent.positions, {
-                  ...context,
-                  policy: request.policy,
-                })
+              ? prepareVertexMove(
+                  model,
+                  intent.positions,
+                  {
+                    ...context,
+                    policy: request.policy,
+                  },
+                  reply.operationId,
+                )
               : prepareEntityTranslation(
                   model,
                   intent.entities,

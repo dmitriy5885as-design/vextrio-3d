@@ -1,3 +1,4 @@
+import {createHomeProject} from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { serializeProject, occurrenceMatrix } from "@forma/document";
 import { componentProject } from "../fixtures/v2-project";
@@ -38,7 +39,7 @@ async function save(page: Page) {
 }
 async function rectangle(page: Page) {
   await page.goto("/");
-  await page.locator(".start-card").first().click();
+  await createHomeProject(page);
   await page.keyboard.press("r");
   await click(page, [0, 0, 0]);
   const input = page.getByLabel("Размер построения", { exact: true });
@@ -173,7 +174,7 @@ test("M mouse preview, axis lock and immediate Ctrl S commit the actual geometry
   ).toBeCloseTo(5, 5);
   expect(Object.keys(g.vertices)).toHaveLength(4);
 });
-test("invalid nonplanar M, Escape, blur and held pointer never change the document", async ({
+test("invalid numeric M, Escape, blur and held pointer never change the document", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -186,7 +187,7 @@ test("invalid nonplanar M, Escape, blur and held pointer never change the docume
     .getByLabel("Режим перемещения", { exact: true })
     .selectOption("coordinates");
   const input = page.getByLabel("Размер перемещения", { exact: true });
-  await input.fill("0;1m;0");
+  await input.fill("0;abc;0");
   await input.press("Enter");
   await expect(page.getByTestId("move-panel").getByRole("alert")).toBeVisible();
   expect((await save(page)).geometries).toEqual(before.geometries);
