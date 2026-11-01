@@ -1,3 +1,4 @@
+import { restoreErasedRegions } from "./erase-merge";
 import { contextPlane } from "./sketch-common";
 import {
   entityTables,
@@ -456,6 +457,14 @@ export function prepareSketch(
     }
     for (const key of edges) delete model.edges[key];
     for (const key of vertices) delete model.vertices[key];
+    replacements = restoreErasedRegions(
+      before,
+      model,
+      edges,
+      new Set(operation.entityIds.filter((key) => before.faces[key])),
+      context,
+      split.allocate,
+    );
     // A removed edge may separate a shell. Keep each connected remainder
     // independently, retaining the old ID for the first surviving component.
     const edgeFaces = new Map<string, Set<string>>(),
@@ -615,7 +624,12 @@ function finishArrangement(
             descendants.length > 1
               ? "split"
               : descendants.length
-                ? "convert"
+                ? table === "faces" &&
+                  [...replacements.values()].filter((ids) =>
+                    ids.includes(descendants[0].id as Id<"face">),
+                  ).length > 1
+                  ? "merge"
+                  : "convert"
                 : "delete",
         });
       }

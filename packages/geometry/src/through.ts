@@ -1,6 +1,6 @@
 import { type GeometryModel, type Face, type Vec3 } from "./model";
 import { type ValidationContext, classifyBody } from "./validate";
-import { contextPlane, metric, inRegion } from "./sketch-common";
+import { contextPlane, metric, inRegion, witness } from "./sketch-common";
 import {
   add,
   subtract,
@@ -28,13 +28,15 @@ export function onSegment(p: Vec3, a: Vec3, b: Vec3, t: number) {
   const k = n ? Math.max(0, Math.min(1, dot(subtract(p, a), d) / n)) : 0;
   return length(subtract(p, add(a, multiply(d, k)))) <= t;
 }
-// A complete ring may share an outer boundary, but may not cross it or touch
-// a hole. Test segments as well as vertices so concave skins cannot be skipped.
+// A profile may share an outer boundary. Reveal strips may also meet a hole
+// boundary, but must remain in the material region. Test edges and an interior
+// witness so an inner boundary is never mistaken for the material it encloses.
 export function containsRing(
   m: GeometryModel,
   f: Face,
   ring: Vec3[],
   context: ValidationContext,
+  allowHoleBoundary = false,
 ) {
   const { world, tolerance: t } = metric(m, context),
     plane = contextPlane(f.plane, context);
@@ -42,9 +44,11 @@ export function containsRing(
     loopVertices(m, l).map(world),
   );
   const polygons = boundaries.map((r) => r.map((v) => projectPoint(v, plane)));
-  const onOuter = (v: Vec3) =>
-    boundaries[0].some((a, i) =>
-      onSegment(v, a, boundaries[0][(i + 1) % boundaries[0].length], t),
+  const onAllowedBoundary = (v: Vec3) =>
+    (allowHoleBoundary ? boundaries : boundaries.slice(0, 1)).some((boundary) =>
+      boundary.some((a, i) =>
+        onSegment(v, a, boundary[(i + 1) % boundary.length], t),
+      ),
     );
   if (
     !ring.every((a, i) =>
@@ -52,7 +56,7 @@ export function containsRing(
         (v) =>
           Math.abs(dot(subtract(v, plane.origin), plane.normal)) <= t &&
           (inRegion(projectPoint(v, plane), polygons[0], polygons.slice(1)) ||
-            onOuter(v)),
+            onAllowedBoundary(v)),
       ),
     )
   )
@@ -72,7 +76,7 @@ export function containsRing(
             length(subtract(d, c));
         for (const h of segmentIntersections(a, b, c, d, t))
           if (
-            k > 0 ||
+            (k > 0 && !allowHoleBoundary) ||
             (!collinear &&
               length(subtract(h.point, a)) > t &&
               length(subtract(h.point, b)) > t)
@@ -90,6 +94,15 @@ export function containsRing(
     )
       return false;
   }
+  if (
+    allowHoleBoundary &&
+    !inRegion(
+      witness(ring.map((v) => projectPoint(v, plane))),
+      polygons[0],
+      polygons.slice(1),
+    )
+  )
+    return false;
   return true;
 }
 // Limited parallel-face push-through, not a general boolean. The complete
@@ -192,6 +205,7 @@ export function extrusionStop(
               add(a, multiply(direction, depth)),
             ],
             context,
+            true,
           );
         })
       )

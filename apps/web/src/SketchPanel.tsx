@@ -451,6 +451,15 @@ export function SketchPanel() {
             <option value="plane">Плоскости</option>
           </select>
         </label>
+        <button
+          type="button"
+          aria-label="Использовать рабочую плоскость"
+          title="Использовать рабочую плоскость — снять автоматически выбранную плоскость грани перед новым построением"
+          disabled={!!state.start}
+          onClick={() => precision.configure({ planeOverride: null })}
+        >
+          Рабочая плоскость: {precision.planeName}
+        </button>
         <label>
           Плоскость{" "}
           <select
