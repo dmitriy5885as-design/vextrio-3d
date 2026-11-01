@@ -4,6 +4,7 @@ import {
   occurrenceMatrix,
   geometryContext,
   definitionAtPath,
+  type ProjectV2,
 } from "@forma/document";
 import {
   affinePlane,
@@ -31,7 +32,13 @@ import {
   useMove,
   isGeometryLocked,
 } from "@forma/editor";
-import { SnapEngine, frameMatrix, normalize } from "@forma/snapping";
+import {
+  SnapEngine,
+  frameMatrix,
+  normalize,
+  resolveDepthSnap,
+  depthSnapKinds,
+} from "@forma/snapping";
 import { PrimitiveAdapter } from "./PrimitiveAdapter";
 import type { Vec3 } from "@forma/shared";
 
@@ -707,6 +714,7 @@ export function Viewport() {
               ? 1
               : -1;
         s.selectEntity(hit.ref);
+        snapEngine?.reset();
         usePushPull.getState().begin({
           ref: hit.ref,
           anchor: hit.point,
@@ -966,6 +974,67 @@ export function Viewport() {
       } else marker.hidden = true;
       requestRender();
     }
+    function ensureSnapIndex(document: ProjectV2) {
+      if (
+        !snapDocument ||
+        snapDocument.nodes !== document.nodes ||
+        snapDocument.geometries !== document.geometries ||
+        snapDocument.definitions !== document.definitions ||
+        snapDocument.geometryPolicy !== document.geometryPolicy
+      ) {
+        snapEngine = new SnapEngine(document);
+        snapDocument = document;
+      }
+    }
+    const depthGeometry = new THREE.BufferGeometry(),
+      depthMaterial = new THREE.LineDashedMaterial({
+        color: 0x4dd5c0,
+        dashSize: 0.08,
+        gapSize: 0.04,
+        depthTest: false,
+      }),
+      depthGuide = new THREE.Line(depthGeometry, depthMaterial),
+      depthPointGeometry = new THREE.BufferGeometry(),
+      depthPointMaterial = new THREE.PointsMaterial({
+        color: 0x4dd5c0,
+        size: 9,
+        sizeAttenuation: false,
+        depthTest: false,
+      }),
+      depthPoint = new THREE.Points(depthPointGeometry, depthPointMaterial);
+    depthGuide.renderOrder = 30;
+    depthPoint.renderOrder = 31;
+    depthGuide.visible = false;
+    depthPoint.visible = false;
+    scene.add(depthGuide, depthPoint);
+    function clearDepthInference() {
+      if (usePushPull.getState().committing) return;
+      const g = usePushPull.getState().gesture;
+      if (g?.snap) usePushPull.setState({ gesture: { ...g, snap: null } });
+    }
+    const unsubscribeDepth = usePushPull.subscribe((state) => {
+      const g = state.gesture,
+        target = g?.snap;
+      depthGuide.visible = depthPoint.visible = !!(
+        g &&
+        target &&
+        !state.editing
+      );
+      if (g && target) {
+        const level = new THREE.Vector3(...g.anchor).addScaledVector(
+          new THREE.Vector3(...g.normal),
+          g.distance,
+        );
+        depthGeometry.setFromPoints([
+          new THREE.Vector3(...g.anchor),
+          level,
+          new THREE.Vector3(...target.point),
+        ]);
+        depthGuide.computeLineDistances();
+        depthPointGeometry.setFromPoints([new THREE.Vector3(...target.point)]);
+      }
+      requestRender();
+    });
     function updatePrecision(clientX: number, clientY: number, flush = false) {
       const p = usePrecision.getState(),
         s = useEditor.getState(),
@@ -976,16 +1045,7 @@ export function Viewport() {
         return;
       }
       try {
-        if (
-          !snapDocument ||
-          snapDocument.nodes !== document.nodes ||
-          snapDocument.geometries !== document.geometries ||
-          snapDocument.definitions !== document.definitions ||
-          snapDocument.geometryPolicy !== document.geometryPolicy
-        ) {
-          snapEngine = new SnapEngine(document);
-          snapDocument = document;
-        }
+        ensureSnapIndex(document);
         camera.updateMatrixWorld();
         const rect = renderer.domElement.getBoundingClientRect(),
           cursor: [number, number] = [clientX - rect.left, clientY - rect.top];
@@ -1161,7 +1221,46 @@ export function Viewport() {
                           Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) /
                         renderer.domElement.clientHeight
                       : 20 / camera.zoom / renderer.domElement.clientHeight);
-              usePushPull.getState().move(value);
+              if (!Number.isFinite(value)) return;
+              const doc = useEditor.getState().project;
+              if (doc.schemaVersion !== 2) return;
+              ensureSnapIndex(doc);
+              const box = renderer.domElement.getBoundingClientRect(),
+                precision = usePrecision.getState(),
+                model = doc.geometries[gesture.ref.geometryId],
+                plane = affinePlane(
+                  model.faces[gesture.ref.entityId].plane,
+                  occurrenceMatrix(doc, gesture.ref.occurrencePath),
+                ),
+                result = snapEngine!.query({
+                  cursor: [lastCursor[0] - box.left, lastCursor[1] - box.top],
+                  project: (p) => projectPoint(p, box),
+                  ray: {
+                    origin: ray.ray.origin.toArray() as Vec3,
+                    direction: ray.ray.direction.toArray() as Vec3,
+                  },
+                  plane,
+                  anchor: gesture.anchor,
+                  axes: [
+                    [1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 1],
+                  ],
+                  gridStep: 0,
+                  enabled: useEditor.getState().snap,
+                  perspective: camera instanceof THREE.PerspectiveCamera,
+                  contextPath: precision.path,
+                  contextOnly: precision.contextOnly,
+                  kinds: depthSnapKinds,
+                }),
+                depth = resolveDepthSnap(
+                  gesture.anchor,
+                  gesture.normal,
+                  value,
+                  result.candidate,
+                  gesture.limit,
+                );
+              usePushPull.getState().move(depth.distance, depth.candidate);
               return;
             }
             inferDrawingPlane(...lastCursor);
@@ -1283,6 +1382,13 @@ export function Viewport() {
       )
         useMove.getState().move(state.target);
 
+      if (
+        state.path !== previous.path &&
+        JSON.stringify(state.path) !== JSON.stringify(previous.path) &&
+        !usePushPull.getState().committing
+      )
+        usePushPull.getState().cancel();
+      if (state.contextOnly !== previous.contextOnly) clearDepthInference();
       topology?.editingContext(state.path);
       volumeBridge?.editingContext(state.path);
       if (
@@ -1322,6 +1428,10 @@ export function Viewport() {
     resize();
     sync();
     const unsubscribe = useEditor.subscribe((state, prev) => {
+      if (state.snap !== prev.snap) {
+        snapEngine?.reset();
+        clearDepthInference();
+      }
       if (
         state.topologyHover !== prev.topologyHover &&
         state.project === prev.project
@@ -1445,6 +1555,11 @@ export function Viewport() {
     return () => {
       disposed = true;
       unsubscribe();
+      unsubscribeDepth();
+      depthGeometry.dispose();
+      depthMaterial.dispose();
+      depthPointGeometry.dispose();
+      depthPointMaterial.dispose();
       unsubscribeVolume();
       volumeBridge?.dispose();
       unsubscribePrecision();

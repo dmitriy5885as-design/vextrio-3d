@@ -40,7 +40,7 @@ export function EditorSettings() {
         />
       </label>
       <label className="setting-row">
-        Привязка к сетке 0,25 м
+        Привязки к геометрии и сетке
         <input
           type="checkbox"
           checked={s.snap}

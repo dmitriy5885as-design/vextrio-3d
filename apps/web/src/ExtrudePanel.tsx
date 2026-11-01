@@ -311,8 +311,8 @@ export function ExtrudePanel() {
                 disabled={busy}
                 aria-invalid={!!error}
                 onChange={(e) => setText(e.target.value)}
-                onFocus={() => usePushPull.setState({ editing: true })}
-                onBlur={() => usePushPull.setState({ editing: false })}
+                onFocus={() => usePushPull.getState().setEditing(true)}
+                onBlur={() => usePushPull.getState().setEditing(false)}
                 onKeyDown={(e) => {
                   if (e.repeat && e.key === "Enter") e.preventDefault();
                   if (e.key === "Escape") {
@@ -352,6 +352,12 @@ export function ExtrudePanel() {
               />
               Изменить все {occurrences} экземпляра
             </label>
+          )}
+          {pointer.gesture?.snap && !pointer.editing && (
+            <p data-testid="depth-inference" role="status" aria-live="polite">
+              По уровню: {pointer.gesture.snap.label} ·{" "}
+              {Number(pointer.gesture.distance.toFixed(8))} м
+            </p>
           )}
           {pending ? (
             <p>Проверяем грани и пересечения…</p>
