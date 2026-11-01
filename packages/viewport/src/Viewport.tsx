@@ -73,7 +73,7 @@ export function Viewport() {
     controls.maxDistance = 2000;
     controls.mouseButtons = {
       LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
       RIGHT: THREE.MOUSE.ROTATE,
     };
     const transform = new TransformControls(camera, renderer.domElement);
@@ -334,11 +334,19 @@ export function Viewport() {
       const selected = getLegacyObjects(s.project).find(
         (o) => o.id === s.selected,
       );
-      const nativePath = s.topologySelection?.occurrencePath;
+      const nativePath =
+        s.topologySelection?.occurrencePath ??
+        s.selectedPath ??
+        (s.selected &&
+        s.project.schemaVersion === 2 &&
+        s.project.nodes[s.selected]?.kind !== "legacy-primitive"
+          ? [s.selected]
+          : undefined);
       // TransformControls is reliable for placements directly under the scene.
       // Nested affine editing remains available through numeric properties.
       const native =
-        nativePath?.length === 1
+        nativePath?.length === 1 &&
+        !(s.tool === "translate" && s.topologySelection)
           ? topology?.findPlacement(nativePath)
           : undefined;
       const mesh =
@@ -556,27 +564,23 @@ export function Viewport() {
               u = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion),
               v = new THREE.Vector3().crossVectors(normal, u).normalize(),
               point = anchor.toArray() as Vec3;
-            usePrecision
-              .getState()
-              .configure({
-                enabled: true,
-                axis: null,
-                planeOverride: {
-                  origin: point,
-                  u: u.toArray() as Vec3,
-                  v: v.toArray() as Vec3,
-                  normal: normal.toArray() as Vec3,
-                },
-              });
+            usePrecision.getState().configure({
+              enabled: true,
+              axis: null,
+              planeOverride: {
+                origin: point,
+                u: u.toArray() as Vec3,
+                v: v.toArray() as Vec3,
+                normal: normal.toArray() as Vec3,
+              },
+            });
             usePrecision.getState().setAnchor(point);
-            useMove
-              .getState()
-              .begin({
-                refs: structuredClone(refs),
-                anchor: point,
-                target: point,
-                revision: state.revision,
-              });
+            useMove.getState().begin({
+              refs: structuredClone(refs),
+              anchor: point,
+              target: point,
+              revision: state.revision,
+            });
             return;
           }
         }
@@ -1227,7 +1231,8 @@ export function Viewport() {
             .configure({ path: path.slice(0, -1), sharedEditConfirmed: false });
         usePushPull.getState().cancel();
         useMove.getState().cancel();
-        if(activeTool === "translate")usePrecision.getState().configure({ enabled: false });
+        if (activeTool === "translate")
+          usePrecision.getState().configure({ enabled: false });
         useOffset.getState().cancel();
         sketchController.cancel();
         usePrecision.getState().clear();

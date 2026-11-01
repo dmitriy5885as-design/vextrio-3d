@@ -38,6 +38,7 @@ test("compact dock preserves object edits, locking, panel visibility and file-me
   await expect(properties).toHaveCount(0);
   await page.getByRole("button", { name: "Окно", exact: true }).click();
   await page
+    .locator(".dropdown")
     .getByRole("button", { name: "Показать боковую панель", exact: true })
     .click();
   await expect(x).toHaveValue("2.5");

@@ -1,3 +1,4 @@
+import "./prepare-cad.mjs";
 import { build, preview } from "vite";
 import { chromium } from "@playwright/test";
 import assert from "node:assert/strict";
@@ -41,11 +42,39 @@ try {
     .click();
   await page.getByTestId("viewport").waitFor();
   await page.waitForFunction(loaded);
+  // Verify the production subpath and the exact Windows CSP with real OCCT.
+  const csp = JSON.parse(
+    fs.readFileSync("apps/desktop/src-tauri/tauri.conf.json", "utf8"),
+  ).app.security.csp;
+  await page.route("**/vextrio-3d/", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      headers: { ...response.headers(), "content-security-policy": csp },
+    });
+  });
+  await page.reload();
+  await page
+    .locator("input[type=file]")
+    .setInputFiles("tests/fixtures/import-tetra.step");
+  await page
+    .getByRole("button", { name: "Импортировать", exact: true })
+    .click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector(".viewport-canvas")
+        ?.getAttribute("data-topology-faces") === "4",
+  );
+  assert.match(
+    await page.getByTestId("model-stats").innerText(),
+    /Грани: 4 · Рёбра: 6 · Полигоны: 4/,
+  );
   assert.deepEqual(failures, []);
   fs.mkdirSync("test-results", { recursive: true });
   await page.screenshot({ path: "test-results/pages-production.png" });
   console.log(
-    "GitHub Pages production smoke: title, welcome, editor, logos and assets OK under " +
+    "GitHub Pages production smoke: Home, editor, logos and actual STEP Worker under Windows CSP OK under " +
       base,
   );
 } finally {

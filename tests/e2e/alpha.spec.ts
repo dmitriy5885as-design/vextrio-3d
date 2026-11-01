@@ -93,7 +93,7 @@ test("orientation cube follows the real camera, preserves pan and framing, suppo
   );
   await page.getByRole("button", { name: "Тип проекции", exact: true }).click();
   await page.getByRole("button", { name: "Изометрия ↗", exact: true }).click();
-  const sphere = page.getByTestId("navigation-cube").locator("svg"),
+  const sphere = page.getByTestId("navigation-cube").locator("svg[aria-label]"),
     cb = (await sphere.boundingBox())!;
   const initial = await save(page);
   await page.mouse.move(cb.x + 70, cb.y + 65);
