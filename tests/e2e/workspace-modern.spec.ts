@@ -98,9 +98,9 @@ test("dock and navigator have persistent reveal handles, controls are consolidat
     page.getByText("Нет открытых файлов", { exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.screenshot({ path: "docs/0.2/images/workspace-1366x768.png" });
+  await page.screenshot({ path: "test-results/workspace-1366x768.png" });
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.screenshot({ path: "docs/0.2/images/workspace-1920x1080.png" });
+  await page.screenshot({ path: "test-results/workspace-1920x1080.png" });
 });
 test("middle mouse pans a fixed view without rotation or geometry edits", async ({
   page,
@@ -297,7 +297,7 @@ test("ASCII STL imports in millimetres and its real face extrudes into a saved p
     ),
   ).toBe(true);
   await page.screenshot({
-    path: "docs/0.2/images/workspace-imported-prism.png",
+    path: "test-results/workspace-imported-prism.png",
   });
 });
 test("cancelling a running CAD Worker returns to the unchanged editor", async ({

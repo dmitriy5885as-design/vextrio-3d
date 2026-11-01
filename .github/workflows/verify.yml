@@ -34,6 +34,8 @@ jobs:
             pnpm exec playwright install --with-deps chromium
           fi
       - run: pnpm test:e2e
+      - name: Ensure E2E leave tracked sources unchanged
+        run: git diff --exit-code
       - run: pnpm check:pages
       - uses: actions/upload-artifact@v4
         if: always()
