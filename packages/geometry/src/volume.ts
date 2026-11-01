@@ -34,7 +34,7 @@ import { contextPlane, metric, inRegion } from "./sketch-common";
 import { segmentIntersections } from "./intersections";
 import { tessellateFace } from "./tessellate";
 import { extrusionStop } from "./through";
-import { boundaryThrough } from "./boundary-cut";
+import { boundaryCut } from "./boundary-cut";
 const unit = (p: Vec3) => multiply(p, 1 / length(p));
 export const linear = (v: Vec3, m: AffineTransform): Vec3 => [
   m[0] * v[0] + m[4] * v[1] + m[8] * v[2],
@@ -276,23 +276,19 @@ export function prepareExtrusion(
       "INVALID_TOPOLOGY",
       `Достигнута противоположная грань: ${-stop.distance} м. Для сквозного проёма укажите эту глубину.`,
     );
-  if (stop?.boundaryEdges?.length && !through)
-    throw new GeometryError(
-      "UNSUPPORTED_OPERATION",
-      `Для проёма до края стены укажите полную глубину ${stop.distance} м или используйте «До противоположной грани».`,
-    );
   const orientation =
     body.shellIds
       .flatMap((s) => before.shells[s].faces)
       .find((u) => u.faceId === f.id)?.orientation ?? 1;
-  if (through?.boundaryEdges?.length) {
-    const cut = boundaryThrough(
+  if (stop?.boundaryEdges?.length) {
+    const cut = boundaryCut(
       before,
       f,
-      through,
+      stop,
       localVector,
       context,
       operationId,
+      !through,
     );
     validateGeometry(cut.model, context);
     assertFaceContacts(
@@ -311,7 +307,7 @@ export function prepareExtrusion(
     const forward = diffGeometry(before, cut.model);
     return { forward, inverse: invertDelta(forward), lineage: cut.lineage };
   }
-  if (closed) {
+  if (closed && !through) {
     // Offset a prismatic cap without changing its IDs. All incident faces must
     // remain in their original planes; inversion/collision is checked below.
     const incident = body.faceIds.filter((id) =>

@@ -165,6 +165,22 @@ export function extrusionStop(
       ) > 1e-8
     )
       return null;
+    // Existing recess reveals lie behind the cap. They are extended by the
+    // next cut rather than subtracted as an outer boundary strip. A whole
+    // solid cap still has its side faces ahead and is not accepted here.
+    const depths = [
+      m.faces[neighbors[0]].outerLoopId,
+      ...m.faces[neighbors[0]].innerLoopIds,
+    ]
+      .flatMap((l) => loopVertices(m, l))
+      .map((p) => dot(subtract(world(p), plane.origin), direction));
+    if (
+      depths.every((d) => d <= tolerance) &&
+      depths.some((d) => d < -tolerance)
+    ) {
+      interiorEdges++;
+      continue;
+    }
     boundaryEdges.push({ edgeId: eid, faceId: neighbors[0] });
   }
   // Reject whole-cap collapse and corner-only contacts; a notch needs skin.
