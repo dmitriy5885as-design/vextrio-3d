@@ -286,12 +286,7 @@ export function Properties() {
                 s.topologySelections.length > 1 ||
                 isGeometryLocked(s.project, ref)
               }
-              onClick={() =>
-                void s.editGeometry(ref, {
-                  kind: "delete-entities",
-                  entityIds: [ref.entityId],
-                })
-              }
+              onClick={() => void s.deleteSelection()}
             >
               Удалить грань
             </button>
@@ -459,6 +454,14 @@ export function Properties() {
               onChange={(e) => s.setLocked(o.id, e.target.checked)}
             />
           </label>
+          <button
+            className="convert-primitive"
+            disabled={objectLocked}
+            onClick={s.convertPrimitive}
+            title="Преобразовать в топологию — редактировать вершины, рёбра и грани с Undo"
+          >
+            Редактировать вершины
+          </button>
           <div className="object-actions">
             <button disabled={objectLocked} onClick={s.duplicate}>
               <Copy size={14} /> Дубликат

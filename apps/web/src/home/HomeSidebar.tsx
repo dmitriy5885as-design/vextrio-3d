@@ -16,7 +16,7 @@ const links = [
   { id: "projects", label: "Проекты", icon: FolderOpen },
   { id: "templates", label: "Шаблоны", icon: Boxes },
   { id: "learning", label: "Обучение", icon: GraduationCap },
-  { id: "settings", label: "Настройки", icon: Settings2 },
+  { id: "settings", label: "Параметры", icon: Settings2 },
 ] as const;
 export function HomeSidebar({
   page,

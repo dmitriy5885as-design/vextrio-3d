@@ -1,6 +1,7 @@
 import { contextPlane } from "./sketch-common";
 import {
   entityTables,
+  createIdAllocator,
   GeometryError,
   type GeometryModel,
   type Id,
@@ -384,11 +385,14 @@ export function prepareSketch(
   if (
     operation.kind === "delete-entities" &&
     (!operation.entityIds.length ||
-      operation.entityIds.some((key) => !before.faces[key]))
+      operation.entityIds.some(
+        (key) =>
+          !before.faces[key] && !before.edges[key] && !before.vertices[key],
+      ))
   )
     throw new GeometryError(
       "UNSUPPORTED_OPERATION",
-      "S3 delete supports existing faces only",
+      "Select existing vertices, edges or faces",
     );
   if (
     operation.kind === "make-face" &&
@@ -398,17 +402,51 @@ export function prepareSketch(
       operation.boundaryEdgeIds.some((e) => !before.edges[e]))
   )
     throw new GeometryError("INVALID_TOPOLOGY", "Invalid face boundary");
-  const split = splitSegments(
-      before,
-      operation.kind === "insert-segments" ? operation.segments : [],
-      context,
-      operationId,
-      operation.kind === "insert-segments" ? operation.plane : null,
-    ),
+  const split =
+      operation.kind === "delete-entities"
+        ? {
+            model: structuredClone(before),
+            ...metric(before, context),
+            lineage: [] as LineageEntry[],
+            allocate: createIdAllocator(operationId, [
+              before.id,
+              before.ownerDefinitionId,
+              ...entityTables.flatMap((t) => Object.keys(before[t])),
+              ...context.materialIds,
+              ...(context.reservedIds ?? []),
+            ]),
+          }
+        : splitSegments(
+            before,
+            operation.kind === "insert-segments" ? operation.segments : [],
+            context,
+            operationId,
+            operation.kind === "insert-segments" ? operation.plane : null,
+          ),
     model = split.model;
   let replacements = new Map<string, Id<"face">[]>();
   if (operation.kind === "delete-entities") {
-    for (const fid of operation.entityIds) {
+    const vertices = new Set(
+      operation.entityIds.filter((key) => model.vertices[key]),
+    );
+    const edges = new Set(
+      operation.entityIds.filter((key) => model.edges[key]),
+    );
+    for (const e of Object.values(model.edges))
+      if (vertices.has(e.start) || vertices.has(e.end)) edges.add(e.id);
+    const faces = new Set(
+      operation.entityIds.filter((key) => model.faces[key]),
+    );
+    for (const f of Object.values(model.faces))
+      if (
+        [f.outerLoopId, ...f.innerLoopIds].some((l) =>
+          model.loops[l].coedgeIds.some((c) =>
+            edges.has(model.coedges[c].edgeId),
+          ),
+        )
+      )
+        faces.add(f.id);
+    for (const fid of faces) {
       const f = model.faces[fid];
       for (const lid of [f.outerLoopId, ...f.innerLoopIds]) {
         for (const cid of model.loops[lid].coedgeIds) delete model.coedges[cid];
@@ -416,9 +454,50 @@ export function prepareSketch(
       }
       delete model.faces[fid];
     }
+    for (const key of edges) delete model.edges[key];
+    for (const key of vertices) delete model.vertices[key];
+    // A removed edge may separate a shell. Keep each connected remainder
+    // independently, retaining the old ID for the first surviving component.
+    const edgeFaces = new Map<string, Set<string>>(),
+      loopFaces = new Map<string, string>();
+    for (const face of Object.values(model.faces))
+      for (const lid of [face.outerLoopId, ...face.innerLoopIds])
+        loopFaces.set(lid, face.id);
+    for (const c of Object.values(model.coedges)) {
+      const face = loopFaces.get(c.loopId);
+      if (face) {
+        const list = edgeFaces.get(c.edgeId) ?? new Set<string>();
+        list.add(face);
+        edgeFaces.set(c.edgeId, list);
+      }
+    }
     for (const shell of Object.values(model.shells)) {
-      shell.faces = shell.faces.filter((f) => model.faces[f.faceId]);
-      if (!shell.faces.length) delete model.shells[shell.id];
+      const remaining = new Map<string, (typeof shell.faces)[number]>(
+        shell.faces
+          .filter((f) => model.faces[f.faceId])
+          .map((f) => [f.faceId, f]),
+      );
+      delete model.shells[shell.id];
+      let first = true;
+      while (remaining.size) {
+        const queue: string[] = [remaining.keys().next().value!];
+        const uses: typeof shell.faces = [];
+        for (let i = 0; i < queue.length; i++) {
+          const key = queue[i],
+            use = remaining.get(key);
+          if (!use) continue;
+          remaining.delete(key);
+          uses.push(use);
+          const f = model.faces[key];
+          for (const lid of [f.outerLoopId, ...f.innerLoopIds])
+            for (const cid of model.loops[lid].coedgeIds)
+              for (const next of edgeFaces.get(model.coedges[cid].edgeId) ?? [])
+                if (remaining.has(next)) queue.push(next);
+        }
+        const sid = first ? shell.id : split.allocate("shell");
+        first = false;
+        model.shells[sid] = { id: sid, faces: uses };
+      }
     }
   } else
     replacements = regenerateFaces(

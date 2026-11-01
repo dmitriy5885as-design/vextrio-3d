@@ -1,3 +1,4 @@
+import { TopologyEntities } from "./workspace/TopologyEntities";
 import { definitionOccurrences } from "@forma/document";
 import { useEditor, isObjectLocked } from "@forma/editor";
 import { Boxes, Eye, EyeOff, Lock, Unlock } from "lucide-react";
@@ -21,52 +22,62 @@ export function TopologyTree({ onSelect }: { onSelect?: () => void }) {
             vertex = g ? Object.keys(g.vertices)[0] : undefined,
             entityId = face ?? edge ?? vertex;
           return (
-            <div
-              className="tree-object"
-              style={{ paddingLeft: Math.min(24, o.path.length * 8) }}
-              key={JSON.stringify(o.path) + "@" + d.id}
-            >
-              {g && entityId ? (
-                <button
-                  onClick={() => {
-                    s.selectEntity({
-                      definitionId: d.id,
-                      geometryId: g.id,
-                      kind: face ? "face" : edge ? "edge" : "vertex",
-                      entityId,
-                      occurrencePath: o.path,
-                    });
-                    onSelect?.();
-                  }}
-                >
-                  <Boxes size={14} />
-                  <span>{name}</span>
-                  <small>{Object.keys(g.faces).length} граней</small>
-                </button>
-              ) : (
-                <span>
-                  <Boxes size={14} /> {name}
-                </span>
-              )}
-              {node && node.kind !== "legacy-primitive" && (
-                <>
+            <div className="topology-entry">
+              <div
+                className="tree-object"
+                style={{ paddingLeft: Math.min(24, o.path.length * 8) }}
+                key={JSON.stringify(o.path) + "@" + d.id}
+              >
+                {g && entityId ? (
                   <button
-                    title={`${node.visible ? "Скрыть" : "Показать"} узел ${name}`}
-                    disabled={isObjectLocked(p, node.id)}
-                    onClick={() =>
-                      s.patchNode(node.id, { visible: !node.visible })
-                    }
+                    onClick={() => {
+                      s.selectEntity({
+                        definitionId: d.id,
+                        geometryId: g.id,
+                        kind: face ? "face" : edge ? "edge" : "vertex",
+                        entityId,
+                        occurrencePath: o.path,
+                      });
+                      onSelect?.();
+                    }}
                   >
-                    {node.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                    <Boxes size={14} />
+                    <span>{name}</span>
+                    <small>{Object.keys(g.faces).length} граней</small>
                   </button>
-                  <button
-                    title={`${node.locked ? "Разблокировать" : "Заблокировать"} узел ${name}`}
-                    disabled={isObjectLocked(p, node.id, true)}
-                    onClick={() => s.setNodeLocked(node.id, !node.locked)}
-                  >
-                    {node.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                  </button>
-                </>
+                ) : (
+                  <span>
+                    <Boxes size={14} /> {name}
+                  </span>
+                )}
+                {node && node.kind !== "legacy-primitive" && (
+                  <>
+                    <button
+                      title={`${node.visible ? "Скрыть" : "Показать"} узел ${name}`}
+                      disabled={isObjectLocked(p, node.id)}
+                      onClick={() =>
+                        s.patchNode(node.id, { visible: !node.visible })
+                      }
+                    >
+                      {node.visible ? <Eye size={13} /> : <EyeOff size={13} />}
+                    </button>
+                    <button
+                      title={`${node.locked ? "Разблокировать" : "Заблокировать"} узел ${name}`}
+                      disabled={isObjectLocked(p, node.id, true)}
+                      onClick={() => s.setNodeLocked(node.id, !node.locked)}
+                    >
+                      {node.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                    </button>
+                  </>
+                )}
+              </div>
+              {g && (
+                <TopologyEntities
+                  model={g}
+                  definitionId={d.id}
+                  path={o.path}
+                  onSelect={onSelect}
+                />
               )}
             </div>
           );

@@ -1,0 +1,14 @@
+VEXTRIO 3D — third-party CAD import notices
+
+occt-import-js 0.0.23 (unmodified JavaScript and WebAssembly)
+Copyright: see cad/license.occt-import-js.txt and cad/license.occt.txt.
+License: LGPL-2.1; Open CASCADE Technology includes its additional exception.
+Exact npm source revision: c2148e54b456b571238d35cac037d304053d64b2
+Source: https://github.com/kovacsv/occt-import-js/tree/c2148e54b456b571238d35cac037d304053d64b2
+Package and source distribution: https://www.npmjs.com/package/occt-import-js/v/0.0.23
+
+The separately shipped files in cad/ are replaceable resources, not statically
+linked into the editor. scripts/prepare-cad.mjs copies them without modification
+from the pinned dependency. Full license texts are distributed beside them.
+The CAD module runs in a dedicated Worker and is loaded only on CAD import.
+It produces faceted geometry; VEXTRIO does not promise native CAD history.

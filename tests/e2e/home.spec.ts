@@ -37,7 +37,7 @@ for (const [width, height] of [
       "Проекты",
       "Шаблоны",
       "Обучение",
-      "Настройки",
+      "Параметры",
     ])
       await expect(
         page
@@ -218,7 +218,7 @@ test("settings share editor state; available lessons open working instructions",
 }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "Стартовый центр" });
-  await nav.getByRole("button", { name: "Настройки", exact: true }).click();
+  await nav.getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByLabel("Тема", { exact: true }).selectOption("light");
   await expect(page.locator(".app")).toHaveClass(/light/);
   await nav.getByRole("button", { name: "Обучение", exact: true }).click();
@@ -233,7 +233,7 @@ test("settings share editor state; available lessons open working instructions",
     .getByRole("button", { name: "Создать проект", exact: true })
     .click();
   await expect(page.getByTestId("viewport")).toBeVisible();
-  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await page.getByRole("button", { name: "Параметры", exact: true }).click();
   await expect(page.getByLabel("Тема", { exact: true })).toHaveValue("light");
 });
 test("dialog supports Escape, returns focus and respects reduced motion", async ({

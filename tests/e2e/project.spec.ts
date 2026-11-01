@@ -118,20 +118,20 @@ test("mouse selection, history, camera and themes at target resolutions", async 
   await expect(page.locator(".tree-object")).toHaveCount(2);
   await page.getByRole("button", { name: "Вид сверху" }).click();
   await page
-    .getByRole("button", { name: "Перспектива", exact: false })
+    .getByRole("button", { name: "Тип проекции", exact: true })
     .first()
     .click();
   await expect(
-    page.getByRole("button", { name: "Ортография", exact: false }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Тип проекции", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await page.getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByLabel("Тема", { exact: true }).selectOption("light");
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
   await expect(page.locator(".app")).toHaveClass(/light/);
   await page.screenshot({ path: "test-results/forma-light-1366.png" });
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await page.getByRole("button", { name: "Настройки", exact: true }).click();
+  await page.getByRole("button", { name: "Параметры", exact: true }).click();
   await page.getByLabel("Тема", { exact: true }).selectOption("dark");
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.getByRole("button", { name: "Изометрия ↗", exact: true }).click();

@@ -1,16 +1,43 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Vector3, Matrix4, Spherical } from "three";
 import { useEditor } from "@forma/editor";
 import type { Vec3 } from "@forma/shared";
 const views = [
-  { key: "front", label: "Вид спереди", text: "СПЕРЕДИ", normal: [0, 0, 1] },
+  { key: "front", label: "Вид спереди", text: "ПЕРЕД", normal: [0, 0, 1] },
   { key: "back", label: "Вид сзади", text: "СЗАДИ", normal: [0, 0, -1] },
-  { key: "right", label: "Вид справа", text: "СПРАВА", normal: [1, 0, 0] },
-  { key: "left", label: "Вид слева", text: "СЛЕВА", normal: [-1, 0, 0] },
-  { key: "top", label: "Вид сверху", text: "СВЕРХУ", normal: [0, 1, 0] },
-  { key: "bottom", label: "Вид снизу", text: "СНИЗУ", normal: [0, -1, 0] },
+  { key: "right", label: "Вид справа", text: "ПРАВО", normal: [1, 0, 0] },
+  { key: "left", label: "Вид слева", text: "ЛЕВО", normal: [-1, 0, 0] },
+  { key: "top", label: "Вид сверху", text: "ВЕРХ", normal: [0, 1, 0] },
+  { key: "bottom", label: "Вид снизу", text: "НИЗ", normal: [0, -1, 0] },
 ] as const;
+function NavigationIcon({
+  kind,
+}: {
+  kind: "cube" | "fit" | "focus" | "minus";
+}) {
+  const paths = {
+    cube: "M12 3 3 8v9l9 5 9-5V8L12 3ZM3 8l9 5 9-5M12 13v9",
+    fit: "M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5",
+    focus: "M12 2v4m0 12v4M2 12h4m12 0h4M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+    minus: "M5 12h14",
+  };
+  return (
+    <svg
+      className="navigation-icon"
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={paths[kind]} />
+    </svg>
+  );
+}
 export function NavigationCube() {
+  const [collapsed, setCollapsed] = useState(false);
   const camera = useEditor((s) => s.project.camera),
     drag = useRef<{
       x: number;
@@ -28,7 +55,7 @@ export function NavigationCube() {
     matrix = new Matrix4()
       .lookAt(direction, new Vector3(), new Vector3(0, 1, 0))
       .invert();
-  const project = (v: readonly number[], cx = 78, cy = 64, scale = 25) => {
+  const project = (v: readonly number[], cx = 78, cy = 64, scale = 30) => {
     const p = new Vector3(v[0], v[1], v[2]).applyMatrix4(matrix);
     return { x: cx + p.x * scale, y: cy - p.y * scale, z: p.z };
   };
@@ -84,6 +111,17 @@ export function NavigationCube() {
   const activate = (fn: () => void) => {
     if (!suppress.current) fn();
   };
+  if (collapsed)
+    return (
+      <button
+        className="navigation-reveal"
+        aria-label="Показать навигатор"
+        title="Показать навигатор — виды камеры и проекция"
+        onClick={() => setCollapsed(false)}
+      >
+        <NavigationIcon kind="cube" />
+      </button>
+    );
   return (
     <div
       className="navigation-cube"
@@ -94,13 +132,13 @@ export function NavigationCube() {
       }}
     >
       <div className="navigation-heading">
-        <span>ОРИЕНТАЦИЯ</span>
+        <span>НАВИГАТОР</span>
         <button
-          title="Изометрия"
-          aria-label="Изометрия ↗"
-          onClick={() => useEditor.getState().view("iso")}
+          aria-label="Скрыть навигатор"
+          title="Скрыть навигатор"
+          onClick={() => setCollapsed(true)}
         >
-          ⌂
+          <NavigationIcon kind="minus" />
         </button>
       </div>
       <svg
@@ -163,6 +201,7 @@ export function NavigationCube() {
         {faces.map((f) => (
           <g
             key={f.key}
+            data-side={f.key}
             role="button"
             tabIndex={0}
             aria-label={f.label}
@@ -260,6 +299,29 @@ export function NavigationCube() {
           Потяните ↔
         </text>
       </svg>
+      <div className="navigation-tools">
+        <button
+          title="Изометрия — показать модель под углом"
+          aria-label="Изометрия ↗"
+          onClick={() => useEditor.getState().view("iso")}
+        >
+          <NavigationIcon kind="cube" />
+        </button>
+        <button
+          title="Вписать модель — показать все видимые объекты"
+          aria-label="Вписать модель"
+          onClick={() => useEditor.getState().view("reset")}
+        >
+          <NavigationIcon kind="fit" />
+        </button>
+        <button
+          title="Фокус на выделении — приблизить выбранную геометрию"
+          aria-label="Фокус на выделении"
+          onClick={() => useEditor.getState().view("focus")}
+        >
+          <NavigationIcon kind="focus" />
+        </button>
+      </div>
       <div className="navigation-actions">
         <select
           aria-label="Стандартный вид"
@@ -277,6 +339,7 @@ export function NavigationCube() {
         </select>
         <button
           aria-label="Тип проекции"
+          aria-pressed={camera.projection === "orthographic"}
           title="Переключить перспективную и ортографическую проекцию"
           onClick={() => useEditor.getState().view("projection")}
         >

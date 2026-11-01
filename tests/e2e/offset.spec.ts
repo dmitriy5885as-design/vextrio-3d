@@ -178,7 +178,7 @@ test("invalid sizes, focus loss, Escape and a held pointer never write an Offset
   await expect(page.getByTestId("offset-panel")).toHaveCount(0);
   // Camera focus remains available; frame the model before testing cancellation.
   await page
-    .getByRole("button", { name: "Сбросить камеру", exact: true })
+    .getByRole("button", { name: "Вписать модель", exact: true })
     .click();
   // Use tree selection below so no camera projection assumptions are needed.
   await selectTree(page, "Сцена");

@@ -205,7 +205,7 @@ export function WelcomeHome({
         )}
         {page === "settings" && (
           <section className="home-settings">
-            <h1>Настройки</h1>
+            <h1>Параметры</h1>
             <p className="home-lead">
               Ваше рабочее пространство — здесь и в редакторе.
             </p>

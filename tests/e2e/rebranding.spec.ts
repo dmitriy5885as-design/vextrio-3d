@@ -16,21 +16,21 @@ test("VEXTRIO 3D welcome, editor, settings and help retain working v1 editing", 
   await page.screenshot({ path: "test-results/vextrio-welcome.png" });
   await createHomeProject(page);
   await expect(page.locator(".brand strong")).toHaveText("VEXTRIO 3D");
-  await page.getByRole("button", { name: "Настройки", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Настройки" })).toBeVisible();
+  await page.getByRole("button", { name: "Параметры", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Параметры" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("FORMA");
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.getByRole("button", { name: "Справка", exact: true }).click();
-  await page.getByRole("button", { name: "О VEXTRIO 3D и управление" }).click();
-  await expect(page.getByRole("heading", { name: /VEXTRIO 3D/ })).toBeVisible();
+  await page.getByRole("button", { name: "Руководство и горячие клавиши" }).click();
+  await expect(page.getByRole("heading", { name: "Справка", exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("FORMA");
   // The «О программе» tab renders the auto-generated devblog from
   // CHANGELOG.md; it must carry the shipped version and never leak the
   // pre-rebrand name into the visible UI.
-  await page.getByRole("button", { name: "О программе" }).click();
-  await expect(page.getByText(APP_VERSION).first()).toBeVisible();
+  await page.getByRole("tab", { name: "О программе" }).click();
+  await expect(page.getByText(`Бесплатный редактор для Windows и браузера. Версия ${APP_VERSION}. Придай идее форму.`)).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Недавние изменения" }),
+    page.getByRole("heading", { name: "Журнал изменений" }),
   ).toBeVisible();
   await expect(page.locator("body")).not.toContainText("FORMA");
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();

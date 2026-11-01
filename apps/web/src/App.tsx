@@ -1,3 +1,9 @@
+import { WorkspaceDialog } from "./workspace/WorkspaceDialog";
+import { ModelStats } from "./workspace/ModelStats";
+import { ImportDialog } from "./workspace/ImportDialog";
+import { HelpContent } from "./workspace/HelpContent";
+import { Tooltips } from "./workspace/Tooltips";
+import "./workspace/workspace.css";
 import { WelcomeHome } from "./home/WelcomeHome";
 import { NewProjectDialog } from "./home/NewProjectDialog";
 import { EditorSettings } from "./home/EditorSettings";
@@ -59,11 +65,9 @@ import {
   Save,
   Scaling,
   Search,
-  Settings2,
   Square,
   Undo2,
   Unlock,
-  View,
   X,
   Trash2,
   Globe,
@@ -101,7 +105,6 @@ import {
 import { ru } from "@forma/ui";
 import { shortcuts, toolLabels, isSketchTool } from "@forma/tools";
 import { Properties } from "./Properties";
-import { devblogEntries } from "./changelog";
 
 function Button({
   children,
@@ -132,6 +135,7 @@ export function App() {
   const s = useEditor();
   const recovery = useRecovery();
   const recent = useRecentProjects();
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [newTemplate, setNewTemplate] = useState<TemplateId | null>(null);
   const [hasDocument, setHasDocument] = useState(false);
   const [homeError, setHomeError] = useState("");
@@ -150,7 +154,7 @@ export function App() {
     [query, setQuery] = useState(""),
     [structure, setStructure] = useState(true),
     [dockTab, setDockTab] = useState<"structure" | "properties">("structure"),
-    [helpTab, setHelpTab] = useState<"hotkeys" | "about">("hotkeys");
+    [projectMenu, setProjectMenu] = useState(false);
   // KOMPAS-style left dock: show properties automatically once something is
   // selected and return to the structure tree when the selection is cleared.
   useEffect(() => {
@@ -158,18 +162,9 @@ export function App() {
     else setDockTab("structure");
   }, [s.selected, s.topologySelection]);
   const removeSelected = () => {
-    if (s.topologySelections.length > 1) {
-      s.notify("Для удаления выберите одну грань.");
-      return;
-    }
-    const ref = s.topologySelection;
-    if (ref?.kind === "face")
-      void s.editGeometry(ref, {
-        kind: "delete-entities",
-        entityIds: [ref.entityId],
-      });
-    else s.remove();
+    void s.deleteSelection();
   };
+
   const nativeContexts =
     !welcome && s.project.schemaVersion === 2
       ? definitionOccurrences(s.project).filter(
@@ -360,14 +355,42 @@ export function App() {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
-        (e.target as HTMLElement).matches("input,textarea,select") ||
+        (e.target instanceof HTMLElement &&
+          (e.target.matches("input,textarea,select") ||
+            e.target.isContentEditable)) ||
         fileBusyRef.current ||
         modal ||
+        importFile ||
         newTemplate ||
         welcome
       )
         return;
-      const key = e.key.toLowerCase();
+      if (projectMenu || menu) {
+        if (e.key === "Escape") {
+          setProjectMenu(false);
+          setMenu(null);
+        }
+        return;
+      }
+      const physical: Record<string, string> = {
+        KeyM: "m",
+        KeyL: "l",
+        KeyR: "r",
+        KeyC: "c",
+        KeyA: "a",
+        KeyP: "p",
+        KeyF: "f",
+        KeyV: "v",
+        KeyQ: "q",
+        KeyS: "s",
+        KeyO: "o",
+        KeyH: "h",
+        KeyZ: "z",
+        KeyY: "y",
+        KeyD: "d",
+        KeyN: "n",
+      };
+      const key = physical[e.code] ?? e.key.toLowerCase();
       if (e.ctrlKey || e.metaKey) {
         if (["s", "o", "n", "z", "y", "d"].includes(key)) e.preventDefault();
         if (key === "s") void save(e.shiftKey);
@@ -378,7 +401,10 @@ export function App() {
         if (key === "d") s.duplicate();
         return;
       }
-      if (key === "delete" || key === "backspace") removeSelected();
+      if (key === "delete" || key === "backspace") {
+        e.preventDefault();
+        removeSelected();
+      }
       if (key === " ") e.preventDefault();
       if (key === "escape") {
         s.select(null);
@@ -422,6 +448,7 @@ export function App() {
       { label: "Стартовый экран", action: () => void returnHome() },
       { label: "Новый проект", action: newProject, shortcut: "Ctrl N" },
       { label: "Открыть…", action: open, shortcut: "Ctrl O" },
+      { label: "Импорт модели…", action: () => input.current?.click() },
       { label: "Сохранить", action: () => void save(), shortcut: "Ctrl S" },
       {
         label: "Сохранить как…",
@@ -472,7 +499,7 @@ export function App() {
         label: "Удалить",
         action: removeSelected,
         shortcut: "Del",
-        disabled: !s.selected,
+        disabled: !s.selected && !s.topologySelection,
       },
     ],
     Вид: [
@@ -538,10 +565,16 @@ export function App() {
         label: structure ? "Скрыть боковую панель" : "Показать боковую панель",
         action: () => setStructure(!structure),
       },
-      { label: "Настройки", action: () => setModal("settings") },
+      { label: "Параметры", action: () => setModal("settings") },
+    ],
+    Параметры: [
+      { label: "Параметры редактора", action: () => setModal("settings") },
     ],
     Справка: [
-      { label: "О VEXTRIO 3D и управление", action: () => setModal("help") },
+      {
+        label: "Руководство и горячие клавиши",
+        action: () => setModal("help"),
+      },
     ],
   };
   return (
@@ -549,6 +582,17 @@ export function App() {
       className={`app ${s.theme}${welcome ? " app-home" : ""}`}
       aria-busy={fileBusy}
     >
+      <Tooltips />
+      {importFile && (
+        <ImportDialog
+          file={importFile}
+          onClose={() => setImportFile(null)}
+          onImported={() => {
+            setHasDocument(true);
+            setWelcome(false);
+          }}
+        />
+      )}
       {fileBusy && (
         <div className="file-busy-overlay" role="status">
           Работа с файлом…
@@ -558,12 +602,21 @@ export function App() {
         hidden
         ref={input}
         type="file"
-        accept=".v3d,.json"
+        accept=".v3d,.json,.obj,.stl,.step,.stp,.iges,.igs,.brep,.brp"
         aria-label="Открыть файл проекта"
         onChange={async (e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
-          if (!file || fileBusyRef.current || !safe() || !beginFile()) return;
+          if (!file || fileBusyRef.current) return;
+          if (
+            /\.(obj|stl|step|stp|iges|igs|brep|brp|blend|m3d|sldprt|sldasm|f3d|fbx|glb|gltf|ply)$/i.test(
+              file.name,
+            )
+          ) {
+            setImportFile(file);
+            return;
+          }
+          if (!safe() || !beginFile()) return;
           const startedProject = useEditor.getState().project;
           try {
             const project = await browserFileAdapter.open(file);
@@ -598,7 +651,6 @@ export function App() {
           onOpen={(id) => void open(id)}
           onResume={() => setWelcome(false)}
           onAbout={() => {
-            setHelpTab("about");
             setModal("help");
           }}
           onRestore={() => void restoreProject()}
@@ -629,13 +681,6 @@ export function App() {
                 <img src={`${import.meta.env.BASE_URL}vextrio.svg`} alt="" />
               </button>
               <strong>VEXTRIO 3D</strong>
-              <span
-                className="release-badge"
-                data-testid="app-version"
-                title={`Версия ${APP_VERSION}`}
-              >
-                {APP_RELEASE_LABEL}
-              </span>
               {menu === "Файл" && (
                 <>
                   <div
@@ -665,7 +710,11 @@ export function App() {
                 <div className="menu-anchor" key={m}>
                   <button
                     className={menu === m ? "menu-active" : ""}
-                    onClick={() => setMenu(menu === m ? null : m)}
+                    onClick={() =>
+                      m === "Параметры"
+                        ? setModal("settings")
+                        : setMenu(menu === m ? null : m)
+                    }
                   >
                     {m}
                   </button>
@@ -695,11 +744,70 @@ export function App() {
                 </div>
               ))}
             </nav>
-            <div className="project-title">
-              <span className={dirty ? "unsaved-dot" : "saved-dot"} />
-              {s.project.name}
-              <span className="file-extension">.v3d</span>
-              <ChevronDown size={12} />
+            <div className="menu-anchor project-switcher">
+              <button
+                className="project-title"
+                aria-label="Переключить проект"
+                aria-expanded={projectMenu}
+                onClick={() => {
+                  setProjectMenu(!projectMenu);
+                  void recent.refresh();
+                }}
+              >
+                <span className={dirty ? "unsaved-dot" : "saved-dot"} />
+                <span className="project-name">{s.project.name}</span>
+                <span className="file-extension">.v3d</span>
+                <ChevronDown size={12} />
+              </button>
+              {projectMenu && (
+                <>
+                  <div
+                    className="menu-backdrop"
+                    onClick={() => setProjectMenu(false)}
+                  />
+                  <div className="dropdown project-dropdown">
+                    <button
+                      onClick={() => {
+                        setProjectMenu(false);
+                        newProject();
+                      }}
+                    >
+                      Новый проект
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProjectMenu(false);
+                        open();
+                      }}
+                    >
+                      Открыть проект…
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProjectMenu(false);
+                        void returnHome();
+                      }}
+                    >
+                      Все проекты на стартовом экране
+                    </button>
+                    <strong>Недавние файлы</strong>
+                    {!recent.entries.length && <p>Нет открытых файлов</p>}
+                    {recent.entries.map((entry) => (
+                      <button
+                        key={entry.id}
+                        onClick={() => {
+                          setProjectMenu(false);
+                          void open(entry.id);
+                        }}
+                      >
+                        {entry.name}
+                        {!isDesktop() && " · выбрать файл снова"}
+                      </button>
+                    ))}
+                    {recent.error && <p role="alert">{recent.error}</p>}
+                  </div>
+                </>
+              )}
             </div>
             <div className="topbar-right">
               <div className="local-badge">
@@ -707,9 +815,6 @@ export function App() {
               </div>
               <Button title="Стартовый экран" onClick={() => void returnHome()}>
                 <House size={17} />
-              </Button>
-              <Button title="Настройки" onClick={() => setModal("settings")}>
-                <Settings2 size={16} />
               </Button>
             </div>
           </header>
@@ -804,7 +909,7 @@ export function App() {
                 </Button>
                 <Button
                   title="Удалить выделенное"
-                  disabled={!s.selected && s.topologySelection?.kind !== "face"}
+                  disabled={!s.selected && !s.topologySelection}
                   onClick={removeSelected}
                 >
                   <Trash2 size={18} />
@@ -835,13 +940,6 @@ export function App() {
                     onClick={() => setDockTab("properties")}
                   >
                     Свойства
-                  </button>
-                  <button
-                    className="plain dock-hide"
-                    title="Скрыть боковую панель"
-                    onClick={() => setStructure(false)}
-                  >
-                    <PanelRight size={14} />
                   </button>
                 </div>
                 <div
@@ -941,6 +1039,23 @@ export function App() {
               className={`scene${isSketchTool(s.tool) || ["offset", "translate"].includes(s.tool) ? " sketch-active" : ""}`}
             >
               <Viewport />
+              <button
+                className="dock-reveal"
+                aria-label={
+                  structure
+                    ? "Скрыть боковую панель"
+                    : "Показать боковую панель"
+                }
+                title={
+                  structure
+                    ? "Скрыть боковую панель"
+                    : "Показать боковую панель — структура и свойства"
+                }
+                aria-expanded={structure}
+                onClick={() => setStructure(!structure)}
+              >
+                <PanelRight size={18} />
+              </button>
               {isSketchTool(s.tool) ? (
                 <SketchPanel />
               ) : s.tool === "translate" ? (
@@ -952,15 +1067,6 @@ export function App() {
               ) : (
                 <PrecisionPanel />
               )}
-              <div className="viewport-header">
-                <button onClick={() => s.view("projection")}>
-                  <View size={14} />
-                  {s.project.camera.projection === "perspective"
-                    ? "Перспектива"
-                    : "Ортография"}
-                  <ChevronDown size={12} />
-                </button>
-              </div>
               <NavigationCube />
               <EditContext />
               <div className="viewport-bottom">
@@ -975,19 +1081,20 @@ export function App() {
                     : "Орбита · перетаскивание"}
                 </span>
                 <span>
-                  <Hand size={13} /> Орбита · СКМ · Shift: панорама
+                  <Hand size={13} /> СКМ · панорама · Shift: орбита
                 </span>
               </div>
-              <button
-                className="reset-view"
-                title="Сбросить камеру"
-                onClick={() => s.view("reset")}
-              >
-                <Maximize size={16} />
-              </button>
             </section>
           </main>
           <footer className="statusbar">
+            <span
+              className="release-badge"
+              data-testid="app-version"
+              title={`Версия ${APP_VERSION}`}
+            >
+              {APP_RELEASE_LABEL}
+            </span>
+
             <span
               className="recovery-status"
               data-testid="recovery-status"
@@ -1021,6 +1128,7 @@ export function App() {
                   ? "Выделен 1 объект"
                   : "Нет выделения"}
             </span>
+            <ModelStats />
             <span className="status-spacer" />
             <span>Привязка: {s.snap ? "0,25 м" : "выкл."}</span>
             <label>
@@ -1051,7 +1159,10 @@ export function App() {
         />
       )}
       {modal && (
-        <div className="modal-overlay">
+        <WorkspaceDialog
+          label={modal === "settings" ? "Параметры" : "Справка"}
+          onClose={() => setModal(null)}
+        >
           <div className="dialog">
             <button
               className="dialog-close"
@@ -1063,108 +1174,16 @@ export function App() {
             {modal === "settings" ? (
               <>
                 <span className="eyebrow">ВАШЕ РАБОЧЕЕ ПРОСТРАНСТВО</span>
-                <h2>Настройки</h2>
+                <h2>Параметры</h2>
                 <EditorSettings />
               </>
             ) : (
               <>
-                <span className="eyebrow">SHAPE YOUR IDEAS</span>
-                <h2>
-                  VEXTRIO 3D <small>{APP_RELEASE_LABEL}</small>
-                </h2>
-                <div className="dock-tabs dialog-tabs">
-                  <button
-                    className={helpTab === "hotkeys" ? "active" : ""}
-                    aria-pressed={helpTab === "hotkeys"}
-                    onClick={() => setHelpTab("hotkeys")}
-                  >
-                    Горячие клавиши
-                  </button>
-                  <button
-                    className={helpTab === "about" ? "active" : ""}
-                    aria-pressed={helpTab === "about"}
-                    onClick={() => setHelpTab("about")}
-                  >
-                    О программе
-                  </button>
-                </div>
-                {helpTab === "hotkeys" ? (
-                  <>
-                    <p>
-                      Нарисуйте прямоугольник (R), выберите его грань (Space),
-                      задайте высоту (P). Сгруппируйте результат и собирайте
-                      модель из независимых частей.
-                    </p>
-                    <div className="help-grid">
-                      <kbd>Space / V</kbd>
-                      <span>Выделение</span>
-                      <kbd>L / R / C / A</kbd>
-                      <span>Линия / прямоугольник / окружность / дуга</span>
-                      <kbd>F</kbd>
-                      <span>Отступ замкнутого контура</span>
-                      <kbd>P</kbd>
-                      <span>Вытянуть / вдавить выбранную грань</span>
-                      <kbd>M / Q / S</kbd>
-                      <span>Перемещение / вращение / масштаб</span>
-                      <kbd>Shift F</kbd>
-                      <span>Фокус на выбранном объекте</span>
-                      <kbd>Ctrl Z / Y</kbd>
-                      <span>Отменить / повторить</span>
-                      <kbd>Ctrl D</kbd>
-                      <span>Дублировать объект</span>
-                      <kbd>Delete</kbd>
-                      <span>Удалить объект</span>
-                      <kbd>Мышь</kbd>
-                      <span>
-                        Средняя кнопка — орбита, колесо — зум, Shift + средняя
-                        кнопка — панорама
-                      </span>
-                    </div>
-                    <p className="dialog-note">
-                      Выдавливание поддерживает плоские контуры и ограниченные
-                      углубления и сквозные окна между параллельными гранями.
-                      Поддерживаются сквозные дверные проёмы до края стены.
-                      Общие булевы операции пока не поддерживаются. Экспорт
-                      OBJ/STL — в меню за значком программы слева сверху.
-                      Основные инструменты остаются бесплатными.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      Бесплатный браузерный и настольный редактор 3D-моделей:
-                      эскизы на гранях, выдавливание, окна, сквозные проёмы,
-                      группы и экземпляры, экспорт OBJ / STL. Без регистрации;
-                      файлы остаются у вас. Текущая версия{" "}
-                      <strong>
-                        {APP_VERSION} ({APP_RELEASE_LABEL})
-                      </strong>
-                      .
-                    </p>
-                    <h3>Недавние изменения</h3>
-                    <div className="devblog">
-                      {devblogEntries.map((entry) => (
-                        <article
-                          className="devblog-entry"
-                          key={`${entry.version} ${entry.title}`}
-                        >
-                          <h4>
-                            {entry.title} <small>{entry.version}</small>
-                          </h4>
-                          <ul>
-                            {entry.items.map((item, index) => (
-                              <li key={`${entry.version}-${index}`}>{item}</li>
-                            ))}
-                          </ul>
-                        </article>
-                      ))}
-                    </div>
-                  </>
-                )}
+                <HelpContent />
               </>
             )}
           </div>
-        </div>
+        </WorkspaceDialog>
       )}
     </div>
   );
