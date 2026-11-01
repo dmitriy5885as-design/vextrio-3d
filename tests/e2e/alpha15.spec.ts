@@ -262,7 +262,16 @@ test.describe.serial("basic house built entirely through UI", () => {
       "docs/0.2/examples/alpha15-house.v3d",
       JSON.stringify(opened, null, 2),
     );
-    await page.screenshot({ path: "docs/0.2/images/alpha15-house.png" });
+    await page.bringToFront();
+    await expect(page.locator(".viewport-canvas")).toHaveAttribute(
+      "data-topology-faces",
+      "24",
+    );
+    await page.screenshot({
+      path: "docs/0.2/images/alpha15-house.png",
+      animations: "disabled",
+      caret: "hide",
+    });
     for (const g of Object.values(opened.geometries) as GeometryModel[])
       expect(
         Object.values(g.faces).every((f) => tessellateFace(g, f).area > 0),
