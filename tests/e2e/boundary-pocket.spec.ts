@@ -84,14 +84,14 @@ test("50mm floor recess previews, commits, restores history and reopens as ident
   await page.keyboard.press("Control+y");
   expect((await save(page)).geometries).toEqual(after.geometries);
   await page.bringToFront();
-  mkdirSync("docs/0.2/images", { recursive: true });
+  mkdirSync("test-results", { recursive: true });
   await page.screenshot({
-    path: "docs/0.2/images/alpha16-recess.png",
+    path: "test-results/alpha16-recess.png",
     animations: "disabled",
     caret: "hide",
   });
   writeFileSync(
-    "docs/0.2/examples/alpha16-recess.v3d",
+    "test-results/alpha16-recess.v3d",
     JSON.stringify(after, null, 2),
   );
   page.on("dialog", (d) => d.accept());
