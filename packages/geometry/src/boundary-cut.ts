@@ -14,16 +14,18 @@ import { loopVertices, onSegment, type ExtrusionStop } from "./through";
 import { diffGeometry, type LineageEntry } from "./transactions";
 import type { ValidationContext } from "./validate";
 
-// Subtract a complete boundary-touching prism from a single shell. Existing
+// Subtract a boundary-touching prism from a single shell. For a partial cut,
+// keep the translated cap and leave the opposite skin untouched. Existing
 // planar arrangements split the back skin and boundary strips; no triangles
 // are used to decide topology. The caller validates the complete candidate.
-export function boundaryThrough(
+export function boundaryCut(
   before: GeometryModel,
   source: Face,
   stop: ExtrusionStop,
   vector: Vec3,
   context: ValidationContext,
   operationId: Id<"operation">,
+  retainCap: boolean,
 ) {
   const body = Object.values(before.bodies).find((b) =>
     b.faceIds.includes(source.id),
@@ -70,7 +72,9 @@ export function boundaryThrough(
     };
     return lid;
   };
-  const cuts = new Map<string, Vec3[][]>([[stop.faceId, [top.map(world)]]]);
+  const cuts = new Map<string, Vec3[][]>(
+    retainCap ? [] : [[stop.faceId, [top.map(world)]]],
+  );
   for (const { edgeId, faceId } of stop.boundaryEdges!) {
     const e = before.edges[edgeId],
       a = before.vertices[e.start].position,
@@ -181,6 +185,21 @@ export function boundaryThrough(
     shell.faces.push({ faceId: id, orientation });
   });
   removeFace(source.id);
+  if (retainCap) {
+    // Retain the selected face ID and material; only its boundary and plane move.
+    m.faces[source.id] = {
+      ...structuredClone(source),
+      plane: {
+        ...structuredClone(source.plane),
+        origin: add(source.plane.origin, vector),
+      },
+      outerLoopId: loop(
+        top.flatMap((a, i) => path(a, top[(i + 1) % top.length])),
+      ),
+      innerLoopIds: [],
+    };
+    shell.faces.push({ faceId: source.id, orientation });
+  }
   // Remove only unreferenced edges from this body and newly constructed atoms.
   // Unrelated wire bodies and construction vertices must remain untouched.
   const used = new Set(Object.values(m.coedges).map((c) => c.edgeId));

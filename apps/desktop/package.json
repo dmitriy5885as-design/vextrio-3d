@@ -1,6 +1,6 @@
 {
   "name": "@forma/desktop",
-  "version": "0.2.0-alpha.15",
+  "version": "0.2.0-alpha.16",
   "private": true,
   "scripts": {
     "dev": "tauri dev",

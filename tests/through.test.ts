@@ -317,8 +317,8 @@ it("a stale through-cut response cannot overwrite a newer document/history", asy
   useEditor.getState().undo();
   expect(useEditor.getState().project).toEqual(p);
 });
-it.each([-0.1, -0.3])(
-  "rejects partial/overshooting boundary cuts atomically: %s",
+it.each([-0.21, -0.3])(
+  "rejects overshooting boundary cuts atomically: %s",
   async (distance) => {
     const { p, face, ref, side } = await windowPatch(0.2, 0, 2.1),
       s = useEditor.getState();
@@ -456,4 +456,26 @@ it("serializes a just-confirmed door only after its common history command finis
       JSON.stringify((useEditor.getState().project as ProjectV2).geometries),
     ),
   );
+});
+
+it("supports the previously rejected half-depth boundary cut with exact inverse history", async () => {
+  const { p, g, face, ref, side, body } = await windowPatch(0.2, 0, 2.1);
+  expect(
+    (
+      await useEditor
+        .getState()
+        .editGeometry(ref, {
+          kind: "extrude-face",
+          faceId: face.id,
+          distance: -0.1,
+          side,
+        })
+    ).status,
+  ).toBe("applied");
+  const after = useEditor.getState().project as ProjectV2;
+  const next = after.geometries[g.id];
+  expect(classifyBody(next, body.id)).toBe("closed-shell");
+  expect(bodyVolume(next, body.id)).toBeCloseTo(2.19, 8);
+  useEditor.getState().undo();
+  expect(useEditor.getState().project).toEqual(p);
 });
