@@ -246,14 +246,14 @@ test.describe.serial("basic house built entirely through UI", () => {
     expect(house.geometries[gid]).toEqual(walls.geometries[gid]);
     // Capture the completed construction before navigating away. Persistence
     // checks below remain independent of Chrome's capture-after-reload path.
-    mkdirSync("docs/0.2/images", { recursive: true });
+    mkdirSync("test-results", { recursive: true });
     await page.bringToFront();
     await expect(page.locator(".viewport-canvas")).toHaveAttribute(
       "data-topology-faces",
       "24",
     );
     await page.screenshot({
-      path: "docs/0.2/images/alpha15-house.png",
+      path: "test-results/alpha15-house.png",
       animations: "disabled",
       caret: "hide",
     });
@@ -270,9 +270,9 @@ test.describe.serial("basic house built entirely through UI", () => {
     const opened = await save(page);
     expect(opened.geometries).toEqual(house.geometries);
     expect(opened.nodes).toEqual(house.nodes);
-    mkdirSync("docs/0.2/images", { recursive: true });
+    mkdirSync("test-results", { recursive: true });
     writeFileSync(
-      "docs/0.2/examples/alpha15-house.v3d",
+      "test-results/alpha15-house.v3d",
       JSON.stringify(opened, null, 2),
     );
     // Roundtrip acceptance exercises the real picking/render bridge too.
