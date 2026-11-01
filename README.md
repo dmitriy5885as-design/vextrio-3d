@@ -1,33 +1,63 @@
 # VEXTRIO 3D
 
-## Актуальная разработка — 0.2.0 Alpha.12
+## Актуальная разработка — 0.2.0 Alpha.14
+
+**Последние изменения опубликованы и готовы к проверке:** [PR №23](https://github.com/dmitriy5885as-design/vextrio-3d/pull/23) · [ветка Alpha.14](https://github.com/dmitriy5885as-design/vextrio-3d/tree/codex/editor-workspace) · [проверенный исходный код ee379b5](https://github.com/dmitriy5885as-design/vextrio-3d/tree/ee379b58d93ffb9856042a8d03e6f71ae114bfd6).
 
 | Где | Версия | Ссылка |
 | --- | --- | --- |
-| Последние исходники | **0.2.0-alpha.12** | [Ветка разработки](https://github.com/dmitriy5885as-design/vextrio-3d/tree/codex/move-surface-contacts) · [PR №21](https://github.com/dmitriy5885as-design/vextrio-3d/pull/21) |
-| Основной сайт | **0.2.0-alpha.7** | [Открыть редактор в браузере](https://dmitriy5885as-design.github.io/vextrio-3d/) |
-| Код приложения в main | **0.2.0-alpha.7** | Следующие этапы ожидают приёмки и объединения |
+| Последние исходники и README разработки | **0.2.0-alpha.14** | [Открыть ветку](https://github.com/dmitriy5885as-design/vextrio-3d/tree/codex/editor-workspace) · [Diff PR №23](https://github.com/dmitriy5885as-design/vextrio-3d/pull/23/files) |
+| Windows x64 | **0.2.0-alpha.14** | [Скачать установщик из GitHub Actions](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/41273708098/artifacts/13071050209) |
+| Основной сайт | **0.2.0-alpha.7** | [Открыть опубликованный редактор](https://dmitriy5885as-design.github.io/vextrio-3d/) |
+| Код приложения в main | **0.2.0-alpha.7** | Этапы №17–23 ожидают приёмки и объединения |
 
-**Alpha.12 уже загружена на GitHub.** Последние изменения доступны в ветке разработки и Windows-сборке ниже; основной сайт пока использует Alpha.7. Обновление этого README не объединяет изменения приложения автоматически. Точная версия запущенной сборки видна в шапке редактора и заголовке окна.
+README на главной обновлён отдельно от кода приложения: сайт пока показывает Alpha.7. В Alpha.14 точная версия находится в левом нижнем углу редактора и в заголовке окна. Для загрузки установщика-артефакта может потребоваться вход в GitHub.
 
-### Что добавлено после Alpha.7
+### Что проверить в Alpha.14
+
+- Новый VEXTRIO Home: настоящий новый проект, шаблоны, недавние файлы, восстановление и общие параметры.
+- Скрыть/вернуть боковую панель и навигатор. Рядом с кубом работают виды, изометрия, фокус, вписывание и проекция. Средняя кнопка мыши — панорама, Shift+СКМ — орбита.
+- Параметры перед Справкой; руководство с поиском, горячие клавиши, описания при наведении и рабочее меню у названия проекта.
+- Создать куб → Свойства → «Редактировать вершины» → выбрать вершину в структуре → M. Проверить Delete, Undo/Redo, сохранение и повторное открытие.
+- Файл → «Импорт модели»: OBJ/STL, STEP/IGES/BREP. Для STL/OBJ/BREP укажите исходные единицы. STEP читает настоящий локальный CAD Worker.
+- В структуре доступны реальные вершины, рёбра и грани; внизу — счётчик граней, рёбер и полигонов отображения.
+
+**Финальный независимый CI:** [run 41273708098](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/41273708098) — **501 unit/integration, 97 Playwright E2E, Web build, check:deps, GitHub Pages/CSP smoke, Windows NSIS и 10 native Rust-тестов прошли**. Это результаты source `ee379b58d93ffb9856042a8d03e6f71ae114bfd6`.
+
+[Подробный аудит, реализованные функции, входные данные, тесты и ограничения](https://github.com/dmitriy5885as-design/vextrio-3d/blob/ee379b58d93ffb9856042a8d03e6f71ae114bfd6/docs/0.2/WORKSPACE_ALPHA14.md) · [Полный отчёт PR №23 с итогами CI](https://github.com/dmitriy5885as-design/vextrio-3d/pull/23) · [Скриншот 1920×1080](https://github.com/dmitriy5885as-design/vextrio-3d/blob/ee379b58d93ffb9856042a8d03e6f71ae114bfd6/docs/0.2/images/workspace-1920x1080.png).
+
+![Рабочий интерфейс Alpha.14, 1366×768](https://github.com/dmitriy5885as-design/vextrio-3d/blob/ee379b58d93ffb9856042a8d03e6f71ae114bfd6/docs/0.2/images/workspace-1366x768.png?raw=true)
+
+### Запустить именно Alpha.14 в браузере локально
+
+```bash
+git clone --branch codex/editor-workspace --single-branch https://github.com/dmitriy5885as-design/vextrio-3d.git vextrio-alpha14
+cd vextrio-alpha14
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Откройте адрес, который выведет Vite. Публичная ссылка выше по-прежнему ведёт к Alpha.7.
+
+### Границы поддержки
+
+CAD импортируется в редактируемую **фасетную геометрию**, без аналитического BREP и истории построения. Импорт ограничен 20 МБ и 3000 граней; материалы, текстуры и исходная сборочная иерархия пока не переносятся. Родные .blend/.m3d/.sldprt/.sldasm/.f3d требуют экспорта OBJ/STL или STEP в исходной программе. Реальная браузерная проверка CAD покрывает STEP; отдельная ручная приёмка IGES/BREP пока не проведена. Открытую дугу или цепочку отрезков нужно замкнуть перед выдавливанием.
+
+Ручные установка/обновление Windows, native import chooser и offline WebView2 ещё не проверены. Поздние локальные перепроверки встретили сбои WebGL и исчерпание памяти ПК; финальный чистый CI прошёл целиком. Совместимость .v3d v1/v2, `format: "forma"`, внутренние @forma/* и Windows identifier сохранены.
+
+### Этапы после Alpha.7
 
 | Версия | Функции | PR |
 | --- | --- | --- |
 | Alpha.8 | Автоскладывание четырёхугольников при перемещении M | [№17](https://github.com/dmitriy5885as-design/vextrio-3d/pull/17) |
-| Alpha.9 | Сгибы многоугольников, сохранение граничных вершин и объединение плоских участков | [№18](https://github.com/dmitriy5885as-design/vextrio-3d/pull/18) |
+| Alpha.9 | Сгибы многоугольников и объединение плоских участков | [№18](https://github.com/dmitriy5885as-design/vextrio-3d/pull/18) |
 | Alpha.10 | Сгибы граней с отверстиями без заполнения проёмов | [№19](https://github.com/dmitriy5885as-design/vextrio-3d/pull/19) |
-| Alpha.11 | Соединение свободных линий в M: T/X-пересечения, совпадения и грани при замыкании | [№20](https://github.com/dmitriy5885as-design/vextrio-3d/pull/20) |
-| Alpha.12 | Контакты свободных линий с неподвижными гранями, разделение поверхностей и сохранение отверстий | [№21](https://github.com/dmitriy5885as-design/vextrio-3d/pull/21) |
+| Alpha.11 | Соединение свободных линий в M | [№20](https://github.com/dmitriy5885as-design/vextrio-3d/pull/20) |
+| Alpha.12 | Контакты свободных линий с неподвижными гранями | [№21](https://github.com/dmitriy5885as-design/vextrio-3d/pull/21) |
+| Alpha.13 | VEXTRIO Home, проекты, шаблоны и восстановление | [№22](https://github.com/dmitriy5885as-design/vextrio-3d/pull/22) |
+| Alpha.14 | Рабочее пространство, M/Delete, вершины примитивов, импорт моделей | [№23](https://github.com/dmitriy5885as-design/vextrio-3d/pull/23) |
 
-В Alpha.12 линия разделяет прямоугольник 4×3 м на две выбираемые грани по 6 м². Разрез поверхности с отверстием сохраняет проём и площадь 11 м². Проверены точные Undo/Redo, сохранение/открытие .v3d, группы, материалы и разделение верхней грани замкнутого блока с сохранением объёма 24 м³.
-
-**Проверки Alpha.12:** 465 unit/integration тестов, 73 Playwright E2E, Web/Windows-сборки, check:deps, проверка GitHub Pages и 3 нативных FileSession теста — [успешный CI](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/41224827510).
-
-- [Windows x64 — установщик Alpha.12](https://github.com/dmitriy5885as-design/vextrio-3d/actions/runs/41224827510/artifacts/13051072334) — артефакт GitHub Actions, для скачивания может потребоваться вход в GitHub. Ручные установка/обновление и offline WebView2 не проверены.
-- [Подробный отчёт, ограничения, скриншоты и проекты .v3d](https://github.com/dmitriy5885as-design/vextrio-3d/blob/88e05c04269cc95f9885d35481998022be4ca383/docs/0.2/SURFACE_CONTACTS.md).
-
-Поддержаны свободные линии у неподвижных поверхностей. Автоматическое слияние самих движущихся граней/тел ещё не реализовано; полный паритет со SketchUp не достигнут. PR №17–21 образуют последовательность зависимых этапов и пока не объединены с main. Совместимость .v3d v1/v2 и `format: "forma"` сохранена.
+PR №17–23 образуют последовательность зависимых этапов. Автоматического объединения с main нет; полный паритет со SketchUp пока не достигнут.
 
 ## Открыть в браузере
 
