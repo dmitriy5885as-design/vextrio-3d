@@ -1061,3 +1061,27 @@
   font-size: 24px;
   margin: 22px 0 16px;
 }
+
+.home-current > span {
+  min-width: 0;
+  flex: 1;
+}
+.home-current strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-current button {
+  flex-shrink: 0;
+}
+.home-recovery > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+.home-recovery p,
+.home-notice {
+  overflow-wrap: anywhere;
+}
+.home-recovery > div:last-child {
+  flex-shrink: 0;
+}

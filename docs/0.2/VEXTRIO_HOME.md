@@ -19,7 +19,7 @@
 
 WelcomeHome, HomeSidebar, HeroSection, QuickActions, RecentProjects, TemplateGallery, LearningSection, NewProjectDialog и EditorSettings выделены в компоненты. App монтирует либо Home, либо редактор. Viewport/NavigationCube загружаются через React.lazy при входе в редактор; на Home нет canvas, WebGL-контекста или animation loop viewport. Существующий cleanup viewport освобождает ресурсы при возврате.
 
-Локальный hero — WebP около 91 КБ; [происхождение, путь и prompt](HOME_ASSET.md). Оригинальные логотип, название и слоган «Придай идее форму» сохранены. Компоновка проверяется на 1000 px, 1366×768 и 1920×1080; есть visible focus, системный focus trap диалога и reduced motion.
+Локальный hero — WebP около 91 КБ; [происхождение, путь и prompt](HOME_ASSET.md). Оригинальные логотип, название и слоган «Придай идее форму» сохранены. Компоновка проверяется на 1000 px, 1366×768 и 1920×1080, включая имя проекта из 190 символов: кнопка продолжения остаётся в пределах окна; есть visible focus, системный focus trap диалога и reduced motion.
 
 Геометрическое ядро, исходники модели документа и команд редактора не изменялись. Формат .v3d, `format: "forma"`, схемы v1/v2, @forma/* и Windows identifier сохранены. Версии workspace согласованы с Alpha.13. Новых веб-зависимостей нет; native-реестр использует serde_json (уже транзитивную зависимость Tauri, теперь объявленную явно).
 

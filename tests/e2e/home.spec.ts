@@ -165,7 +165,7 @@ test("Home roundtrip and cancelled replacement preserve unsaved work and Undo/Re
   page,
 }) => {
   await page.goto("/");
-  await createHomeProject(page);
+  await createHomeProject(page, "W".repeat(190));
   await page.getByRole("button", { name: "Создать: Куб", exact: true }).click();
   const before = await save(page);
   await page
@@ -174,6 +174,10 @@ test("Home roundtrip and cancelled replacement preserve unsaved work and Undo/Re
   await expect(
     page.getByText("Есть несохранённые изменения", { exact: true }),
   ).toBeVisible();
+  await page.setViewportSize({ width: 1000, height: 768 });
+  await expect(
+    page.getByRole("button", { name: "Продолжить работу", exact: true }),
+  ).toBeInViewport();
   await expect(page.locator("canvas")).toHaveCount(0);
   await page.getByRole("button", { name: "Новый проект", exact: true }).click();
   page.once("dialog", (d) => d.dismiss());
