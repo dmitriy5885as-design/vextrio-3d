@@ -35,6 +35,8 @@ import {
   canArrangeWireMove,
   prepareWireMoveArrangement,
   rebuildBodies,
+  canArrangeSurfaceMove,
+  prepareSurfaceMoveArrangement,
 } from "./sketch";
 
 export interface MoveEntity {
@@ -89,15 +91,12 @@ export function moveSelection(model: GeometryModel, entities: MoveEntity[]) {
   return { vertices, edges, faces };
 }
 
-function finish(
+function reframeMovedFaces(
   before: GeometryModel,
   after: GeometryModel,
   changed: Set<string>,
-  context: ValidationContext,
-  lineage: LineageEntry[] = [],
 ) {
-  const { world, tolerance } = metric(after, context),
-    affected = new Set<string>();
+  const affected = new Set<string>();
 
   for (const f of Object.values(after.faces)) {
     const rings = [f.outerLoopId, ...f.innerLoopIds].map((lid) =>
@@ -155,6 +154,18 @@ function finish(
     };
   }
 
+  return affected;
+}
+
+function finish(
+  before: GeometryModel,
+  after: GeometryModel,
+  changed: Set<string>,
+  context: ValidationContext,
+  lineage: LineageEntry[] = [],
+) {
+  const { world, tolerance } = metric(after, context),
+    affected = reframeMovedFaces(before, after, changed);
   validateGeometry(after, context);
 
   const edges = Object.values(after.edges),
@@ -384,6 +395,21 @@ export function prepareVertexMove(
   if (canArrangeWireMove(model, after))
     return finishWireMove(model, after, changed, context, operationId);
   const lineage = foldMovedFaces(model, after, changed, context, operationId);
+  if (!lineage.length) {
+    reframeMovedFaces(model, after, changed);
+    if (canArrangeSurfaceMove(model, after, changed, context)) {
+      const arranged = prepareSurfaceMoveArrangement(
+        model,
+        after,
+        context,
+        operationId,
+      );
+      const joined = applyDelta(model, arranged.forward, context);
+      for (const v of Object.keys(joined.vertices))
+        if (!model.vertices[v]) changed.add(v);
+      return finish(model, joined, changed, context, arranged.lineage);
+    }
+  }
   return finish(model, after, changed, context, lineage);
 }
 

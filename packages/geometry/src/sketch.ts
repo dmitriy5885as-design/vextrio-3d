@@ -1,4 +1,5 @@
 import { restoreErasedRegions } from "./erase-merge";
+import { segmentIntersections } from "./intersections";
 import { contextPlane } from "./sketch-common";
 import {
   entityTables,
@@ -211,9 +212,30 @@ function regenerateFaces(
   local: (p: Vec3) => Vec3,
   declared: PlaneFrame | null,
   force: Id<"edge">[] | null,
+  surfaceOnly = false,
 ) {
-  const planes = discoverPlanes(model, world, tolerance, context, declared),
+  const planes = surfaceOnly
+      ? []
+      : discoverPlanes(model, world, tolerance, context, declared),
     cells: Cell[] = [];
+  if (surfaceOnly)
+    for (const f of Object.values(before.faces)) {
+      const p = contextPlane(f.plane, context);
+      if (
+        !planes.some(
+          (q) =>
+            length(cross(p.normal, q.normal)) <=
+              (context.policy?.angular ?? 1e-10) &&
+            onPlane(p.origin, q, tolerance),
+        )
+      )
+        planes.push(p);
+      if (planes.length > 64)
+        throw new GeometryError(
+          "RESOURCE_LIMIT",
+          "Move: не более 64 плоскостей поверхностей.",
+        );
+    }
   for (const plane of planes)
     cells.push(...planeCells(model, plane, world, tolerance));
   const oldFaces = Object.values(model.faces),
@@ -264,6 +286,7 @@ function regenerateFaces(
         "INVALID_TOPOLOGY",
         "Overlapping source faces on the same plane",
       );
+    if (surfaceOnly && !containing.length) continue;
     const emptyBefore = beforeCells.get(cell.plane)!.some((old) =>
       inRegion(
         projectPoint(cell.sample, cell.plane),
@@ -734,10 +757,154 @@ export function prepareWireMoveArrangement(
       "UNSUPPORTED_OPERATION",
       "Перемещение свободных линий не должно изменять исходные поверхности.",
     );
+  return arrangeMovedGeometry(before, moved, context, operationId, false);
+}
+
+/** First surface Move stage: a planar sheet boundary joins a stationary sheet.
+ * Closed shells and coplanar overlaps retain the existing rejection path. */
+export function canArrangeSurfaceMove(
+  before: GeometryModel,
+  moved: GeometryModel,
+  changed: ReadonlySet<string>,
+  context: ValidationContext,
+) {
+  const { world, tolerance } = metric(moved, context);
+  const vertices = (f: Face) =>
+    [f.outerLoopId, ...f.innerLoopIds].flatMap((l) =>
+      moved.loops[l].coedgeIds.flatMap((cid) => {
+        const e = moved.edges[moved.coedges[cid].edgeId];
+        return [e.start, e.end];
+      }),
+    );
+  const affected = Object.values(moved.faces).filter((f) =>
+    vertices(f).some((v) => changed.has(v)),
+  );
+  const shellFaces = new Set(
+    Object.values(moved.shells).flatMap((s) => s.faces.map((u) => u.faceId)),
+  );
+  if (
+    !affected.length ||
+    affected.some((f) => !before.faces[f.id] || shellFaces.has(f.id))
+  )
+    return false;
+  const stationary = Object.values(moved.faces).filter(
+    (f) => !shellFaces.has(f.id) && !vertices(f).some((v) => changed.has(v)),
+  );
+  for (const source of affected)
+    for (const target of stationary) {
+      const plane = contextPlane(target.plane, context);
+      if (
+        length(
+          cross(contextPlane(source.plane, context).normal, plane.normal),
+        ) <= (context.policy?.angular ?? 1e-10)
+      )
+        continue;
+      const targetEdges = new Set(
+        [target.outerLoopId, ...target.innerLoopIds].flatMap((l) =>
+          moved.loops[l].coedgeIds.map((c) => moved.coedges[c].edgeId),
+        ),
+      );
+      for (const lid of [source.outerLoopId, ...source.innerLoopIds])
+        for (const cid of moved.loops[lid].coedgeIds) {
+          const e = moved.edges[moved.coedges[cid].edgeId];
+          if (
+            targetEdges.has(e.id) ||
+            (!changed.has(e.start) && !changed.has(e.end))
+          )
+            continue;
+          const a = world(moved.vertices[e.start].position),
+            b = world(moved.vertices[e.end].position);
+          if (!onPlane(a, plane, tolerance) || !onPlane(b, plane, tolerance))
+            continue;
+          // Split the query at outer/hole boundaries; a midpoint inside an
+          // opening must not hide valid contact on the material either side.
+          const cuts = [0, 1];
+          for (const eid of targetEdges) {
+            const edge = moved.edges[eid];
+            for (const hit of segmentIntersections(
+              a,
+              b,
+              world(moved.vertices[edge.start].position),
+              world(moved.vertices[edge.end].position),
+              tolerance,
+              context.policy?.angular,
+            ))
+              cuts.push(hit.a);
+          }
+          cuts.sort((x, y) => x - y);
+          for (let i = 1; i < cuts.length; i++) {
+            const t = (cuts[i - 1] + cuts[i]) / 2;
+            const point = a.map((n, k) => n + (b[k] - n) * t) as Vec3;
+            if (faceContains(moved, target, point, context, tolerance))
+              return true;
+          }
+        }
+    }
+  return false;
+}
+
+export function prepareSurfaceMoveArrangement(
+  before: GeometryModel,
+  moved: GeometryModel,
+  context: ValidationContext,
+  operationId: Id<"operation">,
+) {
+  const result = arrangeMovedGeometry(
+    before,
+    moved,
+    context,
+    operationId,
+    true,
+  );
+  // Sheet junctions must not silently attach to or restructure closed bodies.
+  const protectedIds = new Set<string>();
+  for (const body of Object.values(before.bodies).filter(
+    (b) => b.shellIds.length,
+  )) {
+    for (const key of [
+      body.id,
+      ...body.vertexIds,
+      ...body.edgeIds,
+      ...body.faceIds,
+      ...body.shellIds,
+    ])
+      protectedIds.add(key);
+    for (const fid of body.faceIds)
+      for (const lid of [
+        before.faces[fid].outerLoopId,
+        ...before.faces[fid].innerLoopIds,
+      ]) {
+        protectedIds.add(lid);
+        for (const cid of before.loops[lid].coedgeIds) protectedIds.add(cid);
+      }
+  }
+  if (
+    entityTables.some((table) =>
+      result.forward[table].some(
+        (p) => p.before !== null && protectedIds.has(p.id),
+      ),
+    )
+  )
+    throw new GeometryError(
+      "UNSUPPORTED_OPERATION",
+      "Соединение поверхностей с объёмными телами пока не поддерживается.",
+    );
+  return result;
+}
+
+function arrangeMovedGeometry(
+  before: GeometryModel,
+  moved: GeometryModel,
+  context: ValidationContext,
+  operationId: Id<"operation">,
+  surfaceOnly: boolean,
+): PreparedGeometryChange {
+  validateGeometry(before, context);
+  validateGeometry(moved, context);
   const split = splitSegments(moved, [], context, operationId);
   const replacements = regenerateFaces(
-    before,
-    before,
+    surfaceOnly ? moved : before,
+    surfaceOnly ? moved : before,
     split.model,
     context,
     split.allocate,
@@ -746,6 +913,7 @@ export function prepareWireMoveArrangement(
     split.local,
     null,
     null,
+    surfaceOnly,
   );
   const vertexAliases = new Map(
     split.lineage
