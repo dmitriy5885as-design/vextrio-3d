@@ -148,7 +148,9 @@ export function boundaryCut(
     return lid;
   };
   const cuts = new Map<string, Vec3[][]>(
-    retainCap ? [] : [[stop.faceId, [top.map(world)]]],
+    retainCap
+      ? []
+      : (stop.faceIds ?? [stop.faceId]).map((fid) => [fid, [top.map(world)]]),
   );
   for (const { edgeId, faceId } of stop.boundaryEdges!) {
     const e = before.edges[edgeId],
@@ -166,18 +168,24 @@ export function boundaryCut(
     const originalRings = [original.outerLoopId, ...original.innerLoopIds].map(
       (l) => loopVertices(before, l).map((p) => projectPoint(world(p), plane)),
     );
-    const cells = planeCells(m, plane, world, t).filter(
+    const originalCells = planeCells(m, plane, world, t).filter((cell) =>
+      inRegion(
+        projectPoint(cell.sample, plane),
+        originalRings[0],
+        originalRings.slice(1),
+      ),
+    );
+    const cells = originalCells.filter(
       (cell) =>
-        inRegion(
-          projectPoint(cell.sample, plane),
-          originalRings[0],
-          originalRings.slice(1),
-        ) &&
         !polygons.some((poly) =>
           inRegion(projectPoint(cell.sample, plane), poly),
         ),
     );
-    if (!cells.length)
+    if (cells.length === originalCells.length) continue;
+    if (
+      !cells.length &&
+      (retainCap || !(stop.faceIds ?? [stop.faceId]).includes(fid))
+    )
       throw new GeometryError(
         "UNSUPPORTED_OPERATION",
         "Проём удаляет опорную грань целиком.",

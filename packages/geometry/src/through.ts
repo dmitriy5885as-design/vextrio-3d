@@ -11,6 +11,7 @@ import {
   length,
 } from "./math";
 import { segmentIntersections } from "./intersections";
+import { oppositePatch } from "./opposite-patch";
 export const loopVertices = (m: GeometryModel, l: string) =>
   m.loops[l].coedgeIds.map((cid) => {
     const c = m.coedges[cid],
@@ -19,6 +20,7 @@ export const loopVertices = (m: GeometryModel, l: string) =>
   });
 export interface ExtrusionStop {
   faceId: string;
+  faceIds?: string[];
   distance: number;
   boundaryEdges?: { edgeId: string; faceId: string }[];
 }
@@ -106,7 +108,8 @@ export function containsRing(
   return true;
 }
 // Limited parallel-face push-through, not a general boolean. The complete
-// profile must fit within one opposite face, without crossing existing holes.
+// profile must fit within an opposite face or connected coplanar patch,
+// without crossing existing holes.
 export function extrusionStop(
   m: GeometryModel,
   face: Face,
@@ -186,6 +189,16 @@ export function extrusionStop(
   // Reject whole-cap collapse and corner-only contacts; a notch needs skin.
   if (!interiorEdges) return null;
   let nearest: ExtrusionStop | null = null;
+  const candidates = body.faceIds.filter((fid) => {
+    const use = shellUses.find((u) => u.faceId === fid)?.orientation ?? 1;
+    return (
+      dot(
+        multiply(contextPlane(m.faces[fid].plane, context).normal, use),
+        direction,
+      ) >
+      1 - 1e-8
+    );
+  });
   for (const fid of body.faceIds) {
     if (fid === face.id) continue;
     const other = m.faces[fid],
@@ -204,8 +217,16 @@ export function extrusionStop(
       ),
       polygons = boundaries.map((r) => r.map((v) => projectPoint(v, p))),
       profile = ring.map((v) => projectPoint(v, p));
+    const patch = oppositePatch(
+      m,
+      fid,
+      candidates,
+      ring,
+      context,
+      !!boundaryEdges.length,
+    );
     if (boundaryEdges.length) {
-      if (!containsRing(m, other, ring, context)) continue;
+      if (!patch && !containsRing(m, other, ring, context)) continue;
       if (
         boundaryEdges.some(({ edgeId, faceId }) => {
           const e = m.edges[edgeId],
@@ -226,7 +247,21 @@ export function extrusionStop(
         })
       )
         continue;
-      nearest = { faceId: fid, distance: -depth, boundaryEdges };
+      nearest = {
+        faceId: fid,
+        ...(patch ? { faceIds: patch } : {}),
+        distance: -depth,
+        boundaryEdges,
+      };
+      continue;
+    }
+    if (patch) {
+      nearest = {
+        faceId: fid,
+        faceIds: patch,
+        distance: -depth,
+        boundaryEdges: [],
+      };
       continue;
     }
     if (
