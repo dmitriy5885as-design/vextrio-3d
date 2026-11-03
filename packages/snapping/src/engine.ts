@@ -66,6 +66,7 @@ export interface SnapQuery {
   contextPath?: string[];
   contextOnly?: boolean;
   includeLocked?: boolean;
+  kinds?: readonly SnapKind[];
   radius?: number;
   releaseRadius?: number;
 }
@@ -363,6 +364,7 @@ export class SnapEngine {
       ref?: EntityRef,
       guide?: [Vec3, Vec3],
     ) => {
+      if (q.kinds && !q.kinds.includes(kind)) return;
       if (point.some((n) => !Number.isFinite(n) || Math.abs(n) > 1e9)) return;
       const p = q.project(point),
         distance = Math.hypot(p.x - q.cursor[0], p.y - q.cursor[1]);

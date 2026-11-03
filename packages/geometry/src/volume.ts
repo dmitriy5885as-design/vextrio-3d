@@ -120,17 +120,25 @@ export function assertFaceContacts(
         max: [0, 1, 2].map((i) => Math.max(...points.map((p) => p[i]))),
       };
     });
+  // Sweep along the widest world axis. Only overlapping boxes consume the
+  // narrow-phase budget; distant detail must not make a local edit impossible.
+  const spreads = [0, 1, 2].map((k) =>
+    faces.length
+      ? Math.max(...faces.map((f) => f.max[k])) -
+        Math.min(...faces.map((f) => f.min[k]))
+      : 0,
+  );
+  const axis = spreads.indexOf(Math.max(...spreads));
+  faces.sort(
+    (a, b) => a.min[axis] - b.min[axis] || a.f.id.localeCompare(b.f.id),
+  );
   let pairs = 0;
   for (let i = 0; i < faces.length; i++)
     for (let j = i + 1; j < faces.length; j++) {
       const a = faces[i],
         b = faces[j];
+      if (b.min[axis] > a.max[axis] + tolerance) break;
       if (!changed.has(a.f.id) && !changed.has(b.f.id)) continue;
-      if (++pairs > 200000)
-        throw new GeometryError(
-          "INVALID_TOPOLOGY",
-          "Слишком сложная модель для проверки пересечений объёма.",
-        );
       if (
         [0, 1, 2].some(
           (k) =>
@@ -138,6 +146,11 @@ export function assertFaceContacts(
         )
       )
         continue;
+      if (++pairs > 200000)
+        throw new GeometryError(
+          "RESOURCE_LIMIT",
+          "Слишком сложная модель для проверки пересечений объёма.",
+        );
       const sharedVertices = a.vertices.filter((v) => b.vertices.includes(v)),
         sharedEdges = a.edges.filter((e) => b.edges.includes(e));
       const allowed = (p: Vec3) =>
@@ -280,7 +293,10 @@ export function prepareExtrusion(
     body.shellIds
       .flatMap((s) => before.shells[s].faces)
       .find((u) => u.faceId === f.id)?.orientation ?? 1;
-  if (stop?.boundaryEdges?.length) {
+  if (
+    stop &&
+    (stop.boundaryEdges?.length || (through && stop.faceIds?.length))
+  ) {
     const cut = boundaryCut(
       before,
       f,

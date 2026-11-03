@@ -841,7 +841,7 @@ export function App() {
             <div className="toolbar-spacer" />
             <div className="toolbar-section">
               <Button
-                title="Привязка к сетке 0,25 м"
+                title="Привязки к геометрии и сетке"
                 active={s.snap}
                 onClick={() => useEditor.setState({ snap: !s.snap })}
               >

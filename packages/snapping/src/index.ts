@@ -6,3 +6,5 @@ export function snapPosition(position: Vec3, step: number): Vec3 {
     ? (position.map((n) => Math.round(n / step) * step) as Vec3)
     : [...position];
 }
+
+export * from "./depth";
