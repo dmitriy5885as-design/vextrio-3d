@@ -15,6 +15,7 @@ import { cross, dot, length, projectPoint, subtract } from "./math";
 import {
   canonical,
   validateGeometry,
+  classifyBody,
   type ValidationContext,
 } from "./validate";
 import {
@@ -560,7 +561,7 @@ export function prepareSketch(
     operationId,
   );
 }
-function finishArrangement(
+export function finishArrangement(
   before: GeometryModel,
   model: GeometryModel,
   rawLineage: LineageEntry[],
@@ -780,7 +781,12 @@ export function canArrangeSurfaceMove(
     vertices(f).some((v) => changed.has(v)),
   );
   const shellFaces = new Set(
-    Object.values(moved.shells).flatMap((s) => s.faces.map((u) => u.faceId)),
+    Object.values(moved.bodies)
+      .filter(
+        (b) =>
+          b.shellIds.length || classifyBody(moved, b.id) === "closed-shell",
+      )
+      .flatMap((b) => b.faceIds),
   );
   if (
     !affected.length ||
@@ -859,7 +865,7 @@ export function prepareSurfaceMoveArrangement(
   // Sheet junctions must not silently attach to or restructure closed bodies.
   const protectedIds = new Set<string>();
   for (const body of Object.values(before.bodies).filter(
-    (b) => b.shellIds.length,
+    (b) => b.shellIds.length || classifyBody(before, b.id) === "closed-shell",
   )) {
     for (const key of [
       body.id,

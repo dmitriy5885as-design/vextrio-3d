@@ -1,6 +1,6 @@
 {
   "exports": "./src/index.ts",
-  "version": "0.2.0-alpha.17",
+  "version": "0.2.0-alpha.18",
   "name": "@forma/file-io",
   "private": true,
   "type": "module",

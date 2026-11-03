@@ -30,6 +30,7 @@ import { segmentIntersections } from "./intersections";
 import { assertFaceContacts } from "./volume";
 
 import { foldMovedFaces } from "./fold";
+import { prepareSolidWallJoin } from "./solid-wall-join";
 import type { LineageEntry } from "./transactions";
 import {
   canArrangeWireMove,
@@ -397,6 +398,19 @@ export function prepareVertexMove(
   const lineage = foldMovedFaces(model, after, changed, context, operationId);
   if (!lineage.length) {
     reframeMovedFaces(model, after, changed);
+    const solidJoin = prepareSolidWallJoin(
+      model,
+      after,
+      changed,
+      context,
+      operationId,
+    );
+    if (solidJoin) {
+      const joined = applyDelta(model, solidJoin.forward, context);
+      for (const v of Object.keys(joined.vertices))
+        if (!model.vertices[v]) changed.add(v);
+      return finish(model, joined, changed, context, solidJoin.lineage);
+    }
     if (canArrangeSurfaceMove(model, after, changed, context)) {
       const arranged = prepareSurfaceMoveArrangement(
         model,
