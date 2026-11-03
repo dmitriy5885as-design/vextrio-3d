@@ -1,5 +1,6 @@
 import {
   GeometryError,
+  defaultPolicy,
   entityTables,
   type Face,
   type GeometryModel,
@@ -13,6 +14,7 @@ import { splitSegments } from "./edge-builder";
 import { loopVertices, onSegment, type ExtrusionStop } from "./through";
 import { diffGeometry, type LineageEntry } from "./transactions";
 import type { ValidationContext } from "./validate";
+import { segmentIntersections } from "./intersections";
 
 // Subtract a boundary-touching prism from a single shell. For a partial cut,
 // keep the translated cap and leave the opposite skin untouched. Existing
@@ -46,9 +48,82 @@ export function boundaryCut(
       top[(i + 1) % top.length],
     ]);
   points.forEach((p, i) => segments.push([p, top[i]]));
-  const split = splitSegments(before, segments, context, operationId),
+  // Arrangement is local to the edited body. Unrelated bodies must neither
+  // consume its segment budget nor be welded into its boundaries.
+  const scoped = { ...before };
+  const members = {
+    vertices: new Set<string>(body.vertexIds),
+    edges: new Set<string>(body.edgeIds),
+    faces: new Set<string>(body.faceIds),
+    shells: new Set<string>(body.shellIds),
+    bodies: new Set<string>([body.id]),
+    loops: new Set<string>(
+      body.faceIds.flatMap((fid) => {
+        const f = before.faces[fid];
+        return [f.outerLoopId, ...f.innerLoopIds];
+      }),
+    ),
+    coedges: new Set<string>(),
+  };
+  for (const lid of members.loops)
+    for (const cid of before.loops[lid].coedgeIds) members.coedges.add(cid);
+  for (const table of entityTables)
+    Object.assign(scoped, {
+      [table]: Object.fromEntries(
+        Object.entries(before[table]).filter(([key]) =>
+          members[table].has(key),
+        ),
+      ),
+    });
+  // Retain the full scene's metric and ID reservation despite the local input.
+  const { tolerance, world } = metric(before, context, segments.flat());
+  // Scoping must not silently permit disconnected contacts that the former
+  // global splitter would have welded. Separate wire bodies have no faces for
+  // the caller's face/face checks, so certify the new boundary against them too.
+  const worldSegments = segments.map(([a, b]) => [world(a), world(b)]);
+  for (const edge of Object.values(before.edges)) {
+    if (members.edges.has(edge.id)) continue;
+    const a = world(before.vertices[edge.start].position),
+      b = world(before.vertices[edge.end].position);
+    for (const [c, d] of worldSegments) {
+      if (
+        [0, 1, 2].some(
+          (k) =>
+            Math.max(a[k], b[k]) + tolerance < Math.min(c[k], d[k]) ||
+            Math.max(c[k], d[k]) + tolerance < Math.min(a[k], b[k]),
+        )
+      )
+        continue;
+      if (
+        segmentIntersections(a, b, c, d, tolerance, context.policy?.angular)
+          .length
+      )
+        throw new GeometryError(
+          "UNSUPPORTED_OPERATION",
+          "Проём пересекает геометрию другого тела. Разделите геометрию на группы.",
+          [edge.id, source.id],
+        );
+    }
+  }
+  const split = splitSegments(
+      scoped,
+      segments,
+      {
+        ...context,
+        policy: {
+          ...(context.policy ?? defaultPolicy),
+          absoluteDistance: tolerance,
+          relativeDistance: 0,
+        },
+        reservedIds: new Set([
+          ...(context.reservedIds ?? []),
+          ...entityTables.flatMap((table) => Object.keys(before[table])),
+        ]),
+      },
+      operationId,
+    ),
     m = split.model,
-    { world, tolerance: t } = metric(m, context),
+    t = tolerance,
     allocate = split.allocate,
     shell = m.shells[shellBefore.id];
   const removeFace = (fid: string) => {
@@ -233,6 +308,12 @@ export function boundaryCut(
       target.edgeIds.flatMap((e) => [m.edges[e].start, m.edges[e].end]),
     ),
   ];
+  // Restore other bodies only after arrangement and cleanup; the caller checks
+  // contacts against the complete scene before accepting the atomic change.
+  for (const table of entityTables)
+    for (const [key, value] of Object.entries(before[table]))
+      if (!members[table].has(key))
+        Object.assign(m[table], { [key]: structuredClone(value) });
   const delta = diffGeometry(before, m),
     lineage: LineageEntry[] = [];
   for (const table of entityTables)
