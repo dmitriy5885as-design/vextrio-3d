@@ -293,7 +293,10 @@ export function prepareExtrusion(
     body.shellIds
       .flatMap((s) => before.shells[s].faces)
       .find((u) => u.faceId === f.id)?.orientation ?? 1;
-  if (stop?.boundaryEdges?.length) {
+  if (
+    stop &&
+    (stop.boundaryEdges?.length || (through && stop.faceIds?.length))
+  ) {
     const cut = boundaryCut(
       before,
       f,
