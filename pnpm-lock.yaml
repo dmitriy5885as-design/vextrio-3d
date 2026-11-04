@@ -259,6 +259,9 @@ importers:
       '@forma/snapping':
         specifier: workspace:*
         version: link:../snapping
+      '@forma/tools':
+        specifier: workspace:*
+        version: link:../tools
       react:
         specifier: ^19.0.0
         version: 19.3.1

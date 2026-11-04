@@ -1,3 +1,4 @@
+import { installPointerTools } from "./PointerTools";
 import { TopologyBridge } from "./TopologyBridge";
 import {
   getLegacyObjects,
@@ -457,6 +458,14 @@ export function Viewport() {
       downMoveGeneration = useMove.getState().generation,
       downOffsetGeneration = useOffset.getState().generation,
       downGeneration = sketchController.generation;
+    const disposePointerTools = installPointerTools({
+      element: renderer.domElement,
+      scene,
+      camera: () => camera,
+      topology: () => topology,
+      project: (point) => projectPoint(point),
+      render: requestRender,
+    });
     const pointerDown = (e: PointerEvent) => {
       inferDrawingPlane(e.clientX, e.clientY);
       down = { x: e.clientX, y: e.clientY };
@@ -899,16 +908,22 @@ export function Viewport() {
       preview.visible = !!(enabled && p.target);
       planeGuide.visible = enabled;
       precisionAxes.visible = enabled;
-      controls.mouseButtons.LEFT = ["extrude", "offset", "translate"].includes(
-        useEditor.getState().tool,
-      )
+      controls.mouseButtons.LEFT = [
+        "extrude",
+        "offset",
+        "translate",
+        "freehand",
+        "erase",
+      ].includes(useEditor.getState().tool)
         ? (null as unknown as THREE.MOUSE)
         : useEditor.getState().tool === "pan"
           ? THREE.MOUSE.PAN
           : enabled
             ? (null as unknown as THREE.MOUSE)
             : THREE.MOUSE.ROTATE;
-      transform.enabled = !enabled && useEditor.getState().tool !== "offset";
+      transform.enabled =
+        !enabled &&
+        !["offset", "erase", "freehand"].includes(useEditor.getState().tool);
       if (enabled) {
         try {
           const { matrix } = precisionFrame(document, p),
@@ -1555,6 +1570,7 @@ export function Viewport() {
     return () => {
       disposed = true;
       unsubscribe();
+      disposePointerTools();
       unsubscribeDepth();
       depthGeometry.dispose();
       depthMaterial.dispose();

@@ -294,6 +294,7 @@ export class TopologyBridge {
     ray: THREE.Raycaster,
     threshold: number,
     includePreviewHiddenRoot = false,
+    only?: EntityRef["kind"],
   ): { ref: EntityRef } | { legacyId: string; path: string[] } | null {
     this.root.updateMatrixWorld(true);
     // Edges get a narrower hit band than vertices, leaving thin native
@@ -325,8 +326,12 @@ export class TopologyBridge {
     for (const hit of candidates) {
       const data = hit.object.userData;
       if (data.renderRevision !== this.revision) continue;
-      if (data.entityRef) return { ref: structuredClone(data.entityRef) };
-      if (data.baseRef) {
+      if (data.entityRef) {
+        if (!only || data.entityRef.kind === only)
+          return { ref: structuredClone(data.entityRef) };
+        continue;
+      }
+      if (data.baseRef && (!only || data.baseRef.kind === only)) {
         const index =
             hit.object instanceof THREE.LineSegments
               ? Math.floor((hit.index ?? -2) / 2)
@@ -335,7 +340,7 @@ export class TopologyBridge {
         if (key)
           return { ref: { ...structuredClone(data.baseRef), entityId: key } };
       }
-      if (data.id)
+      if (data.id && !only)
         return {
           legacyId: data.id,
           path: structuredClone(data.occurrencePath),

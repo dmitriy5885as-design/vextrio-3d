@@ -1033,7 +1033,10 @@ export const useEditor = create<EditorState>((set, get) => {
     },
     setTool: (tool) => {
       if (
-        (isSketchTool(tool) || tool === "offset") &&
+        (isSketchTool(tool) ||
+          tool === "offset" ||
+          tool === "freehand" ||
+          tool === "erase") &&
         get().project.schemaVersion !== 2
       ) {
         reject(
