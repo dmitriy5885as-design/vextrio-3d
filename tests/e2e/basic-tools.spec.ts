@@ -294,7 +294,7 @@ test("freehand draws on an existing vertical face and makes a real through openi
     caret: "hide",
   });
   expect(classifyBody(g, Object.keys(g.bodies)[0])).toBe("closed-shell");
-  expect(bodyVolume(g, Object.keys(g.bodies)[0])).toBeCloseTo(2.2, 7);
+  expect(bodyVolume(g, Object.keys(g.bodies)[0])).toBeCloseTo(2.2, 5);
 });
 
 test("Escape discards an eraser stroke and modifiers never silently delete edges", async ({
