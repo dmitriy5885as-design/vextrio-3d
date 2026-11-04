@@ -12,7 +12,7 @@ import {
   arcProfile,
 } from "@forma/geometry";
 import type { WorkPlane } from "@forma/snapping";
-export type SketchTool = "line" | "rectangle" | "circle" | "arc";
+export type SketchTool = "line" | "rectangle" | "circle" | "polygon" | "arc";
 export type ToolPhase =
   "Idle" | "Hover" | "Start" | "Preview" | "Commit" | "Continue" | "Finish";
 export interface SketchStats {
@@ -31,6 +31,7 @@ export interface ToolState {
   preview: "pending" | "valid" | "invalid" | null;
   stats: SketchStats | null;
   circleSides: number;
+  polygonSides: number;
   arcSides: number;
   arcEnd: Vec3 | null;
 }
@@ -70,7 +71,7 @@ export function sketchSegments(
     Math.max(tolerance, length(delta) * 1e-12)
   )
     throw Error("Точка должна лежать в рабочей плоскости.");
-  if (tool === "circle") {
+  if (tool === "circle" || tool === "polygon") {
     validatePlane(plane);
     if (!Number.isInteger(circleSides) || circleSides < 3 || circleSides > 128)
       throw Error("Число сегментов должно быть целым от 3 до 128.");
@@ -119,6 +120,7 @@ export class ToolController {
     preview: null,
     stats: null,
     circleSides: 24,
+    polygonSides: 6,
     arcSides: 12,
     arcEnd: null,
   };
@@ -160,6 +162,17 @@ export class ToolController {
       this.move(this.state.target, plane);
     return true;
   }
+  setPolygonSides(count: number, plane: WorkPlane) {
+    if (this.state.phase === "Commit") return false;
+    if (!Number.isInteger(count) || count < 3 || count > 128) {
+      this.publish({ error: "Число сторон должно быть целым от 3 до 128." });
+      return false;
+    }
+    this.publish({ polygonSides: count, error: "" });
+    if (this.state.tool === "polygon" && this.state.start && this.state.target)
+      this.move(this.state.target, plane);
+    return true;
+  }
   setArcSides(count: number, plane: WorkPlane) {
     if (this.state.phase === "Commit") return false;
     if (!Number.isInteger(count) || count < 2 || count > 128) {
@@ -185,7 +198,14 @@ export class ToolController {
       if (!arcEnd) throw Error("Сначала задайте второй конец дуги.");
       return arcProfile(start, arcEnd, target, plane, arcSides).segments;
     }
-    return sketchSegments(tool, start, target, plane, 1e-7, circleSides);
+    return sketchSegments(
+      tool,
+      start,
+      target,
+      plane,
+      1e-7,
+      tool === "polygon" ? this.state.polygonSides : circleSides,
+    );
   }
   cancel() {
     this.epoch++;

@@ -72,6 +72,9 @@ import {
   Trash2,
   Globe,
   Pencil,
+  PencilLine,
+  Eraser,
+  Hexagon,
 } from "lucide-react";
 const Viewport = lazy(() =>
   import("@forma/viewport").then((m) => ({ default: m.Viewport })),
@@ -545,6 +548,8 @@ export function App() {
         shortcut: "R",
       },
       { label: "Окружность", action: () => s.setTool("circle"), shortcut: "C" },
+      { label: "Многоугольник", action: () => s.setTool("polygon") },
+      { label: "Свободное рисование", action: () => s.setTool("freehand") },
       { label: "Дуга", action: () => s.setTool("arc"), shortcut: "A" },
       {
         label: "Отступ контура",
@@ -866,9 +871,16 @@ export function App() {
                       icon: <MousePointer2 size={20} />,
                       key: "Space",
                     },
+                    { tool: "erase", icon: <Eraser size={20} />, key: "E" },
                     { tool: "line", icon: <Pencil size={20} />, key: "L" },
+                    {
+                      tool: "freehand",
+                      icon: <PencilLine size={20} />,
+                      key: "",
+                    },
                     { tool: "rectangle", icon: <Square size={20} />, key: "R" },
                     { tool: "circle", icon: <Circle size={20} />, key: "C" },
+                    { tool: "polygon", icon: <Hexagon size={20} />, key: "" },
                     { tool: "arc", icon: <Spline size={20} />, key: "A" },
                     { tool: "offset", icon: <ScanLine size={20} />, key: "F" },
                     {
@@ -883,7 +895,7 @@ export function App() {
                 ).map((t) => (
                   <Button
                     key={t.tool}
-                    title={`${toolLabels[t.tool]} (${t.key})`}
+                    title={`${toolLabels[t.tool]}${t.key ? ` (${t.key})` : ""}`}
                     active={s.tool === t.tool}
                     onClick={() => s.setTool(t.tool)}
                   >

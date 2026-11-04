@@ -76,7 +76,10 @@ export function SketchPanel() {
   const arcBulge = state.tool === "arc" && !!state.arcEnd;
   const mode: PrecisionInput["mode"] = coordinates
     ? "coordinates"
-    : state.tool === "line" || state.tool === "circle" || state.tool === "arc"
+    : state.tool === "line" ||
+        state.tool === "circle" ||
+        state.tool === "polygon" ||
+        state.tool === "arc"
       ? "length"
       : "rectangle";
   const submit = async () => {
@@ -84,14 +87,18 @@ export function SketchPanel() {
       const frame = precisionFrame(p, precision),
         plane = sketchPlane();
       if (
-        (state.tool === "circle" || state.tool === "arc") &&
+        (state.tool === "circle" ||
+          state.tool === "polygon" ||
+          state.tool === "arc") &&
         /^\d+s$/i.test(text.trim())
       ) {
         const count = Number(text.trim().slice(0, -1));
         const accepted =
           state.tool === "arc"
             ? sketchController.setArcSides(count, plane)
-            : sketchController.setCircleSides(count, plane);
+            : state.tool === "polygon"
+              ? sketchController.setPolygonSides(count, plane)
+              : sketchController.setCircleSides(count, plane);
         if (accepted) {
           setText("");
           usePrecision.setState({ editing: false, exact: false, error: "" });
@@ -110,7 +117,11 @@ export function SketchPanel() {
               state.start ?? precision.anchor,
             )
           : ([0, 0, 0] as [number, number, number]);
-      if (state.tool === "circle" || state.tool === "arc") {
+      if (
+        state.tool === "circle" ||
+        state.tool === "polygon" ||
+        state.tool === "arc"
+      ) {
         direction = subtract(
           direction,
           multiply(plane.normal, dot(direction, plane.normal)),
@@ -158,13 +169,13 @@ export function SketchPanel() {
         else arcChordFrame(state.start, result.point, plane);
       }
       if (
-        state.tool === "circle" &&
+        (state.tool === "circle" || state.tool === "polygon") &&
         state.start &&
         length(subtract(result.point, state.start)) <= 1e-7
       )
         throw Error("Радиус должен быть больше геометрического допуска.");
       if (
-        state.tool === "circle" &&
+        (state.tool === "circle" || state.tool === "polygon") &&
         state.start &&
         Math.abs(dot(subtract(result.point, state.start), plane.normal)) > 1e-7
       )
@@ -229,8 +240,10 @@ export function SketchPanel() {
         <strong>
           {state.tool === "line"
             ? "Линия · L"
-            : state.tool === "circle"
-              ? "Окружность · C"
+            : state.tool === "circle" || state.tool === "polygon"
+              ? state.tool === "polygon"
+                ? "Многоугольник"
+                : "Окружность · C"
               : state.tool === "arc"
                 ? "Дуга · A"
                 : "Прямоугольник · R"}
@@ -248,15 +261,15 @@ export function SketchPanel() {
           : state.start
             ? state.tool === "line"
               ? "Укажите конец отрезка"
-              : state.tool === "circle"
+              : state.tool === "circle" || state.tool === "polygon"
                 ? "Укажите радиус или введите размер"
                 : state.tool === "arc"
                   ? state.arcEnd
                     ? "Задайте выпуклость дуги мышью или числом"
                     : "Укажите второй конец дуги или длину хорды"
                   : "Укажите противоположный угол"
-            : state.tool === "circle"
-              ? "Щёлкните центр окружности"
+            : state.tool === "circle" || state.tool === "polygon"
+              ? "Щёлкните центр фигуры"
               : "Щёлкните начальную точку"}
       </p>
       <form
@@ -270,7 +283,7 @@ export function SketchPanel() {
             {mode === "coordinates"
               ? "X; Y; Z"
               : mode === "length"
-                ? state.tool === "circle"
+                ? state.tool === "circle" || state.tool === "polygon"
                   ? "Радиус"
                   : state.tool === "arc"
                     ? arcBulge
@@ -287,7 +300,7 @@ export function SketchPanel() {
               mode === "coordinates"
                 ? "=0;0;0"
                 : mode === "length"
-                  ? state.tool === "circle"
+                  ? state.tool === "circle" || state.tool === "polygon"
                     ? "1000 мм · 48s — сегменты"
                     : state.tool === "arc"
                       ? arcBulge
@@ -321,19 +334,33 @@ export function SketchPanel() {
           Enter · подтвердить
         </button>
       </form>
-      {(state.tool === "circle" || state.tool === "arc") && (
+      {(state.tool === "circle" ||
+        state.tool === "polygon" ||
+        state.tool === "arc") && (
         <label>
           Сегментов{" "}
           <select
             aria-label={
-              state.tool === "arc" ? "Сегменты дуги" : "Сегменты окружности"
+              state.tool === "arc"
+                ? "Сегменты дуги"
+                : state.tool === "polygon"
+                  ? "Стороны многоугольника"
+                  : "Сегменты окружности"
             }
-            value={state.tool === "arc" ? state.arcSides : state.circleSides}
+            value={
+              state.tool === "arc"
+                ? state.arcSides
+                : state.tool === "polygon"
+                  ? state.polygonSides
+                  : state.circleSides
+            }
             disabled={state.phase === "Commit"}
             onChange={(e) =>
               (state.tool === "arc"
                 ? sketchController.setArcSides.bind(sketchController)
-                : sketchController.setCircleSides.bind(sketchController))(
+                : state.tool === "polygon"
+                  ? sketchController.setPolygonSides.bind(sketchController)
+                  : sketchController.setCircleSides.bind(sketchController))(
                 Number(e.target.value),
                 sketchPlane(),
               )
@@ -354,7 +381,11 @@ export function SketchPanel() {
                 64,
                 96,
                 128,
-                state.tool === "arc" ? state.arcSides : state.circleSides,
+                state.tool === "arc"
+                  ? state.arcSides
+                  : state.tool === "polygon"
+                    ? state.polygonSides
+                    : state.circleSides,
               ]),
             ]
               .sort((a, b) => a - b)
@@ -382,8 +413,11 @@ export function SketchPanel() {
       {precision.target && (
         <output data-testid="drawing-target">
           {precision.target.map((n) => formatDimension(n, p.units)).join("; ")}
-          {state.start && (state.tool === "line" || state.tool === "circle")
-            ? ` · ${state.tool === "circle" ? "R " : ""}${formatDimension(length(subtract(precision.target, state.start)), p.units)}`
+          {state.start &&
+          (state.tool === "line" ||
+            state.tool === "circle" ||
+            state.tool === "polygon")
+            ? ` · ${state.tool === "circle" || state.tool === "polygon" ? "R " : ""}${formatDimension(length(subtract(precision.target, state.start)), p.units)}`
             : ""}
         </output>
       )}

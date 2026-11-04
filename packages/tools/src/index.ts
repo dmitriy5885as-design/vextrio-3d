@@ -7,6 +7,9 @@ export type ToolName =
   | "line"
   | "rectangle"
   | "circle"
+  | "polygon"
+  | "freehand"
+  | "erase"
   | "arc"
   | "extrude"
   | "offset"
@@ -17,11 +20,13 @@ export function isSketchTool(tool: ToolName): tool is SketchTool {
     tool === "line" ||
     tool === "rectangle" ||
     tool === "circle" ||
+    tool === "polygon" ||
     tool === "arc"
   );
 }
 export const shortcuts: Record<string, ToolName> = {
   v: "select",
+  e: "erase",
   m: "translate",
   q: "rotate",
   o: "orbit",
@@ -43,9 +48,14 @@ export const toolLabels = {
   line: "Линия",
   rectangle: "Прямоугольник",
   circle: "Окружность",
+  polygon: "Многоугольник",
+  freehand: "Свободное рисование",
+  erase: "Ластик",
   arc: "Дуга",
   extrude: "Вытянуть / вдавить",
   offset: "Отступ",
   orbit: "Орбита",
   pan: "Панорама",
 } as const;
+
+export * from "./freehand";
