@@ -45,7 +45,8 @@ import { PrimitiveAdapter } from "./PrimitiveAdapter";
 import type { Vec3 } from "@forma/shared";
 
 export function Viewport() {
-  const host = useRef<HTMLDivElement>(null);
+  const host = useRef<HTMLDivElement>(null),
+    previewOwner = useVolumePreview((state) => state.owner);
   useEffect(() => {
     if (!host.current) return;
     const el = host.current;
@@ -104,7 +105,7 @@ export function Viewport() {
         wanted =
           preview.document &&
           preview.owner === state.tool &&
-          ["extrude", "offset", "translate"].includes(state.tool) &&
+          ["extrude", "offset", "translate", "rotate"].includes(state.tool) &&
           preview.revision === state.revision
             ? preview.document
             : null;
@@ -358,7 +359,10 @@ export function Viewport() {
       // Nested affine editing remains available through numeric properties.
       const native =
         nativePath?.length === 1 &&
-        !(s.tool === "translate" && s.topologySelection)
+        !(
+          s.topologySelection &&
+          ["translate", "rotate", "scale"].includes(s.tool)
+        )
           ? topology?.findPlacement(nativePath)
           : undefined;
       const mesh =
@@ -1628,5 +1632,11 @@ export function Viewport() {
       renderer.domElement.remove();
     };
   }, []);
-  return <div className="viewport-canvas" ref={host} />;
+  return (
+    <div
+      className="viewport-canvas"
+      ref={host}
+      data-preview-owner={previewOwner ?? undefined}
+    />
+  );
 }

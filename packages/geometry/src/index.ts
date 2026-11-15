@@ -18,3 +18,5 @@ export * from "./offset";
 export * from "./move";
 
 export * from "./from-polygons";
+
+export * from "./rotate";
