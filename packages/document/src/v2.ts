@@ -1,3 +1,4 @@
+import { constructionData, validateConstruction } from "./construction";
 import {
   clone,
   type Project as ProjectV1,
@@ -128,6 +129,7 @@ export function documentIds(p: ProjectV2) {
     ...Object.keys(p.nodes),
     ...Object.keys(p.materials),
     ...Object.keys(p.references),
+    ...Object.keys(constructionData(p).guides),
     ...Object.keys(p.geometries),
     ...Object.values(p.geometries).flatMap((g) =>
       entityTables.flatMap((t) => Object.keys(g[t])),
@@ -529,6 +531,7 @@ export function validateProjectV2(value: unknown): asserts value is ProjectV2 {
   for (const g of Object.values(p.geometries))
     for (const t of entityTables)
       for (const [key, e] of Object.entries(g[t])) claim(key, e);
+  validateConstruction(p, ids);
   const objects = getLegacyObjects(p);
   validateProjectV1({
     schemaVersion: 1,
