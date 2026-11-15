@@ -61,3 +61,5 @@ export function serializeProject(project: Document): string {
     throw Error("Файл превышает допустимые 20 МБ.");
   return text;
 }
+
+export * from "./construction";

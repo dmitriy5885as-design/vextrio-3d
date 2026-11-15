@@ -1362,7 +1362,28 @@ hr {
     font-size: 8px;
   }
 }
-.edit-context {position:absolute; left:18px; bottom:88px; z-index:4; display:flex; gap:14px; align-items:center; max-width:calc(100% - 36px); padding:8px 12px; border:1px dashed #4dd5c0; border-radius:5px; background:var(--panel); font-size:11px;} .edit-context button{color:var(--text);background:none;border:0;cursor:pointer;font-size:11px;}
+.edit-context {
+  position: absolute;
+  left: 18px;
+  bottom: 88px;
+  z-index: 4;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  max-width: calc(100% - 36px);
+  padding: 8px 12px;
+  border: 1px dashed #4dd5c0;
+  border-radius: 5px;
+  background: var(--panel);
+  font-size: 11px;
+}
+.edit-context button {
+  color: var(--text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 11px;
+}
 
 .release-badge {
   flex-shrink: 0;
@@ -1370,4 +1391,38 @@ hr {
   color: var(--muted);
   font-size: 10px;
   padding-right: 10px;
+}
+
+.measurement-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 48px;
+  z-index: 12;
+  max-width: 340px;
+}
+.measurement-panel > button {
+  background: #17273b;
+  color: #edf5ff;
+  border: 1px solid #39536e;
+  border-radius: 7px;
+  padding: 8px 12px;
+}
+.measurement-panel .precision-fields {
+  max-height: min(520px, 65vh);
+  overflow: auto;
+  background: #172232;
+  padding: 12px;
+  border: 1px solid #39536e;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.measurement-panel input {
+  width: 100%;
+}
+.measurement-panel ul {
+  max-height: 100px;
+  overflow: auto;
+  padding-left: 18px;
 }

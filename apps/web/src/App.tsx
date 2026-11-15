@@ -1,3 +1,4 @@
+import { MeasurementPanel } from "./MeasurementPanel";
 import { WorkspaceDialog } from "./workspace/WorkspaceDialog";
 import { ModelStats } from "./workspace/ModelStats";
 import { ImportDialog } from "./workspace/ImportDialog";
@@ -1079,6 +1080,7 @@ export function App() {
               ) : (
                 <PrecisionPanel />
               )}
+              <MeasurementPanel />
               <NavigationCube />
               <EditContext />
               <div className="viewport-bottom">

@@ -1,5 +1,6 @@
 import type { Vec3 } from "@forma/shared";
 import {
+  constructionData,
   definitionOccurrences,
   type ProjectV2,
   type EntityRef,
@@ -21,6 +22,7 @@ import {
 } from "@forma/geometry";
 import { normalize, rayOnPlane, rayOnAxis, type WorkPlane } from "./precision";
 export type SnapKind =
+  | "guide"
   | "vertex"
   | "endpoint"
   | "midpoint"
@@ -141,6 +143,7 @@ function nearby(box: Box, q: SnapQuery, radius: number): boolean {
   );
 }
 const labels: Record<SnapKind, string> = {
+  guide: "Направляющая",
   vertex: "Вершина",
   endpoint: "Конец отрезка",
   midpoint: "Середина ребра",
@@ -154,6 +157,7 @@ const labels: Record<SnapKind, string> = {
   perpendicular: "Перпендикулярно ребру",
 };
 const priority: Record<SnapKind, number> = {
+  guide: 2.5,
   intersection: 0,
   vertex: 1,
   endpoint: 1,
@@ -223,6 +227,13 @@ function edgePoint(a: Vec3, b: Vec3, q: SnapQuery): Vec3 | null {
 }
 export class SnapEngine {
   private root: Branch | null;
+  private guides: {
+    key: string;
+    origin: Vec3;
+    direction?: Vec3;
+    path: string[];
+    locked: boolean;
+  }[] = [];
   private previous: SnapCandidate | null = null;
   private acquired: Source[] = [];
   readonly sourceCount: number;
@@ -232,10 +243,35 @@ export class SnapEngine {
   constructor(project: ProjectV2) {
     this.policy = project.geometryPolicy;
     const sources: Source[] = [];
+    const guides = Object.values(constructionData(project).guides);
     for (const occurrence of definitionOccurrences(project)) {
       const did = occurrence.definitionId,
         gid = project.definitions[did].geometryId;
-      if (!occurrence.visible || !gid) continue;
+      if (!occurrence.visible) continue;
+      for (const guide of guides) {
+        if (guide.definitionId !== did) continue;
+        if (this.guides.length >= 4096)
+          throw Error("Превышен бюджет экземпляров направляющих (4096).");
+        const origin = transformAffine(guide.origin, occurrence.worldTransform);
+        this.guides.push({
+          key: JSON.stringify([occurrence.path, "guide", guide.id]),
+          origin,
+          direction: guide.direction
+            ? normalize(
+                subtract(
+                  transformAffine(
+                    add(guide.origin, guide.direction),
+                    occurrence.worldTransform,
+                  ),
+                  origin,
+                ),
+              )
+            : undefined,
+          path: [...occurrence.path],
+          locked: occurrence.locked,
+        });
+      }
+      if (!gid) continue;
       const g = project.geometries[gid],
         points = new Map<string, Vec3>(),
         degree = new Map<string, number>();
@@ -386,6 +422,31 @@ export class SnapEngine {
         guide: guide ? [[...guide[0]], [...guide[1]]] : undefined,
       });
     };
+    if (q.enabled && (!q.kinds || q.kinds.includes("guide"))) {
+      for (const guide of this.guides) {
+        if (
+          (guide.locked && !q.includeLocked) ||
+          (q.contextOnly && !samePath(guide.path, q.contextPath ?? []))
+        )
+          continue;
+        const point = guide.direction
+          ? rayOnAxis(
+              q.ray.origin,
+              q.ray.direction,
+              guide.origin,
+              guide.direction,
+            )
+          : guide.origin;
+        if (point)
+          append(
+            "guide",
+            point,
+            guide.key,
+            undefined,
+            guide.direction ? [guide.origin, point] : undefined,
+          );
+      }
+    }
     if (q.enabled && this.root) {
       const visit = (branch: Branch) => {
         if (this.stats.inspected >= 10000) {

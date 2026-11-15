@@ -1,3 +1,4 @@
+import { ConstructionBridge } from "./ConstructionBridge";
 import { installPointerTools } from "./PointerTools";
 import { TopologyBridge } from "./TopologyBridge";
 import {
@@ -91,6 +92,8 @@ export function Viewport() {
       string,
       THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
     >();
+    const construction = new ConstructionBridge();
+    scene.add(construction.root);
     let topology: TopologyBridge | null = null;
     let volumeBridge: TopologyBridge | null = null;
     let renderedVolumeDocument: import("@forma/document").ProjectV2 | null =
@@ -238,6 +241,7 @@ export function Viewport() {
     }
     function sync() {
       const s = useEditor.getState();
+      construction.update(s.project);
       scene.background = new THREE.Color(
         s.theme === "dark" ? "#1b2433" : "#e7edf5",
       );
@@ -995,6 +999,7 @@ export function Viewport() {
         snapDocument.nodes !== document.nodes ||
         snapDocument.geometries !== document.geometries ||
         snapDocument.definitions !== document.definitions ||
+        snapDocument.extensions !== document.extensions ||
         snapDocument.geometryPolicy !== document.geometryPolicy
       ) {
         snapEngine = new SnapEngine(document);
@@ -1596,6 +1601,7 @@ export function Viewport() {
       marker.remove();
       observer.disconnect();
       topology?.dispose();
+      construction.dispose();
       cancelAnimationFrame(frame);
       controls.dispose();
       transform.dispose();

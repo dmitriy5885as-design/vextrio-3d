@@ -1,3 +1,8 @@
+import {
+  constructionData,
+  constructionKey,
+  type ConstructionGuide,
+} from "@forma/document";
 import { insertPolygonPart, primitivePolygons } from "./polygon-import";
 import { create } from "zustand";
 import {
@@ -172,6 +177,8 @@ interface EditorState {
   redo: () => CommandResult;
   canUndo: boolean;
   canRedo: boolean;
+  addGuide: (path: string[], origin: Vec3, direction?: Vec3) => CommandResult;
+  removeGuides: (path: string[], guideIds: string[]) => CommandResult;
   replace: (project: Project) => CommandResult;
   setTool: (tool: EditorState["tool"]) => void;
   setCamera: (camera: CameraData) => CommandResult;
@@ -274,7 +281,50 @@ export const useEditor = create<EditorState>((set, get) => {
     for (const session of pendingGeometry) session.cancelAll();
     pendingGeometry.clear();
   };
+  const editGuides = (
+    path: string[],
+    update: (
+      guides: Record<string, ConstructionGuide>,
+      definitionId: string,
+    ) => void,
+  ) =>
+    commitDocument("Изменение направляющих", (p) => {
+      if (p.schemaVersion !== 2) throw Error("Направляющим нужен документ v2.");
+      const definitionId = definitionAtPath(p, path);
+      const occurrences = definitionOccurrences(p).filter(
+        (o) => o.definitionId === definitionId,
+      );
+      if (occurrences.some((o) => o.locked))
+        throw Error("Контекст заблокирован.");
+      if (occurrences.length > 1)
+        throw Error("Сначала сделайте компонент уникальным.");
+      const data = clone(constructionData(p));
+      update(data.guides, definitionId);
+      p.extensions[constructionKey] = data;
+    });
   return {
+    addGuide: (path, origin, direction) =>
+      editGuides(path, (guides, definitionId) => {
+        const key = "guide/" + crypto.randomUUID();
+        guides[key] = {
+          id: key,
+          definitionId,
+          kind: direction ? "line" : "point",
+          origin: [...origin],
+          ...(direction ? { direction: [...direction] as Vec3 } : {}),
+        };
+      }),
+    removeGuides: (path, guideIds) =>
+      editGuides(path, (guides, definitionId) => {
+        for (const key of guideIds) {
+          if (
+            !Object.hasOwn(guides, key) ||
+            guides[key].definitionId !== definitionId
+          )
+            throw Error("Направляющая не принадлежит текущему контексту.");
+          delete guides[key];
+        }
+      }),
     project: initial,
     selected: null,
     selectedPath: null,

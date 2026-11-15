@@ -1,4 +1,6 @@
 import {
+  constructionData,
+  constructionKey,
   type ProjectV2,
   type EntityRef,
   validateEntityRef,
@@ -154,6 +156,21 @@ export function makeUnique(p: ProjectV2, nodeId: string): string {
         };
       }
   }
+  const data = constructionData(p);
+  const copied = Object.values(data.guides).filter(
+    (g) => g.definitionId === source.id,
+  );
+  if (copied.length) {
+    p.extensions[constructionKey] = data;
+    for (const guide of copied) {
+      const key = fresh("guide");
+      data.guides[key] = {
+        ...structuredClone(guide),
+        id: key,
+        definitionId: did,
+      };
+    }
+  }
   return did;
 }
 export function removeInstance(p: ProjectV2, nodeId: string) {
@@ -176,6 +193,9 @@ export function removeInstance(p: ProjectV2, nodeId: string) {
       (node) => node.kind !== "legacy-primitive" && node.definitionId === d.id,
     )
   ) {
+    for (const guide of Object.values(constructionData(p).guides))
+      if (guide.definitionId === d.id)
+        delete constructionData(p).guides[guide.id];
     delete p.definitions[d.id];
     if (d.geometryId) {
       delete p.geometries[d.geometryId];
