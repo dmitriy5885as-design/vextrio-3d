@@ -1,4 +1,5 @@
 import { RotatePanel } from "./RotatePanel";
+import { ScalePanel } from "./ScalePanel";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { WorkspaceDialog } from "./workspace/WorkspaceDialog";
 import { ModelStats } from "./workspace/ModelStats";
@@ -1076,6 +1077,9 @@ export function App() {
                 <MovePanel />
               ) : s.tool === "rotate" ? (
                 <RotatePanel />
+              ) : s.tool === "scale" &&
+                (s.topologySelection || s.topologySelections.length > 0) ? (
+                <ScalePanel />
               ) : s.tool === "offset" ? (
                 <OffsetPanel />
               ) : s.tool === "extrude" ? (

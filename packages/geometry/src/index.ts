@@ -20,3 +20,5 @@ export * from "./move";
 export * from "./from-polygons";
 
 export * from "./rotate";
+
+export * from "./scale";
