@@ -193,3 +193,66 @@ it("copies guide identities for a unique component and removes orphan guides wit
   expect(constructionData(p).guides[copied.id]).toBeUndefined();
   expect(constructionData(p).guides["guide/original"]).toBeDefined();
 });
+
+it("places a guide in a rotated nonuniform group and respects hidden, locked and editing contexts", () => {
+  const p = componentProject(),
+    group = p.nodes["instance/group"];
+  if (group.kind === "legacy-primitive") throw Error();
+  group.transform.scale = [2, 3, 4];
+  group.transform.rotation = [0, 0, Math.SQRT1_2, Math.SQRT1_2];
+  useEditor.getState().replace(p);
+  expect(useEditor.getState().addGuide([group.id], [1, 2, 3]).status).toBe(
+    "applied",
+  );
+  const saved = structuredClone(useEditor.getState().project) as typeof p;
+  const bridge = new ConstructionBridge();
+  bridge.update(saved);
+  const point = bridge.root.children[0] as import("three").Points;
+  const position = point.geometry.getAttribute("position");
+  expect(position.getX(0)).toBeCloseTo(-11, 6);
+  expect(position.getY(0)).toBeCloseTo(2, 6);
+  expect(position.getZ(0)).toBeCloseTo(12, 6);
+  const q = {
+    cursor: [-11, 2] as [number, number],
+    project: (p: [number, number, number]) => ({
+      x: p[0],
+      y: p[1],
+      depth: 10,
+      visible: true,
+      w: 1,
+    }),
+    ray: {
+      origin: [-11, 2, 22] as [number, number, number],
+      direction: [0, 0, -1] as [number, number, number],
+    },
+    plane: workPlane("XY"),
+    anchor: [0, 0, 0] as [number, number, number],
+    axes: [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ] as [number, number, number][],
+    gridStep: 0,
+    enabled: true,
+    kinds: ["guide"] as const,
+    contextOnly: true,
+    contextPath: [group.id],
+  };
+  expect(new SnapEngine(saved).query(q).candidate?.kind).toBe("guide");
+  expect(
+    new SnapEngine(saved).query({ ...q, contextPath: [] }).candidate,
+  ).toBeNull();
+  saved.nodes[group.id].locked = true;
+  expect(new SnapEngine(saved).query(q).candidate).toBeNull();
+  expect(
+    new SnapEngine(saved).query({ ...q, includeLocked: true }).candidate?.kind,
+  ).toBe("guide");
+  saved.nodes[group.id].visible = false;
+  expect(
+    new SnapEngine(saved).query({ ...q, includeLocked: true }).candidate,
+  ).toBeNull();
+  bridge.update(saved); // Same-reference changes are not part of the immutable editor contract.
+  bridge.update(structuredClone(saved));
+  expect(bridge.root.children).toHaveLength(0);
+  bridge.dispose();
+});

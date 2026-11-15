@@ -1,4 +1,4 @@
-import {createHomeProject} from "./home-helpers";
+import { createHomeProject } from "./home-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { PerspectiveCamera, Vector3 } from "three";
 import { readFileSync } from "node:fs";
@@ -58,6 +58,21 @@ test("drawing remains usable at 1024 pixels with the input dock outside the canv
     "1",
   );
   await page.keyboard.press("Space");
+  // Leaving the compact input dock expands the canvas. Wait for ResizeObserver
+  // to update the drawing buffer/camera before projecting the picking point.
+  await expect(page.getByTestId("sketch-panel")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.getByTestId("viewport").evaluate((el) => {
+        const canvas = el as HTMLCanvasElement,
+          ratio = Math.min(devicePixelRatio, 2);
+        return (
+          canvas.width === Math.floor(canvas.clientWidth * ratio) &&
+          canvas.height === Math.floor(canvas.clientHeight * ratio)
+        );
+      }),
+    )
+    .toBe(true);
   await click(page, [2, 0, 1]);
   await expect(page.getByTestId("face-area")).toContainText("12 м²");
 });
