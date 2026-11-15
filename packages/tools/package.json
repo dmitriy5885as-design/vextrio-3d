@@ -1,6 +1,6 @@
 {
   "exports": "./src/index.ts",
-  "version": "0.2.0-alpha.22",
+  "version": "0.2.0-alpha.23",
   "name": "@forma/tools",
   "private": true,
   "type": "module",
