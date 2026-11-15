@@ -30,6 +30,7 @@ import {
 import { prepareFaceOffset } from "./offset";
 import { prepareVertexRotation } from "./rotate";
 import { prepareVertexScale } from "./scale";
+import { prepareVertexMirror } from "./mirror";
 export type GeometryIntent =
   | {
       kind: "translate-entities";
@@ -49,6 +50,12 @@ export type GeometryIntent =
       vertexIds: string[];
       origin: Vec3;
       factors: Vec3;
+    }
+  | {
+      kind: "mirror-vertices";
+      vertexIds: string[];
+      origin: Vec3;
+      normal: Vec3;
     }
   | { kind: "offset-face"; faceId: string; distance: number }
   | { kind: "extrude-face"; faceId: string; distance: number; side: 1 | -1 }
@@ -194,6 +201,19 @@ export function createLocalGeometryBackend(
             intent.origin,
             intent.factors,
             { ...context, policy: request.policy },
+          );
+          return entityTables.every((t) => change.forward[t].length === 0)
+            ? { ...reply, status: "noop" }
+            : { ...reply, status: "proposed", change };
+        }
+        if (intent.kind === "mirror-vertices") {
+          const change = prepareVertexMirror(
+            model,
+            intent.vertexIds,
+            intent.origin,
+            intent.normal,
+            { ...context, policy: request.policy },
+            reply.operationId,
           );
           return entityTables.every((t) => change.forward[t].length === 0)
             ? { ...reply, status: "noop" }

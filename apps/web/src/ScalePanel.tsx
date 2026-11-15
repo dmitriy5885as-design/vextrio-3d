@@ -32,6 +32,9 @@ export function ScalePanel() {
       "0",
     ]),
     [factors, setFactors] = useState<[string, string, string]>(["1", "1", "1"]),
+    [mode, setMode] = useState<"scale" | "mirror">("scale"),
+    [mirrorAxis, setMirrorAxis] = useState<0 | 1 | 2>(0),
+    [mirrorCoordinate, setMirrorCoordinate] = useState("0"),
     [error, setError] = useState(""),
     [pending, setPending] = useState(false);
   const ticket = useRef(0),
@@ -74,6 +77,22 @@ export function ScalePanel() {
   const getIntent = (): GeometryIntent => {
     if (!allowed)
       throw Error("Выберите вершины, рёбра или грани одного контекста.");
+    if (mode === "mirror") {
+      const planeOrigin: Vec3 = [0, 0, 0],
+        normal: Vec3 = [0, 0, 0];
+      planeOrigin[mirrorAxis] = parseDimension(
+        mirrorCoordinate,
+        project.units,
+        true,
+      );
+      normal[mirrorAxis] = 1;
+      return {
+        kind: "mirror-vertices",
+        vertexIds: selectedVertexIds(),
+        origin: planeOrigin,
+        normal,
+      };
+    }
     const values = factors.map((value) =>
       Number(value.trim().replace(",", ".")),
     ) as Vec3;
@@ -96,6 +115,9 @@ export function ScalePanel() {
     refs,
     origin,
     factors,
+    mode,
+    mirrorAxis,
+    mirrorCoordinate,
     path,
   ]);
   useEffect(() => {
@@ -131,7 +153,9 @@ export function ScalePanel() {
               : "Нет изменения геометрии.",
           );
         const candidate = new GeometryDocumentCommand(
-          "Предпросмотр масштабирования",
+          mode === "scale"
+            ? "Предпросмотр масштабирования"
+            : "Предпросмотр отражения",
           ref,
           result.change,
         ).execute(project);
@@ -170,7 +194,7 @@ export function ScalePanel() {
           useEditor.getState().revision === revision &&
           useEditor.getState().tool === "scale" &&
           token === ticket.current,
-        "Масштабирование геометрии",
+        mode === "scale" ? "Масштабирование геометрии" : "Отражение геометрии",
       );
       if (result.status === "rejected") throw Error(result.error);
       useGeometryPreview.setState({ document: null, owner: null });
@@ -199,86 +223,133 @@ export function ScalePanel() {
   return (
     <div className="sketch-panel" data-testid="scale-panel" aria-busy={pending}>
       <div className="sketch-title">
-        <strong>Масштаб · S</strong>
+        <strong>{mode === "scale" ? "Масштаб · S" : "Отражение"}</strong>
         <button onClick={() => s.setTool("select")}>Отмена · Esc</button>
       </div>
-      <p>
-        Масштабирует выбранные вершины, рёбра или грани в локальных координатах
-        активного контекста. Отрицательные значения и нулевой масштаб запрещены;
-        для отражения будет отдельная команда.
-      </p>
-      <fieldset>
-        <legend>Коэффициенты по осям</legend>
-        <div className="rotate-origin">
-          {(["X", "Y", "Z"] as const).map((label, i) => (
-            <label key={label}>
-              {label}
-              <input
-                aria-label={`Масштаб ${label}`}
-                value={factors[i]}
-                onChange={(e) =>
-                  setFactors(
-                    (old) =>
-                      old.map((value, j) =>
-                        j === i ? e.target.value : value,
-                      ) as [string, string, string],
-                  )
-                }
-              />
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset>
-        <legend>Центр масштабирования · локальные координаты</legend>
-        <div className="rotate-origin">
-          {(["X", "Y", "Z"] as const).map((label, i) => (
-            <label key={label}>
-              {label}
-              <input
-                aria-label={`Центр масштабирования ${label}`}
-                value={origin[i]}
-                onChange={(e) =>
-                  setOrigin(
-                    (old) =>
-                      old.map((value, j) =>
-                        j === i ? e.target.value : value,
-                      ) as [string, string, string],
-                  )
-                }
-              />
-            </label>
-          ))}
-        </div>
+      <div className="rotate-origin">
         <button
-          onClick={() => {
-            const ref = s.topologySelection;
-            if (ref?.kind !== "vertex" || project.schemaVersion !== 2) {
-              setError("Выберите вершину опоры.");
-              return;
-            }
-            const vertex =
-              project.geometries[ref.geometryId]?.vertices[ref.entityId];
-            if (!vertex) {
-              setError("Опорная вершина не найдена.");
-              return;
-            }
-            setOrigin(
-              vertex.position.map((v) => formatDimension(v, project.units)) as [
-                string,
-                string,
-                string,
-              ],
-            );
-            setError("");
-          }}
+          aria-pressed={mode === "scale"}
+          onClick={() => setMode("scale")}
         >
-          Центр из выбранной вершины
+          Масштаб
         </button>
-      </fieldset>
+        <button
+          aria-pressed={mode === "mirror"}
+          onClick={() => setMode("mirror")}
+        >
+          Отражение
+        </button>
+      </div>
+      {mode === "scale" ? (
+        <>
+          <p>
+            Масштабирует выбранные вершины, рёбра или грани в локальных
+            координатах активного контекста. Отрицательные значения и нулевой
+            масштаб запрещены; зеркальное преобразование доступно в режиме
+            «Отражение».
+          </p>
+          <fieldset>
+            <legend>Коэффициенты по осям</legend>
+            <div className="rotate-origin">
+              {(["X", "Y", "Z"] as const).map((label, i) => (
+                <label key={label}>
+                  {label}
+                  <input
+                    aria-label={`Масштаб ${label}`}
+                    value={factors[i]}
+                    onChange={(e) =>
+                      setFactors(
+                        (old) =>
+                          old.map((value, j) =>
+                            j === i ? e.target.value : value,
+                          ) as [string, string, string],
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Центр масштабирования · локальные координаты</legend>
+            <div className="rotate-origin">
+              {(["X", "Y", "Z"] as const).map((label, i) => (
+                <label key={label}>
+                  {label}
+                  <input
+                    aria-label={`Центр масштабирования ${label}`}
+                    value={origin[i]}
+                    onChange={(e) =>
+                      setOrigin(
+                        (old) =>
+                          old.map((value, j) =>
+                            j === i ? e.target.value : value,
+                          ) as [string, string, string],
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const ref = s.topologySelection;
+                if (ref?.kind !== "vertex" || project.schemaVersion !== 2) {
+                  setError("Выберите вершину опоры.");
+                  return;
+                }
+                const vertex =
+                  project.geometries[ref.geometryId]?.vertices[ref.entityId];
+                if (!vertex) {
+                  setError("Опорная вершина не найдена.");
+                  return;
+                }
+                setOrigin(
+                  vertex.position.map((v) =>
+                    formatDimension(v, project.units),
+                  ) as [string, string, string],
+                );
+                setError("");
+              }}
+            >
+              Центр из выбранной вершины
+            </button>
+          </fieldset>
+        </>
+      ) : (
+        <fieldset>
+          <legend>Плоскость отражения</legend>
+          <label>
+            Нормаль плоскости
+            <select
+              aria-label="Ось отражения"
+              value={mirrorAxis}
+              onChange={(e) =>
+                setMirrorAxis(Number(e.target.value) as 0 | 1 | 2)
+              }
+            >
+              <option value={0}>X</option>
+              <option value={1}>Y</option>
+              <option value={2}>Z</option>
+            </select>
+          </label>
+          <label>
+            Координата плоскости ({project.units})
+            <input
+              aria-label="Координата плоскости отражения"
+              value={mirrorCoordinate}
+              onChange={(e) => setMirrorCoordinate(e.target.value)}
+            />
+          </label>
+          <p>
+            Ось и координата плоскости задаются в локальной системе активного
+            геометрического контекста.
+          </p>
+        </fieldset>
+      )}
       {allowed && <output>{refs.length} элементов</output>}
       <button disabled={!allowed || pending} onClick={() => void commit()}>
-        Масштабировать · Enter
+        {mode === "scale" ? "Масштабировать · Enter" : "Отразить · Enter"}
       </button>
       {error && (
         <p role="alert" className="sketch-error">

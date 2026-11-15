@@ -22,3 +22,5 @@ export * from "./from-polygons";
 export * from "./rotate";
 
 export * from "./scale";
+
+export * from "./mirror";

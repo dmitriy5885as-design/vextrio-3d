@@ -96,10 +96,21 @@ function reframeMovedFaces(
   before: GeometryModel,
   after: GeometryModel,
   changed: Set<string>,
+  flipFaces: Set<string> | false = false,
 ) {
   const affected = new Set<string>();
 
   for (const f of Object.values(after.faces)) {
+    const reverse = flipFaces instanceof Set && flipFaces.has(f.id);
+    if (reverse)
+      for (const lid of [f.outerLoopId, ...f.innerLoopIds]) {
+        const loop = after.loops[lid];
+        loop.coedgeIds.reverse();
+        for (const coedgeId of loop.coedgeIds)
+          after.coedges[coedgeId].direction = -after.coedges[coedgeId]
+            .direction as 1 | -1;
+      }
+    if (reverse && flipFaces instanceof Set) flipFaces.delete(f.id);
     const rings = [f.outerLoopId, ...f.innerLoopIds].map((lid) =>
       after.loops[lid].coedgeIds.map((cid) => {
         const c = after.coedges[cid],
@@ -108,7 +119,11 @@ function reframeMovedFaces(
       }),
     );
 
-    if (before.faces[f.id] && !rings.flat().some((v) => changed.has(v)))
+    if (
+      before.faces[f.id] &&
+      !reverse &&
+      !rings.flat().some((v) => changed.has(v))
+    )
       continue;
 
     affected.add(f.id);
@@ -137,13 +152,13 @@ function reframeMovedFaces(
         ),
       );
 
-    if (dot(normal, f.plane.normal) <= 0)
+    const flipped = dot(normal, f.plane.normal) <= 0;
+    if (flipped && !flipFaces)
       throw new GeometryError(
         "DEGENERATE",
         "Перемещение переворачивает грань. Уменьшите расстояние.",
         [f.id],
       );
-
     // JSON stores both signed zero representations as 0. Canonicalise only
     // the freshly computed frame, preserving all nonzero coordinates.
     const zero = (v: Vec3) => v.map((n) => (n === 0 ? 0 : n)) as Vec3;
@@ -164,9 +179,10 @@ function finish(
   changed: Set<string>,
   context: ValidationContext,
   lineage: LineageEntry[] = [],
+  flipFaces: Set<string> | false = false,
 ) {
   const { world, tolerance } = metric(after, context),
-    affected = reframeMovedFaces(before, after, changed);
+    affected = reframeMovedFaces(before, after, changed, flipFaces);
   validateGeometry(after, context);
 
   const edges = Object.values(after.edges),
@@ -342,9 +358,10 @@ function finishWireMove(
   changed: Set<string>,
   context: ValidationContext,
   operationId: Id<"operation">,
+  flipFaces: Set<string> | false = false,
 ) {
   if (!canArrangeWireMove(before, after) || !changed.size)
-    return finish(before, after, changed, context);
+    return finish(before, after, changed, context, [], flipFaces);
   const arranged = prepareWireMoveArrangement(
     before,
     after,
@@ -354,7 +371,7 @@ function finishWireMove(
   const joined = applyDelta(before, arranged.forward, context);
   for (const v of Object.keys(joined.vertices))
     if (!before.vertices[v]) changed.add(v);
-  return finish(before, joined, changed, context, arranged.lineage);
+  return finish(before, joined, changed, context, arranged.lineage, flipFaces);
 }
 
 export function prepareVertexMove(
@@ -362,6 +379,7 @@ export function prepareVertexMove(
   positions: { vertexId: Id<"vertex">; position: Vec3 }[],
   context: ValidationContext,
   operationId: Id<"operation"> = id("direct-vertex-move"),
+  flipFaces: Set<string> | false = false,
 ) {
   validateGeometry(model, context);
 
@@ -393,11 +411,26 @@ export function prepareVertexMove(
     after.vertices[m.vertexId].position = [...m.position];
   }
 
-  if (canArrangeWireMove(model, after))
-    return finishWireMove(model, after, changed, context, operationId);
-  const lineage = foldMovedFaces(model, after, changed, context, operationId);
+  if (
+    !(flipFaces instanceof Set && flipFaces.size) &&
+    canArrangeWireMove(model, after)
+  )
+    return finishWireMove(
+      model,
+      after,
+      changed,
+      context,
+      operationId,
+      flipFaces,
+    );
+  // A full-face reflection is an orientation-reversing affine map, not a
+  // crease. Mirror has already rejected partial face selections, so preserve
+  // each planar face and let the reframe path update its orientation.
+  const lineage = flipFaces
+    ? []
+    : foldMovedFaces(model, after, changed, context, operationId);
   if (!lineage.length) {
-    reframeMovedFaces(model, after, changed);
+    reframeMovedFaces(model, after, changed, flipFaces);
     const solidJoin = prepareSolidWallJoin(
       model,
       after,
@@ -409,7 +442,14 @@ export function prepareVertexMove(
       const joined = applyDelta(model, solidJoin.forward, context);
       for (const v of Object.keys(joined.vertices))
         if (!model.vertices[v]) changed.add(v);
-      return finish(model, joined, changed, context, solidJoin.lineage);
+      return finish(
+        model,
+        joined,
+        changed,
+        context,
+        solidJoin.lineage,
+        flipFaces,
+      );
     }
     if (canArrangeSurfaceMove(model, after, changed, context)) {
       const arranged = prepareSurfaceMoveArrangement(
@@ -421,10 +461,17 @@ export function prepareVertexMove(
       const joined = applyDelta(model, arranged.forward, context);
       for (const v of Object.keys(joined.vertices))
         if (!model.vertices[v]) changed.add(v);
-      return finish(model, joined, changed, context, arranged.lineage);
+      return finish(
+        model,
+        joined,
+        changed,
+        context,
+        arranged.lineage,
+        flipFaces,
+      );
     }
   }
-  return finish(model, after, changed, context, lineage);
+  return finish(model, after, changed, context, lineage, flipFaces);
 }
 
 export function prepareEntityTranslation(
