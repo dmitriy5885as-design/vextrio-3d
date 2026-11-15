@@ -105,7 +105,9 @@ export function Viewport() {
         wanted =
           preview.document &&
           preview.owner === state.tool &&
-          ["extrude", "offset", "translate", "rotate"].includes(state.tool) &&
+          ["extrude", "offset", "translate", "rotate", "scale"].includes(
+            state.tool,
+          ) &&
           preview.revision === state.revision
             ? preview.document
             : null;

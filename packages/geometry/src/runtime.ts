@@ -29,6 +29,7 @@ import {
 } from "./move";
 import { prepareFaceOffset } from "./offset";
 import { prepareVertexRotation } from "./rotate";
+import { prepareVertexScale } from "./scale";
 export type GeometryIntent =
   | {
       kind: "translate-entities";
@@ -42,6 +43,12 @@ export type GeometryIntent =
       origin: Vec3;
       axis: Vec3;
       angle: number;
+    }
+  | {
+      kind: "scale-vertices";
+      vertexIds: string[];
+      origin: Vec3;
+      factors: Vec3;
     }
   | { kind: "offset-face"; faceId: string; distance: number }
   | { kind: "extrude-face"; faceId: string; distance: number; side: 1 | -1 }
@@ -174,6 +181,18 @@ export function createLocalGeometryBackend(
             intent.origin,
             intent.axis,
             intent.angle,
+            { ...context, policy: request.policy },
+          );
+          return entityTables.every((t) => change.forward[t].length === 0)
+            ? { ...reply, status: "noop" }
+            : { ...reply, status: "proposed", change };
+        }
+        if (intent.kind === "scale-vertices") {
+          const change = prepareVertexScale(
+            model,
+            intent.vertexIds,
+            intent.origin,
+            intent.factors,
             { ...context, policy: request.policy },
           );
           return entityTables.every((t) => change.forward[t].length === 0)
