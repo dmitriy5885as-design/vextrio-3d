@@ -150,6 +150,7 @@ interface EditorState {
     ref: EntityRef,
     intent: GeometryIntent,
     acceptContext?: () => boolean,
+    label?: string,
   ) => Promise<CommandResult>;
   tool: ToolName;
   revision: number;
@@ -795,7 +796,7 @@ export const useEditor = create<EditorState>((set, get) => {
         reject(error);
       }
     },
-    editGeometry: (ref, intent, acceptContext) =>
+    editGeometry: (ref, intent, acceptContext, label = "Изменение геометрии") =>
       trackGeometryCommit<CommandResult>(async () => {
         if (transactionInProgress)
           return reject(Error("Вложенная команда запрещена."));
@@ -837,11 +838,7 @@ export const useEditor = create<EditorState>((set, get) => {
                 : "Операция отменена.",
             );
           const project = history.run(
-            new GeometryDocumentCommand(
-              "Изменение геометрии",
-              ref,
-              result.change,
-            ),
+            new GeometryDocumentCommand(label, ref, result.change),
             get().project,
           );
           set({

@@ -28,12 +28,20 @@ import {
   type MoveEntity,
 } from "./move";
 import { prepareFaceOffset } from "./offset";
+import { prepareVertexRotation } from "./rotate";
 export type GeometryIntent =
   | {
       kind: "translate-entities";
       entities: MoveEntity[];
       delta: Vec3;
       copy: boolean;
+    }
+  | {
+      kind: "rotate-vertices";
+      vertexIds: string[];
+      origin: Vec3;
+      axis: Vec3;
+      angle: number;
     }
   | { kind: "offset-face"; faceId: string; distance: number }
   | { kind: "extrude-face"; faceId: string; distance: number; side: 1 | -1 }
@@ -154,6 +162,20 @@ export function createLocalGeometryBackend(
                   { ...context, policy: request.policy },
                   reply.operationId,
                 );
+          return entityTables.every((t) => change.forward[t].length === 0)
+            ? { ...reply, status: "noop" }
+            : { ...reply, status: "proposed", change };
+        }
+
+        if (intent.kind === "rotate-vertices") {
+          const change = prepareVertexRotation(
+            model,
+            intent.vertexIds,
+            intent.origin,
+            intent.axis,
+            intent.angle,
+            { ...context, policy: request.policy },
+          );
           return entityTables.every((t) => change.forward[t].length === 0)
             ? { ...reply, status: "noop" }
             : { ...reply, status: "proposed", change };

@@ -1,3 +1,4 @@
+import { RotatePanel } from "./RotatePanel";
 import { MeasurementPanel } from "./MeasurementPanel";
 import { WorkspaceDialog } from "./workspace/WorkspaceDialog";
 import { ModelStats } from "./workspace/ModelStats";
@@ -1073,6 +1074,8 @@ export function App() {
                 <SketchPanel />
               ) : s.tool === "translate" ? (
                 <MovePanel />
+              ) : s.tool === "rotate" ? (
+                <RotatePanel />
               ) : s.tool === "offset" ? (
                 <OffsetPanel />
               ) : s.tool === "extrude" ? (
